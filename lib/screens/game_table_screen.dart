@@ -78,6 +78,25 @@ class GameTableScreen extends ConsumerWidget {
   Widget _buildTable(BuildContext context, WidgetRef ref, Room room, List<Player> players) {
     final size = MediaQuery.of(context).size;
     final tableSize = size.shortestSide * 0.7;
+    final localId = ref.watch(localPlayerIdProvider);
+
+    // Rotate players list so local player is always at index 0 (Bottom)
+    final rotatedPlayers = [...players];
+    if (localId != null) {
+      final localIdx = rotatedPlayers.indexWhere((p) => p.id == localId);
+      if (localIdx != -1) {
+        for (int i = 0; i < localIdx; i++) {
+          rotatedPlayers.add(rotatedPlayers.removeAt(0));
+        }
+      }
+    }
+
+    final localHand = localId != null ? ref.watch(playerHandProvider(localId)).value : null;
+    final isHandDealt = localHand != null && (
+      (room.currentPhase == 'bidding' && localHand.length >= 5) ||
+      (room.currentPhase == 'bidding_2' && localHand.length >= 13) ||
+      (room.currentPhase == 'playing')
+    );
 
     return Stack(
       alignment: Alignment.center,
@@ -125,12 +144,16 @@ class GameTableScreen extends ConsumerWidget {
                ),
                // CURRENT TRICK CARDS
                _buildTableCenter(ref, room.id, players),
+
+               // DECK VISUAL (for cut phase)
+               if (room.currentPhase == 'deck_cut')
+                 _buildDeckVisual(room.deckCutValue),
             ],
           ),
         ),
 
         // Player Labels and Hands
-        ...players.asMap().entries.map((entry) {
+        ...rotatedPlayers.asMap().entries.map((entry) {
           final index = entry.key;
           final player = entry.value;
           
@@ -146,11 +169,13 @@ class GameTableScreen extends ConsumerWidget {
             right = 40; top = 0; bottom = 0;
           }
 
-          final isTurn = room.turnIndex == index;
+          // Important: use original players list for turn checking
+          final originalIdx = players.indexOf(player);
+          final isTurn = room.turnIndex == originalIdx;
 
           return Positioned(
             top: top, left: left, right: right, bottom: bottom,
-            child: _buildPlayerArea(ref, room, player, index == 0, isTurn),
+            child: _buildPlayerArea(ref, room, player, player.id == localId, isTurn),
           );
         }).toList(),
 
@@ -166,7 +191,7 @@ class GameTableScreen extends ConsumerWidget {
           ),
         
         // Bidding Overlay
-        if ((room.currentPhase == 'bidding' || room.currentPhase == 'bidding_2') && ref.watch(isLocalPlayerTurnProvider(room.code)))
+        if (isHandDealt && (room.currentPhase == 'bidding' || room.currentPhase == 'bidding_2') && ref.watch(isLocalPlayerTurnProvider(room.code)))
           Align(
             alignment: Alignment.bottomCenter,
             child: BiddingOverlay(
