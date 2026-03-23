@@ -152,6 +152,17 @@ class GameTableScreen extends ConsumerWidget {
           ),
         ),
 
+        // Scoreboard Button
+        Positioned(
+          top: 60,
+          right: 20,
+          child: IconButton(
+            icon: const Icon(Icons.leaderboard, color: Colors.amber, size: 30),
+            onPressed: () => _showScoreboard(context, ref, room.id, players),
+            tooltip: 'Match History',
+          ),
+        ),
+
         // Player Labels and Hands
         ...rotatedPlayers.asMap().entries.map((entry) {
           final index = entry.key;
@@ -341,9 +352,11 @@ class GameTableScreen extends ConsumerWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             if (player.bid != null)
-              Text('BID: ${player.bid}', style: const TextStyle(color: Colors.amber, fontSize: 10)),
+              Text('BID: ${player.bid}', style: const TextStyle(color: Colors.amber, fontSize: 10, fontWeight: FontWeight.bold)),
             const SizedBox(width: 8),
             Text('WON: ${player.tricksWon}', style: const TextStyle(color: Colors.greenAccent, fontSize: 10)),
+            const SizedBox(width: 8),
+            Text('TOT: ${player.totalScore}', style: const TextStyle(color: Colors.white70, fontSize: 10)),
           ],
         ),
         const SizedBox(height: 8),
@@ -485,6 +498,67 @@ class GameTableScreen extends ConsumerWidget {
           ),
         );
       }),
+    );
+  }
+
+  void _showScoreboard(BuildContext context, WidgetRef ref, String roomId, List<Player> players) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1E1E1E),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (context) {
+        return StreamBuilder<List<Map<String, dynamic>>>(
+          stream: Supabase.instance.client
+              .from('round_results')
+              .stream(primaryKey: ['id'])
+              .eq('room_id', roomId)
+              .order('round_number', ascending: true),
+          builder: (context, snapshot) {
+            if (snapshot.hasError) return Center(child: Text('Error: ${snapshot.error}'));
+            if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+
+            final results = snapshot.data!;
+            final roundNumbers = results.map((r) => r['round_number'] as int).toSet().toList()..sort();
+
+            return Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                children: [
+                   const Text('MATCH HISTORY', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.amber)),
+                   const SizedBox(height: 16),
+                   Expanded(
+                     child: SingleChildScrollView(
+                       scrollDirection: Axis.horizontal,
+                       child: DataTable(
+                         columnSpacing: 20,
+                         columns: [
+                           const DataColumn(label: Text('Rd', style: TextStyle(color: Colors.white70))),
+                           ...players.map((p) => DataColumn(label: Text(p.name, style: const TextStyle(color: Colors.white70)))),
+                         ],
+                         rows: roundNumbers.map((rd) {
+                           return DataRow(
+                             cells: [
+                               DataCell(Text('$rd', style: const TextStyle(color: Colors.white38))),
+                               ...players.map((p) {
+                                  final res = results.firstWhere(
+                                    (r) => r['round_number'] == rd && r['player_id'] == p.id,
+                                    orElse: () => {'bid': '-', 'tricks_won': '-'},
+                                  );
+                                  return DataCell(Text('${res['bid']} (${res['tricks_won']})', 
+                                    style: TextStyle(color: (res['tricks_won'] is int && res['bid'] is int && res['tricks_won'] >= res['bid']) ? Colors.green : Colors.redAccent)));
+                               }),
+                             ],
+                           );
+                         }).toList(),
+                       ),
+                     ),
+                   ),
+                ],
+              ),
+            );
+          },
+        );
+      },
     );
   }
 

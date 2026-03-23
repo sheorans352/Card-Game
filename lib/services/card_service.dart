@@ -261,6 +261,10 @@ class CardService {
     final playersData = await _supabase.from('players').select('*').eq('room_id', roomId);
     final players = playersData as List;
 
+    // Get current round number
+    final existingResults = await _supabase.from('round_results').select('round_number').eq('room_id', roomId).order('round_number', ascending: false).limit(1).maybeSingle();
+    final roundNumber = (existingResults?['round_number'] ?? 0) + 1;
+
     for (var p in players) {
       final bid = p['bid'] as int? ?? 0;
       final tricks = p['tricks_won'] as int? ?? 0;
@@ -268,6 +272,16 @@ class CardService {
 
       final roundScore = (tricks >= bid) ? bid : -bid;
       final newTotal = currentTotal + roundScore;
+
+      // Record result in history
+      await _supabase.from('round_results').insert({
+        'room_id': roomId,
+        'round_number': roundNumber,
+        'player_id': p['id'],
+        'bid': bid,
+        'tricks_won': tricks,
+        'score_change': roundScore,
+      });
 
       await _supabase.from('players').update({
         'total_score': newTotal,
