@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/room_provider.dart';
 import '../models/game_models.dart';
+import '../models/card_model.dart';
 import '../widgets/bidding_overlay.dart';
 import '../widgets/deck_cut_overlay.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -209,7 +210,7 @@ class GameTableScreen extends ConsumerWidget {
                 }
 
                 // Update player's bid
-                await supabase.from('players').update({'bid': bid}).eq('id', localId);
+                await supabase.from('players').update({'bid': bid}).eq('id', localId!);
                 
                 if (bid >= 5 && trump != null && room.currentPhase == 'bidding') {
                    // TRUMP LOCK in Phase 1
@@ -400,7 +401,7 @@ class GameTableScreen extends ConsumerWidget {
                 ),
               ],
             )
-          : const Center(child: Icon(Icons.spade, color: Colors.white24, size: 24)),
+          : const Center(child: Text('♠', style: TextStyle(color: Colors.white24, fontSize: 24))),
     );
   }
 
@@ -455,7 +456,7 @@ class GameTableScreen extends ConsumerWidget {
               border: Border.all(color: Colors.white24),
               boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 2)],
             ),
-            child: const Center(child: Icon(Icons.spade, color: Colors.white12, size: 24)),
+            child: const Center(child: Text('♠', style: TextStyle(color: Colors.white12, fontSize: 24))),
           ),
         );
       }),

@@ -4,6 +4,7 @@ import 'package:app_links/app_links.dart';
 import '../services/lobby_service.dart';
 import '../services/card_service.dart';
 import '../models/game_models.dart';
+import '../models/card_model.dart';
 
 final appLinksProvider = Provider((ref) => AppLinks());
 
@@ -64,8 +65,7 @@ final playerHandProvider = StreamProvider.family<List<Map<String, dynamic>>, Str
       .from('player_cards')
       .stream(primaryKey: ['id'])
       .eq('player_id', playerId)
-      .eq('is_played', false)
-      .map((data) => List<Map<String, dynamic>>.from(data));
+      .map((data) => data.where((m) => m['is_played'] == false).toList());
 });
 
 final playedCardsProvider = StreamProvider.family<List<Map<String, dynamic>>, String>((ref, roomId) {
@@ -74,9 +74,8 @@ final playedCardsProvider = StreamProvider.family<List<Map<String, dynamic>>, St
       .from('player_cards')
       .stream(primaryKey: ['id'])
       .eq('room_id', roomId)
-      .eq('is_played', true)
       .order('played_at', ascending: true)
-      .map((data) => List<Map<String, dynamic>>.from(data));
+      .map((data) => data.where((m) => m['is_played'] == true).toList());
 });
 
 final playableCardsProvider = Provider.family<Set<String>, String>((ref, roomId) {
@@ -103,7 +102,7 @@ final playableCardsProvider = Provider.family<Set<String>, String>((ref, roomId)
             data: (handMaps) {
               final hand = handMaps.map((m) => CardModel.fromId(m['card_value'] as String)).toList();
               if (hand.isEmpty) return <String>{};
-              if (trickSize == 0) return hand.map((c) => c.id).toSet();
+              if (trickSize == 0) return hand.map((c) => c.id).toSet().cast<String>();
 
               final leadCard = CardModel.fromId(trick[0]['card_value'] as String);
               final leadSuit = leadCard.suit;
@@ -129,10 +128,10 @@ final playableCardsProvider = Provider.family<Set<String>, String>((ref, roomId)
                 if (bestOnTable.suit == leadSuit) {
                   final higherLead = handLeadSuit.where((c) => c.rank > bestOnTable.rank).toList();
                   if (higherLead.isNotEmpty) {
-                    return higherLead.map((c) => c.id).toSet();
+                    return higherLead.map((c) => c.id).toSet().cast<String>();
                   }
                 }
-                return handLeadSuit.map((c) => c.id).toSet();
+                return handLeadSuit.map((c) => c.id).toSet().cast<String>();
               }
 
               // Rule 2: If OUT of lead suit, player can play ANY SUIT.
@@ -148,7 +147,7 @@ final playableCardsProvider = Provider.family<Set<String>, String>((ref, roomId)
 
               final higherSpades = spadsInHand.where((c) => c.rank > maxSpadeOnTable).toList();
               
-              final Set<String> validIds = otherSuits.map((c) => c.id).toSet();
+              final Set<String> validIds = otherSuits.map((c) => c.id).toSet().cast<String>();
               if (higherSpades.isNotEmpty) {
                 validIds.addAll(higherSpades.map((c) => c.id));
               } else {

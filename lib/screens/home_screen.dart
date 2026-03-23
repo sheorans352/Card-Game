@@ -59,8 +59,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   const SizedBox(height: 16),
                   ElevatedButton(
                     onPressed: () async {
-                      if (_nameController.text.isEmpty) return;
-                      final result = await ref.read(lobbyServiceProvider).createRoom(_nameController.text);
+                      final name = _nameController.text.trim();
+                      if (name.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Please enter your name')),
+                        );
+                        return;
+                      }
+                      final result = await ref.read(lobbyServiceProvider).createRoom(name);
                       ref.read(currentRoomCodeProvider.notifier).state = result['roomCode'];
                       ref.read(localPlayerIdProvider.notifier).state = result['playerId'];
                       if (context.mounted) {
@@ -87,10 +93,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   const SizedBox(height: 16),
                   OutlinedButton(
                     onPressed: () async {
-                      if (_nameController.text.isEmpty || _codeController.text.isEmpty) return;
-                      final result = await ref.read(lobbyServiceProvider).joinRoom(_codeController.text, _nameController.text);
+                      final name = _nameController.text.trim();
+                      final code = _codeController.text.trim();
+                      if (name.isEmpty || code.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Name and Room Code are required')),
+                        );
+                        return;
+                      }
+                      final result = await ref.read(lobbyServiceProvider).joinRoom(code, name);
                       if (result != null) {
-                        ref.read(currentRoomCodeProvider.notifier).state = _codeController.text;
+                        ref.read(currentRoomCodeProvider.notifier).state = code;
                         ref.read(localPlayerIdProvider.notifier).state = result['playerId'];
                         if (context.mounted) {
                           Navigator.of(context).push(
@@ -100,7 +113,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       } else {
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Invalid Room Code')),
+                            const SnackBar(content: Text('Invalid Room Code or Room Full')),
                           );
                         }
                       }

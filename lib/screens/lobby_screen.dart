@@ -135,9 +135,8 @@ class LobbyScreen extends ConsumerWidget {
                       const SizedBox(height: 32),
                       playersAsync.when(
                         data: (players) {
-                          // Mock local player check: assume 'Guest' isn't the local player if others exist
-                          final localPlayer = players.firstWhere((p) => p.isHost, orElse: () => players.first);
-                          final isHost = localPlayer.isHost;
+                          final localPlayerId = ref.watch(localPlayerIdProvider);
+                          final isHost = players.any((p) => p.id == localPlayerId && p.isHost);
                           
                           return ElevatedButton(
                             onPressed: isHost ? () async {
