@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/room_provider.dart';
 import '../models/game_models.dart';
 import '../widgets/bidding_overlay.dart';
+import '../widgets/deck_cut_overlay.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'home_screen.dart';
 
@@ -26,6 +27,20 @@ class GameTableScreen extends ConsumerWidget {
         
         if (isHost) {
           ref.read(cardServiceProvider).dealRemainingEight(
+            room.id, 
+            players.map((p) => p.id).toList()
+          );
+        }
+      }
+
+      // Handle transition from Deck Cut to Dealing 1
+      if (room != null && room.currentPhase == 'dealing_1') {
+        final players = ref.read(playersStreamProvider(room.id)).value ?? [];
+        final localId = ref.read(localPlayerIdProvider);
+        final isHost = players.any((p) => p.id == localId && p.isHost);
+        
+        if (isHost) {
+          ref.read(cardServiceProvider).dealInitialFive(
             room.id, 
             players.map((p) => p.id).toList()
           );
@@ -138,6 +153,17 @@ class GameTableScreen extends ConsumerWidget {
           );
         }).toList(),
 
+        // Deck Cut Overlay
+        if (room.currentPhase == 'deck_cut' && ref.watch(isCutterProvider(room.code)))
+          Align(
+            alignment: Alignment.center,
+            child: DeckCutOverlay(
+              onCutConfirmed: (cutPoint) async {
+                await ref.read(cardServiceProvider).cutDeck(room.id, cutPoint);
+              },
+            ),
+          ),
+        
         // Bidding Overlay
         if ((room.currentPhase == 'bidding' || room.currentPhase == 'bidding_2') && ref.watch(isLocalPlayerTurnProvider(room.code)))
           Align(
@@ -308,32 +334,29 @@ class GameTableScreen extends ConsumerWidget {
   }
 
   Widget _buildHand(WidgetRef ref, Room room, Player player, List<Map<String, dynamic>> cards, bool isLocalPlayer, bool isTurn) {
+    final playableCards = ref.watch(playableCardsProvider(room.id));
+
     return Stack(
       clipBehavior: Clip.none,
       children: cards.asMap().entries.map((entry) {
         final i = entry.key;
         final card = entry.value;
         final cardValue = card['card_value'];
+        final isPlayable = !isLocalPlayer || !isTurn || playableCards.isEmpty || playableCards.contains(cardValue);
         
         return Positioned(
           left: i * 20.0,
           child: GestureDetector(
-            onTap: (isLocalPlayer && isTurn && room.currentPhase == 'playing') 
+            onTap: (isLocalPlayer && isTurn && room.currentPhase == 'playing' && isPlayable) 
               ? () async {
                   final service = ref.read(cardServiceProvider);
-                  final isValid = await service.validateMove(room.id, player.id, cardValue);
-                  if (isValid) {
-                    await service.playCard(room.id, player.id, cardValue);
-                  } else {
-                    if (ref.context.mounted) {
-                      ScaffoldMessenger.of(ref.context).showSnackBar(
-                        const SnackBar(content: Text('Must follow suit!')),
-                      );
-                    }
-                  }
+                  await service.playCard(room.id, player.id, cardValue);
                 }
               : null,
-            child: _buildCard(cardValue, isLocalPlayer),
+            child: Opacity(
+              opacity: isPlayable ? 1.0 : 0.4,
+              child: _buildCard(cardValue, isLocalPlayer),
+            ),
           ),
         );
       }).toList(),
@@ -413,6 +436,29 @@ class GameTableScreen extends ConsumerWidget {
       },
       loading: () => const SizedBox(),
       error: (e, s) => const SizedBox(),
+    );
+  }
+
+  Widget _buildDeckVisual(int? cutValue) {
+    // Simple representation of a deck of cards
+    return Stack(
+      alignment: Alignment.center,
+      children: List.generate(10, (index) {
+        return Transform.translate(
+          offset: Offset(index * 0.5, -index * 0.5),
+          child: Container(
+            width: 50,
+            height: 75,
+            decoration: BoxDecoration(
+              color: Colors.blueGrey.shade800,
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: Colors.white24),
+              boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 2)],
+            ),
+            child: const Center(child: Icon(Icons.spade, color: Colors.white12, size: 24)),
+          ),
+        );
+      }),
     );
   }
 

@@ -151,7 +151,7 @@ class LobbyScreen extends ConsumerWidget {
                                   return;
                               }
 
-                              await ref.read(cardServiceProvider).dealInitialFive(roomData.id, playerIds);
+                              await ref.read(cardServiceProvider).shuffleDeck(roomData.id);
                             } : null,
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.green,

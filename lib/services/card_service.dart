@@ -27,36 +27,59 @@ class CardService {
     return deck..shuffle();
   }
 
-  Future<void> dealInitialFive(String roomId, List<String> playerIds) async {
+  Future<void> shuffleDeck(String roomId) async {
     final deck = generateDeck();
+    final deckIds = deck.map((c) => c.id).toList();
+
+    await _supabase.from('rooms').update({
+      'shuffled_deck': deckIds,
+      'current_phase': 'deck_cut',
+    }).eq('id', roomId);
+  }
+
+  Future<void> cutDeck(String roomId, int cutPoint) async {
+    final roomData = await _supabase.from('rooms').select('shuffled_deck, dealer_index').eq('id', roomId).single();
+    final List<dynamic> originalDeck = roomData['shuffled_deck'];
     
-    // Choose a random dealer if not already set (simplified for now)
-    final dealerIndex = 0; // Host or first player for now
+    // Logic: If selected X, cards 1 to X move to bottom.
+    // Index X in 1-based becomes cutPoint. 
+    // New deck = originalDeck.sublist(cutPoint) + originalDeck.sublist(0, cutPoint);
+    final cutDeck = [...originalDeck.sublist(cutPoint), ...originalDeck.sublist(0, cutPoint)];
+
+    await _supabase.from('rooms').update({
+      'shuffled_deck': cutDeck,
+      'deck_cut_value': cutPoint,
+      'current_phase': 'dealing_1', // Move to dealing after cut
+    }).eq('id', roomId);
+  }
+
+  Future<void> dealInitialFive(String roomId, List<String> playerIds) async {
+    final roomData = await _supabase.from('rooms').select('shuffled_deck, dealer_index').eq('id', roomId).single();
+    final List<dynamic> deckIds = roomData['shuffled_deck'];
+    final List<String> deck = List<String>.from(deckIds);
+    
+    final dealerIndex = roomData['dealer_index'] ?? 0;
     final turnIndex = (dealerIndex + 1) % playerIds.length;
 
-    // Update room phase and indices
     await _supabase.from('rooms').update({
-      'current_phase': 'dealing_1',
-      'dealer_index': dealerIndex,
       'turn_index': turnIndex,
     }).eq('id', roomId);
 
-    // Deal 5 cards to each player
+    // Deal 5 cards to each player from the top of the cut deck
+    int cardIndex = 0;
     for (int i = 0; i < 5; i++) {
       for (final playerId in playerIds) {
-        final card = deck.removeLast();
+        final cardId = deck[cardIndex++];
         await _supabase.from('player_cards').insert({
           'room_id': roomId,
           'player_id': playerId,
-          'card_value': card.id,
+          'card_value': cardId,
           'is_revealed': false,
         });
-        // Slight delay for animation "feeling"
         await Future.delayed(const Duration(milliseconds: 200));
       }
     }
 
-    // Move to bidding phase
     await _supabase.from('rooms').update({'current_phase': 'bidding'}).eq('id', roomId);
   }
 
@@ -64,20 +87,24 @@ class CardService {
     final fullDeck = generateDeck();
     
     // Get already dealt cards
-    final dealtData = await _supabase.from('player_cards').select('card_value').eq('room_id', roomId);
-    final dealtValues = (dealtData as List).map((d) => d['card_value'] as String).toSet();
+  Future<void> dealRemainingEight(String roomId, List<String> playerIds) async {
+    final roomData = await _supabase.from('rooms').select('shuffled_deck').eq('id', roomId).single();
+    final List<dynamic> deckIds = roomData['shuffled_deck'];
+    final List<String> fullDeck = List<String>.from(deckIds);
+    
+    // Cards 1-20 are already dealt (5 * 4 players)
+    final remainingDeck = fullDeck.sublist(20);
 
-    final remainingDeck = fullDeck.where((c) => !dealtValues.contains(c.id)).toList();
-
+    int cardIndex = 0;
     // Phase 2: Deal 4 cards
     for (int i = 0; i < 4; i++) {
       for (final playerId in playerIds) {
-        if (remainingDeck.isEmpty) break;
-        final card = remainingDeck.removeLast();
+        if (cardIndex >= remainingDeck.length) break;
+        final cardId = remainingDeck[cardIndex++];
         await _supabase.from('player_cards').insert({
           'room_id': roomId,
           'player_id': playerId,
-          'card_value': card.id,
+          'card_value': cardId,
           'is_revealed': false,
         });
         await Future.delayed(const Duration(milliseconds: 200));
@@ -87,17 +114,18 @@ class CardService {
     // Phase 3: Deal 4 cards
     for (int i = 0; i < 4; i++) {
       for (final playerId in playerIds) {
-        if (remainingDeck.isEmpty) break;
-        final card = remainingDeck.removeLast();
+        if (cardIndex >= remainingDeck.length) break;
+        final cardId = remainingDeck[cardIndex++];
         await _supabase.from('player_cards').insert({
           'room_id': roomId,
           'player_id': playerId,
-          'card_value': card.id,
+          'card_value': cardId,
           'is_revealed': false,
         });
         await Future.delayed(const Duration(milliseconds: 200));
       }
     }
+  }
 
   Future<void> playCard(String roomId, String playerId, String cardValue) async {
     // 1. Mark card as played
@@ -107,20 +135,24 @@ class CardService {
     }).match({'player_id': playerId, 'card_value': cardValue});
 
     // 2. Check if the trick is complete (4 cards)
-    final playedCards = await _supabase
+    final playedCardsData = await _supabase
         .from('player_cards')
-        .select('*, players(name)')
+        .select('id, played_at')
+        .eq('room_id', roomId)
+        .eq('is_played', true);
+    
+    final allPlayed = (playedCardsData as List);
+    
+    if (allPlayed.length % 4 == 0 && allPlayed.isNotEmpty) {
+      final lastFourData = await _supabase
+        .from('player_cards')
+        .select('*')
         .eq('room_id', roomId)
         .eq('is_played', true)
         .order('played_at', ascending: true);
-
-    // Filter for the current trick (last N cards where N % 4 != 0 is previous tricks)
-    // Simplified: Just get cards played after the last 'tricks_won' update? 
-    // Better: Get cards where is_played is true and they aren't part of a finished trick.
-    // Let's use a simpler approach: if playedCards.length is a multiple of 4, a trick just finished.
-    if (playedCards.length % 4 == 0 && playedCards.isNotEmpty) {
-      final currentTrick = (playedCards as List).sublist(playedCards.length - 4);
-      await _evaluateTrick(roomId, currentTrick);
+      
+      final currentTrick = (lastFourData as List).sublist(lastFourData.length - 4);
+      await _evaluateTrick(roomId, currentTrick, allPlayed.length);
     } else {
       // Just move turn to next player
       final roomData = await _supabase.from('rooms').select('turn_index').eq('id', roomId).single();
@@ -145,55 +177,90 @@ class CardService {
     final playedList = playedCards as List;
     final currentTrickSize = playedList.length % 4;
 
-    if (currentTrickSize == 0) return true; // Leading a trick is always valid
+    if (currentTrickSize == 0) return true; // Leading is always valid
 
-    // 2. Identify lead suit
-    final leadCard = CardModel.fromId(playedList[playedList.length - currentTrickSize]['card_value']);
-    final leadSuit = leadCard.suit;
-
-    if (card.suit == leadSuit) return true; // Following suit is always valid
-
-    // 3. If NOT following suit, check if player HAS the lead suit
-    final playerHand = await _supabase.from('player_cards').select('card_value').eq('player_id', playerId).eq('is_played', false);
-    for (var c in playerHand as List) {
-      if (CardModel.fromId(c['card_value']).suit == leadSuit) {
-        return false; // Must follow suit if possible
-      }
-    }
-
-    return true; // Sluffing is valid if no lead suit in hand
-  }
-
-  Future<void> _evaluateTrick(String roomId, List<dynamic> trickCards) async {
+    // 2. Get Room Info (Trump)
     final roomData = await _supabase.from('rooms').select('trump_suit').eq('id', roomId).single();
     final trumpSuitCode = roomData['trump_suit'];
 
-    // Lead card is the first one in the trickCards list (ordered by played_at)
+    // 3. Identify current trick context
+    final trickCards = playedList.sublist(playedList.length - currentTrickSize);
     final leadCard = CardModel.fromId(trickCards[0]['card_value']);
     final leadSuit = leadCard.suit;
 
-    String winnerPlayerId = trickCards[0]['player_id'];
+    // 4. Get Player's available cards
+    final handData = await _supabase.from('player_cards').select('card_value').eq('player_id', playerId).eq('is_played', false);
+    final hand = (handData as List).map((c) => CardModel.fromId(c['card_value'])).toList();
+
+    final hasLeadSuit = hand.any((c) => c.suit == leadSuit);
+
+    // Rule 1: MUST follow suit if possible
+    if (hasLeadSuit) {
+      if (card.suit != leadSuit) return false;
+
+      // NEW: RULE 'Must Play Higher' for lead suit
+      final bestOnTable = _getBestCardInTrick(trickCards, trumpSuitCode);
+      
+      // If best card on table is also lead suit, and we have a higher one, we MUST play it.
+      if (bestOnTable.suit == leadSuit) {
+        final handHigherLead = hand.where((c) => c.suit == leadSuit && c.rank > bestOnTable.rank).toList();
+        if (handHigherLead.isNotEmpty) {
+           return card.rank > bestOnTable.rank;
+        }
+      }
+      return true; // If we can't beat it, any card of lead suit is fine
+    }
+
+    // Rule 2: If OUT of lead suit, the player CAN play any card.
+    // However, the 'Must Play Higher' rule still applies IF they choose to play a Spade.
+    if (!hasLeadSuit && card.suit.code == 'S') {
+      int maxSpadeOnTable = 0;
+      for (var tc in trickCards) {
+        final c = CardModel.fromId(tc['card_value']);
+        if (c.suit.code == 'S' && c.rank > maxSpadeOnTable) maxSpadeOnTable = c.rank;
+      }
+
+      final handHigherSpade = hand.where((c) => c.suit.code == 'S' && c.rank > maxSpadeOnTable).toList();
+      if (handHigherSpade.isNotEmpty) {
+        return card.rank > maxSpadeOnTable;
+      }
+    }
+
+    return true; // Any card is valid if out of lead suit (unless Ducking with a Spade)
+  }
+
+  CardModel _getBestCardInTrick(List<dynamic> trickCards, String? trumpSuitCode) {
+    final leadCard = CardModel.fromId(trickCards[0]['card_value']);
     CardModel bestCard = leadCard;
 
     for (var i = 1; i < trickCards.length; i++) {
       final currentCard = CardModel.fromId(trickCards[i]['card_value']);
-      final currentPlayerId = trickCards[i]['player_id'];
-
       bool isBetter = false;
 
-      // Rule: Trump beats everything
       if (currentCard.suit.code == trumpSuitCode && bestCard.suit.code != trumpSuitCode) {
         isBetter = true;
-      } 
-      // Rule: Higher rank of same suit (trump or lead)
-      else if (currentCard.suit == bestCard.suit && currentCard.rank > bestCard.rank) {
+      } else if (currentCard.suit == bestCard.suit && currentCard.rank > bestCard.rank) {
         isBetter = true;
       }
 
-      if (isBetter) {
-        bestCard = currentCard;
-        winnerPlayerId = currentPlayerId;
-      }
+      if (isBetter) bestCard = currentCard;
+    }
+    return bestCard;
+  }
+
+  Future<void> _evaluateTrick(String roomId, List<dynamic> trickCards, int totalTricks) async {
+    final roomData = await _supabase.from('rooms').select('trump_suit').eq('id', roomId).single();
+    final trumpSuitCode = roomData['trump_suit'];
+
+    final bestCard = _getBestCardInTrick(trickCards, trumpSuitCode);
+    
+    // Find who played the best card
+    String winnerPlayerId = '';
+    for (var tc in trickCards) {
+       if (tc['card_value'] == bestCard.id) {
+         winnerPlayerId = tc['player_id'];
+         break;
+       }
     }
 
     // Update winner's tricks_won

@@ -7,6 +7,8 @@ class Room {
   final int dealerIndex;
   final int turnIndex;
   final String? currentPhase;
+  final List<String> shuffledDeck;
+  final int? deckCutValue;
 
   Room({
     required this.id,
@@ -17,6 +19,8 @@ class Room {
     this.dealerIndex = 0,
     this.turnIndex = 0,
     this.currentPhase,
+    this.shuffledDeck = const [],
+    this.deckCutValue,
   });
 
   factory Room.fromMap(Map<String, dynamic> map) {
@@ -29,6 +33,8 @@ class Room {
       dealerIndex: map['dealer_index'] ?? 0,
       turnIndex: map['turn_index'] ?? 0,
       currentPhase: map['current_phase'],
+      shuffledDeck: List<String>.from(map['shuffled_deck'] ?? []),
+      deckCutValue: map['deck_cut_value'],
     );
   }
 }
