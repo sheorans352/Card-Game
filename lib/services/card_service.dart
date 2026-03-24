@@ -161,7 +161,10 @@ class SupabaseCardService extends CardService {
         'card_value': cardValue,
     });
 
-    final room = await _supabase.from('rooms').select().eq('id', roomId).single();
+    final roomResponse = await _supabase.from('rooms').select().eq('id', roomId);
+    if (roomResponse.isEmpty) return;
+    final room = roomResponse.first;
+
     await _supabase.from('rooms').update({
         'turn_index': (room['turn_index'] + 1) % 4,
     }).eq('id', roomId);
