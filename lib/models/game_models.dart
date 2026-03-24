@@ -132,7 +132,7 @@ class Player {
     };
   }
 
-  static fromJson(dynamic json) => Player.fromMap(json as Map<String, dynamic>);
+  factory Player.fromJson(Map<String, dynamic> json) => Player.fromMap(json);
   Map<String, dynamic> toJson() => toMap();
 
   Player copyWith({

@@ -62,7 +62,7 @@ final roomMetadataProvider = StreamProvider.family<Room?, String>((ref, code) {
         .from('rooms')
         .stream(primaryKey: ['id'])
         .eq('code', code)
-        .map((data) => data.isEmpty ? null : Room.fromJson(data.first));
+        .map<Room?>((data) => data.isEmpty ? null : Room.fromJson(Map<String, dynamic>.from(data.first)));
   }
 });
 
