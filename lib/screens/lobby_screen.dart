@@ -59,44 +59,41 @@ class LobbyScreen extends ConsumerWidget {
                         ),
                         const SizedBox(height: 16),
                         FittedBox(
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const SizedBox(width: 48),
-                              Text(
-                                code,
-                                style: const TextStyle(
-                                  fontSize: 64,
-                                  fontWeight: FontWeight.bold,
-                                  letterSpacing: 12,
-                                  color: Colors.white,
-                                ),
-                              ),
-                              Row(
-                                children: [
-                                  IconButton(
-                                    icon: const Icon(Icons.copy, color: Colors.white70),
-                                    onPressed: () {
-                                      final url = '${Uri.base.origin}/?code=$code';
-                                      Clipboard.setData(ClipboardData(text: url));
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(content: Text('Link copied to clipboard!')),
-                                      );
-                                    },
-                                    tooltip: 'Copy Invite Link',
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(Icons.share, color: Colors.white70),
-                                    onPressed: () {
-                                      final url = '${Uri.base.origin}/?code=$code';
-                                      Share.share('Join my Minus game room: $url');
-                                    },
-                                    tooltip: 'Share Invite Link',
-                                  ),
-                                ],
-                              ),
-                            ],
+                          child: Text(
+                            code,
+                            style: const TextStyle(
+                              fontSize: 64,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 12,
+                              color: Colors.white,
+                            ),
                           ),
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.copy, color: Colors.white70, size: 20),
+                              onPressed: () {
+                                final url = '${Uri.base.origin}/?code=$code';
+                                Clipboard.setData(ClipboardData(text: url));
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Link copied to clipboard!')),
+                                );
+                              },
+                              tooltip: 'Copy Invite Link',
+                            ),
+                            const SizedBox(width: 8),
+                            IconButton(
+                              icon: const Icon(Icons.share, color: Colors.white70, size: 20),
+                              onPressed: () {
+                                final url = '${Uri.base.origin}/?code=$code';
+                                Share.share('Join my Minus game room: $url');
+                              },
+                              tooltip: 'Share Invite Link',
+                            ),
+                          ],
                         ),
                         const Text('ROOM CODE', style: TextStyle(fontSize: 14, color: Colors.white38)),
                         const SizedBox(height: 32),

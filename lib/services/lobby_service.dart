@@ -28,6 +28,11 @@ class SupabaseLobbyService extends LobbyService {
       'total_score': 0,
     }).select().single();
 
+    // Update room with host_id
+    await _supabase.from('rooms').update({
+      'host_id': playerResponse['id'],
+    }).eq('id', roomResponse['id']);
+
     return {
       'roomCode': roomCode,
       'playerId': playerResponse['id'],
