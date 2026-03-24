@@ -46,7 +46,9 @@ class SupabaseCardService extends CardService {
 
   @override
   Future<void> cutDeck(String roomId, int cutPoint) async {
-    final room = await _supabase.from('rooms').select().eq('id', roomId).single();
+    final roomResponse = await _supabase.from('rooms').select().eq('id', roomId);
+    if (roomResponse.isEmpty) return;
+    final room = roomResponse.first;
     final List<dynamic> deck = room['shuffled_deck'];
     final splitIndex = (deck.length * (cutPoint / 100)).round();
     final newDeck = [...deck.sublist(splitIndex), ...deck.sublist(0, splitIndex)];
@@ -61,7 +63,9 @@ class SupabaseCardService extends CardService {
 
   @override
   Future<void> dealInitialFive(String roomId, List<String> playerIds) async {
-    final room = await _supabase.from('rooms').select().eq('id', roomId).single();
+    final roomResponse = await _supabase.from('rooms').select().eq('id', roomId);
+    if (roomResponse.isEmpty) return;
+    final room = roomResponse.first;
     final List<dynamic> deck = room['shuffled_deck'];
     
     for (int i = 0; i < playerIds.length; i++) {
@@ -78,7 +82,9 @@ class SupabaseCardService extends CardService {
 
   @override
   Future<void> dealRemainingEight(String roomId, List<String> playerIds) async {
-    final room = await _supabase.from('rooms').select().eq('id', roomId).single();
+    final roomResponse = await _supabase.from('rooms').select().eq('id', roomId);
+    if (roomResponse.isEmpty) return;
+    final room = roomResponse.first;
     final List<dynamic> deck = room['shuffled_deck'];
     
     for (int i = 0; i < playerIds.length; i++) {
