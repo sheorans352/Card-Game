@@ -1,3 +1,5 @@
+import 'package:supabase_flutter/supabase_flutter.dart';
+
 abstract class LobbyService {
   Future<Map<String, String>> createRoom(String hostName);
   Future<Map<String, String>?> joinRoom(String code, String playerName);
@@ -5,10 +7,55 @@ abstract class LobbyService {
 }
 
 class SupabaseLobbyService extends LobbyService {
+  final _supabase = Supabase.instance.client;
+
   @override
-  Future<Map<String, String>> createRoom(String hostName) async => throw UnimplementedError();
+  Future<Map<String, String>> createRoom(String hostName) async {
+    final roomCode = (100000 + (DateTime.now().millisecondsSinceEpoch % 900000)).toString();
+    
+    final roomResponse = await _supabase.from('rooms').insert({
+      'code': roomCode,
+      'status': 'waiting',
+      'current_phase': 'lobby',
+      'dealer_index': 0,
+      'turn_index': 0,
+    }).select().single();
+
+    final playerResponse = await _supabase.from('players').insert({
+      'room_id': roomResponse['id'],
+      'name': hostName,
+      'is_host': true,
+      'total_score': 0,
+    }).select().single();
+
+    return {
+      'roomCode': roomCode,
+      'playerId': playerResponse['id'],
+    };
+  }
+
   @override
-  Future<Map<String, String>?> joinRoom(String code, String playerName) async => throw UnimplementedError();
+  Future<Map<String, String>?> joinRoom(String code, String playerName) async {
+    final room = await _supabase.from('rooms').select().eq('code', code).maybeSingle();
+    if (room == null) return null;
+
+    final playerResponse = await _supabase.from('players').insert({
+      'room_id': room['id'],
+      'name': playerName,
+      'is_host': false,
+      'total_score': 0,
+    }).select().single();
+
+    return {
+      'playerId': playerResponse['id'],
+    };
+  }
+
   @override
-  Future<void> startGame(String roomId) async => throw UnimplementedError();
+  Future<void> startGame(String roomId) async {
+    await _supabase.from('rooms').update({
+      'status': 'shuffling',
+      'current_phase': 'shuffling',
+    }).eq('id', roomId);
+  }
 }

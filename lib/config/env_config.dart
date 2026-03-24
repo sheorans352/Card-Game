@@ -5,6 +5,9 @@ enum AppEnvironment { staging, production }
 class AppConfig {
   final AppEnvironment environment;
   final bool useMock;
+  
+  static const String supabaseUrl = 'https://ophamlgpkcfrfmjtpjgm.supabase.co';
+  static const String supabaseAnonKey = 'sb_publishable_BEu0MWm9_v2dbmY03hgd-Q_qdmLqoT_';
 
   AppConfig({
     required this.environment,
@@ -12,13 +15,12 @@ class AppConfig {
   });
 
   factory AppConfig.fromEnvironment() {
-    // For now, we manually set this, or use kReleaseMode / --dart-define
-    // By default, staging uses Mock for stability during Flutter 3.19 era.
+    // Stage is default, can toggle via dart-define if needed
     const isStaging = bool.fromEnvironment('staging', defaultValue: true);
     
     return AppConfig(
       environment: isStaging ? AppEnvironment.staging : AppEnvironment.production,
-      useMock: true, // Force mock for now until Supabase is fixed for Web
+      useMock: false, // Switching to Supabase for Multiplayer Beta
     );
   }
 }

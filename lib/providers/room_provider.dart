@@ -70,57 +70,95 @@ class LocalStorageSync {
 }
 
 final roomMetadataProvider = StreamProvider.family<Room?, String>((ref, code) {
-  final controller = StreamController<Room?>();
-  void update() {
-    final room = LocalStorageSync.getData(LocalStorageSync.roomKey, (j) => Room.fromJson(j));
-    if (room != null && room.code == code) controller.add(room);
-    else controller.add(null);
+  final config = ref.watch(appConfigProvider);
+  if (config.useMock) {
+    final controller = StreamController<Room?>();
+    void update() {
+      final room = LocalStorageSync.getData(LocalStorageSync.roomKey, (j) => Room.fromJson(j));
+      if (room != null && room.code == code) controller.add(room);
+      else controller.add(null);
+    }
+    update();
+    final subscription = html.window.onStorage.listen((_) => update());
+    ref.onDispose(() { subscription.cancel(); controller.close(); });
+    return controller.stream;
+  } else {
+    final supabase = Supabase.instance.client;
+    return supabase
+        .from('rooms')
+        .stream(primaryKey: ['id'])
+        .eq('code', code)
+        .map((data) => data.isEmpty ? null : Room.fromJson(data.first));
   }
-  update();
-  final subscription = html.window.onStorage.listen((_) => update());
-  ref.onDispose(() { subscription.cancel(); controller.close(); });
-  return controller.stream;
 });
 
 final playersStreamProvider = StreamProvider.family<List<Player>, String>((ref, roomId) {
-  final controller = StreamController<List<Player>>();
-  void update() {
-    final playersData = LocalStorageSync.getData<List<Player>>(LocalStorageSync.playersKey, 
-      (j) => (j as List).map<Player>((p) => Player.fromJson(p)).toList());
-    controller.add(playersData ?? []);
+  final config = ref.watch(appConfigProvider);
+  if (config.useMock) {
+    final controller = StreamController<List<Player>>();
+    void update() {
+      final playersData = LocalStorageSync.getData<List<Player>>(LocalStorageSync.playersKey, 
+        (j) => (j as List).map<Player>((p) => Player.fromJson(p)).toList());
+      controller.add(playersData ?? []);
+    }
+    update();
+    final subscription = html.window.onStorage.listen((_) => update());
+    ref.onDispose(() { subscription.cancel(); controller.close(); });
+    return controller.stream;
+  } else {
+    final supabase = Supabase.instance.client;
+    return supabase
+        .from('players')
+        .stream(primaryKey: ['id'])
+        .eq('room_id', roomId)
+        .map((data) => data.map((p) => Player.fromJson(p)).toList());
   }
-  update();
-  final subscription = html.window.onStorage.listen((_) => update());
-  ref.onDispose(() { subscription.cancel(); controller.close(); });
-  return controller.stream;
 });
 
 final playerHandProvider = StreamProvider.family<List<Map<String, dynamic>>, String>((ref, playerId) {
-  final controller = StreamController<List<Map<String, dynamic>>>();
-  void update() {
-    final allHands = LocalStorageSync.getData(LocalStorageSync.handsKey, (j) => j as Map<String, dynamic>);
-    if (allHands != null) {
-      final playerHand = (allHands[playerId] as List?)?.cast<Map<String, dynamic>>() ?? [];
-      controller.add(playerHand);
-    } else controller.add([]);
+  final config = ref.watch(appConfigProvider);
+  if (config.useMock) {
+    final controller = StreamController<List<Map<String, dynamic>>>();
+    void update() {
+      final hands = LocalStorageSync.getData(LocalStorageSync.handsKey, (j) => j as Map<String, dynamic>);
+      final myHand = hands[playerId] as List?;
+      controller.add(myHand?.cast<Map<String, dynamic>>() ?? []);
+    }
+    update();
+    final subscription = html.window.onStorage.listen((_) => update());
+    ref.onDispose(() { subscription.cancel(); controller.close(); });
+    return controller.stream;
+  } else {
+    final supabase = Supabase.instance.client;
+    return supabase
+        .from('hands')
+        .stream(primaryKey: ['id'])
+        .eq('player_id', playerId)
+        .map((data) => data.cast<Map<String, dynamic>>());
   }
-  update();
-  final subscription = html.window.onStorage.listen((_) => update());
-  ref.onDispose(() { subscription.cancel(); controller.close(); });
-  return controller.stream;
 });
 
 final playedCardsProvider = StreamProvider.family<List<Map<String, dynamic>>, String>((ref, roomId) {
-  final controller = StreamController<List<Map<String, dynamic>>>();
-  void update() {
-    final played = LocalStorageSync.getData<List<Map<String, dynamic>>>(LocalStorageSync.playedCardsKey, 
-      (j) => (j as List).cast<Map<String, dynamic>>());
-    controller.add(played ?? []);
+  final config = ref.watch(appConfigProvider);
+  if (config.useMock) {
+    final controller = StreamController<List<Map<String, dynamic>>>();
+    void update() {
+      final played = LocalStorageSync.getData<List<Map<String, dynamic>>>(LocalStorageSync.playedCardsKey, 
+        (j) => (j as List).cast<Map<String, dynamic>>());
+      controller.add(played ?? []);
+    }
+    update();
+    final subscription = html.window.onStorage.listen((_) => update());
+    ref.onDispose(() { subscription.cancel(); controller.close(); });
+    return controller.stream;
+  } else {
+    final supabase = Supabase.instance.client;
+    return supabase
+        .from('played_cards')
+        .stream(primaryKey: ['id'])
+        .eq('room_id', roomId)
+        .map((data) => data.cast<Map<String, dynamic>>());
   }
-  update();
-  final subscription = html.window.onStorage.listen((_) => update());
-  ref.onDispose(() { subscription.cancel(); controller.close(); });
-  return controller.stream;
 });
 
 final playableCardsProvider = Provider.family<Set<String>, String>((ref, roomId) {
@@ -223,8 +261,8 @@ class MockLobbyService extends LobbyService {
   @override
   Future<Map<String, String>> createRoom(String hostName) async {
     LocalStorageSync.reset(); // Always start fresh for a new Host session
-    const roomId = 'mock-room-123';
-    const roomCode = 'MOCK12';
+    final roomId = 'mock-room-${DateTime.now().millisecondsSinceEpoch}';
+    final roomCode = (100000 + (DateTime.now().millisecondsSinceEpoch % 900000)).toString();
     const playerId = 'p1';
     final room = Room(id: roomId, code: roomCode, status: 'waiting', hostId: playerId, currentPhase: 'lobby', dealerIndex: 0, turnIndex: 0);
     final player = Player(id: playerId, roomId: roomId, name: hostName, isHost: true, totalScore: 0);

@@ -38,6 +38,7 @@ dependencies:
   flutter_riverpod: ^2.6.1
   share_plus: ^9.0.0
   app_links: ^6.1.1
+  supabase_flutter: ^2.5.7
 
 dev_dependencies:
   flutter_test:
