@@ -76,7 +76,7 @@ final playersStreamProvider = StreamProvider.family<List<Player>, String>((ref, 
         .from('players')
         .stream(primaryKey: ['id'])
         .eq('room_id', roomId)
-        .map((data) => data.map((p) => Player.fromJson(p)).toList());
+        .map((data) => data.map<Player>((p) => Player.fromJson(p)).toList());
   }
 });
 
@@ -90,7 +90,7 @@ final playerHandProvider = StreamProvider.family<List<Map<String, dynamic>>, Str
         .from('hands')
         .stream(primaryKey: ['id'])
         .eq('player_id', playerId)
-        .map((data) => data.cast<Map<String, dynamic>>());
+        .map((data) => data.map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e)).toList());
   }
 });
 
@@ -104,7 +104,7 @@ final playedCardsProvider = StreamProvider.family<List<Map<String, dynamic>>, St
         .from('played_cards')
         .stream(primaryKey: ['id'])
         .eq('room_id', roomId)
-        .map((data) => data.cast<Map<String, dynamic>>());
+        .map((data) => data.map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e)).toList());
   }
 });
 
