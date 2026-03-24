@@ -33,6 +33,27 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
 
     final roomAsync = ref.watch(roomMetadataProvider(roomCode));
 
+    // Automated Dealer Transitions
+    ref.listen<AsyncValue<Room?>>(roomMetadataProvider(roomCode), (previous, next) {
+      next.whenData((room) {
+        if (room == null) return;
+        final isDealer = ref.read(isLocalPlayerDealerProvider(roomCode));
+        if (!isDealer) return;
+
+        if (room.status == 'shuffling') {
+          // Auto-trigger shuffle
+          ref.read(cardServiceProvider).shuffleDeck(room.id);
+        } else if (room.status == 'dealing') {
+          // Auto-trigger initial deal (5 cards each)
+          // We need player IDs
+          final players = ref.read(playersStreamProvider(room.id)).value;
+          if (players != null && players.length == 4) {
+             ref.read(cardServiceProvider).dealInitialFive(room.id, players.map((p) => p.id).toList());
+          }
+        }
+      });
+    });
+
     return Scaffold(
       body: roomAsync.when(
         data: (room) {

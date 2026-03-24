@@ -185,11 +185,24 @@ final isLocalPlayerTurnProvider = Provider.family<bool, String>((ref, code) {
 
 final isCutterProvider = Provider.family<bool, String>((ref, code) {
   final room = ref.watch(roomMetadataProvider(code)).value;
-  final players = ref.watch(playersStreamProvider(room?.id ?? "")).value;
+  if (room == null) return false;
+  final players = ref.watch(playersStreamProvider(room.id)).value;
   final localId = ref.watch(localPlayerIdProvider);
-  if (room == null || players == null || localId == null) return false;
+  if (players == null || localId == null) return false;
+  // Cutter is the player to the left of the dealer (index - 1, or +3 mod 4)
   final cutterIndex = (room.dealerIndex + 3) % players.length;
   return players[cutterIndex].id == localId;
+});
+
+final isLocalPlayerDealerProvider = Provider.family<bool, String>((ref, code) {
+  final room = ref.watch(roomMetadataProvider(code)).value;
+  if (room == null) return false;
+  final players = ref.watch(playersStreamProvider(room.id)).value;
+  final localId = ref.watch(localPlayerIdProvider);
+  if (players == null || localId == null) return false;
+  
+  final dealerIndexInList = room.dealerIndex % players.length;
+  return players[dealerIndexInList].id == localId;
 });
 
 final lobbyServiceProvider = Provider<LobbyService>((ref) {

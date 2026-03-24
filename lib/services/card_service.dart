@@ -72,6 +72,7 @@ class SupabaseCardService extends CardService {
     await _supabase.from('rooms').update({
       'status': 'bidding',
       'current_phase': 'bidding',
+      'turn_index': (room['dealer_index'] + 1) % 4,
     }).eq('id', roomId);
   }
 
@@ -88,23 +89,60 @@ class SupabaseCardService extends CardService {
     await _supabase.from('rooms').update({
       'status': 'bidding_2',
       'current_phase': 'bidding_2',
+      'turn_index': (room['dealer_index'] + 1) % 4,
     }).eq('id', roomId);
   }
 
   @override
   Future<void> placeBid(String roomId, String playerId, int bid, {String? suit}) async {
+    // 1. Update player's bid
     await _supabase.from('players').update({
         'bid': bid,
     }).eq('id', playerId);
 
+    // 2. Fetch latest room and players state
+    final room = await _supabase.from('rooms').select().eq('id', roomId).single();
+    final playersResponse = await _supabase.from('players').select().eq('room_id', roomId);
+    final List<dynamic> players = playersResponse;
+    
     final updates = <String, dynamic>{};
     if (suit != null) {
         updates['trump_suit'] = suit;
+        if (bid >= 5) updates['trump_locked'] = true;
     }
     
-    // Increment turn_index
-    final room = await _supabase.from('rooms').select().eq('id', roomId).single();
-    updates['turn_index'] = (room['turn_index'] + 1) % 4;
+    final nextTurnIndex = (room['turn_index'] + 1);
+    updates['turn_index'] = nextTurnIndex;
+
+    // 3. Phase Transition Logic
+    final currentStatus = room['status'];
+    final playersWithBids = players.where((p) => p['bid'] != null).length;
+
+    if (currentStatus == 'bidding') {
+      // Transition to bidding_2 if all 4 bid OR someone bids >= 5
+      if (bid >= 5 || playersWithBids >= 4) {
+        updates['status'] = 'bidding_2';
+        updates['current_phase'] = 'bidding_2';
+        // Reset turn index to player after dealer for the next phase
+        updates['turn_index'] = (room['dealer_index'] + 1) % 4;
+        
+        await _supabase.from('rooms').update(updates).eq('id', roomId);
+        
+        // Trigger remaining deal (8 cards each)
+        final pIds = players.map<String>((p) => p['id'] as String).toList();
+        await dealRemainingEight(roomId, pIds);
+        return;
+      }
+    } else if (currentStatus == 'bidding_2') {
+      // Transition to playing after 4 more bids (total 8 slots filled if counting rounds, 
+      // but here we just check if the last person in the round bid)
+      if (nextTurnIndex % 4 == (room['dealer_index'] + 1) % 4) {
+        updates['status'] = 'playing';
+        updates['current_phase'] = 'playing';
+        // Cutter starts the play (Dealer + 3)
+        updates['turn_index'] = (room['dealer_index'] + 3) % 4;
+      }
+    }
 
     await _supabase.from('rooms').update(updates).eq('id', roomId);
   }
