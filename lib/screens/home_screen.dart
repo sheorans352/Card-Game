@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/room_provider.dart';
+import '../widgets/spade_background.dart';
 import 'lobby_screen.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -131,54 +132,4 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       ),
     );
   }
-}
-
-class SpadeBackground extends StatelessWidget {
-  const SpadeBackground({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      color: const Color(0xFF121212),
-      child: CustomPaint(
-        painter: _SpadePainter(),
-        child: Container(),
-      ),
-    );
-  }
-}
-
-class _SpadePainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.white.withOpacity(0.03)
-      ..style = PaintingStyle.fill;
-
-    const spacing = 80.0;
-    for (double x = 0; x < size.width; x += spacing) {
-      for (double y = 0; y < size.height; y += spacing) {
-        _drawSpade(canvas, Offset(x + (y % (spacing * 2) == 0 ? 0 : spacing / 2), y), 20, paint);
-      }
-    }
-  }
-
-  void _drawSpade(Canvas canvas, Offset center, double size, Paint paint) {
-    final path = Path();
-    // Simplified spade shape
-    path.moveTo(center.dx, center.dy - size / 2);
-    path.cubicTo(center.dx + size / 2, center.dy - size / 2, center.dx + size / 2, center.dy, center.dx, center.dy + size / 3);
-    path.cubicTo(center.dx - size / 2, center.dy, center.dx - size / 2, center.dy - size / 2, center.dx, center.dy - size / 2);
-    
-    // Stem
-    path.moveTo(center.dx, center.dy + size / 4);
-    path.lineTo(center.dx - size / 8, center.dy + size / 2);
-    path.lineTo(center.dx + size / 8, center.dy + size / 2);
-    path.close();
-
-    canvas.drawPath(path, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

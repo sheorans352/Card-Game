@@ -8,7 +8,10 @@ enum Suit {
   const Suit(this.code);
 
   static Suit fromCode(String code) {
-    return Suit.values.firstWhere((e) => e.code == code);
+    return Suit.values.firstWhere(
+      (e) => e.code.toUpperCase() == code.toUpperCase(),
+      orElse: () => Suit.spades,
+    );
   }
 }
 

@@ -1,187 +1,358 @@
+import 'dart:async';
+import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:app_links/app_links.dart';
-import '../services/lobby_service.dart';
-import '../services/card_service.dart';
 import '../models/game_models.dart';
 import '../models/card_model.dart';
+import '../services/lobby_service.dart';
+import '../services/card_service.dart';
 
-final appLinksProvider = Provider((ref) => AppLinks());
+// Conditionally import dart:html for web
+import 'dart:html' as html;
 
-final appLinkStreamProvider = StreamProvider<Uri>((ref) {
-  return ref.watch(appLinksProvider).uriLinkStream;
+// Mock Providers for Verification
+final currentRoomCodeProvider = StateProvider<String?>((ref) {
+  if (kIsWeb) {
+    // Check for both query params and hash-based query params
+    final uri = Uri.parse(html.window.location.href.replaceFirst('/#/', '/'));
+    final room = uri.queryParameters['room'];
+    if (room != null) return room;
+  }
+  return null;
 });
 
-final lobbyServiceProvider = Provider((ref) => LobbyService());
-final cardServiceProvider = Provider((ref) => CardService());
+final localPlayerIdProvider = StateProvider<String?>((ref) {
+  if (kIsWeb) {
+    var search = html.window.location.search;
+    if (search != null && search.startsWith('?')) {
+      final uri = Uri.parse(html.window.location.href);
+      final id = uri.queryParameters['playerId'];
+      if (id != null) return id;
+    }
+  }
+  return null;
+});
 
-final currentRoomCodeProvider = StateProvider<String?>((ref) => null);
-final localPlayerIdProvider = StateProvider<String?>((ref) => null);
+// Shared state via LocalStorage
+class LocalStorageSync {
+  static const String roomKey = 'minus_mock_room';
+  static const String playersKey = 'minus_mock_players';
+  static const String handsKey = 'minus_mock_hands';
+  static const String playedCardsKey = 'minus_mock_played';
+
+  static void reset() {
+    if (!kIsWeb) return;
+    html.window.localStorage.remove(roomKey);
+    html.window.localStorage.remove(playersKey);
+    html.window.localStorage.remove(handsKey);
+    html.window.localStorage.remove(playedCardsKey);
+  }
+
+  static T getData<T>(String key, T Function(dynamic) fromJson) {
+    if (!kIsWeb) return null as T;
+    final data = html.window.localStorage[key];
+    if (data == null) return null as T;
+    return fromJson(jsonDecode(data));
+  }
+
+  static void setData(String key, dynamic data) {
+    if (!kIsWeb) return;
+    final encoded = jsonEncode(data);
+    html.window.localStorage[key] = encoded;
+    // Explicitly dispatch event for SAME TAB listeners
+    html.window.dispatchEvent(html.StorageEvent('storage', 
+      key: key,
+      newValue: encoded,
+      storageArea: html.window.localStorage,
+    ));
+  }
+}
 
 final roomMetadataProvider = StreamProvider.family<Room?, String>((ref, code) {
-  final supabase = Supabase.instance.client;
-  return supabase
-      .from('rooms')
-      .stream(primaryKey: ['id'])
-      .eq('code', code)
-      .map((data) => data.isNotEmpty ? Room.fromMap(data.first) : null);
+  final controller = StreamController<Room?>();
+  void update() {
+    final room = LocalStorageSync.getData(LocalStorageSync.roomKey, (j) => Room.fromJson(j));
+    if (room != null && room.code == code) controller.add(room);
+    else controller.add(null);
+  }
+  update();
+  final subscription = html.window.onStorage.listen((_) => update());
+  ref.onDispose(() { subscription.cancel(); controller.close(); });
+  return controller.stream;
 });
 
 final playersStreamProvider = StreamProvider.family<List<Player>, String>((ref, roomId) {
-  final supabase = Supabase.instance.client;
-  return supabase
-      .from('players')
-      .stream(primaryKey: ['id'])
-      .eq('room_id', roomId)
-      .order('joined_at', ascending: true)
-      .map((data) => data.map((map) => Player.fromMap(map)).toList());
-});
-
-final isLocalPlayerTurnProvider = Provider.family<bool, String>((ref, code) {
-  final roomAsync = ref.watch(roomMetadataProvider(code));
-  final localPlayerId = ref.watch(localPlayerIdProvider);
-  
-  return roomAsync.when(
-    data: (room) {
-      if (room == null || localPlayerId == null) return false;
-      final playersAsync = ref.watch(playersStreamProvider(room.id));
-      return playersAsync.when(
-        data: (players) {
-          if (room.turnIndex >= players.length) return false;
-          return players[room.turnIndex].id == localPlayerId;
-        },
-        loading: () => false,
-        error: (_, __) => false,
-      );
-    },
-    loading: () => false,
-    error: (_, __) => false,
-  );
+  final controller = StreamController<List<Player>>();
+  void update() {
+    final playersData = LocalStorageSync.getData<List<Player>>(LocalStorageSync.playersKey, 
+      (j) => (j as List).map<Player>((p) => Player.fromJson(p)).toList());
+    controller.add(playersData ?? []);
+  }
+  update();
+  final subscription = html.window.onStorage.listen((_) => update());
+  ref.onDispose(() { subscription.cancel(); controller.close(); });
+  return controller.stream;
 });
 
 final playerHandProvider = StreamProvider.family<List<Map<String, dynamic>>, String>((ref, playerId) {
-  final supabase = Supabase.instance.client;
-  return supabase
-      .from('player_cards')
-      .stream(primaryKey: ['id'])
-      .eq('player_id', playerId)
-      .map((data) => data.where((m) => m['is_played'] == false).toList());
+  final controller = StreamController<List<Map<String, dynamic>>>();
+  void update() {
+    final allHands = LocalStorageSync.getData(LocalStorageSync.handsKey, (j) => j as Map<String, dynamic>);
+    if (allHands != null) {
+      final playerHand = (allHands[playerId] as List?)?.cast<Map<String, dynamic>>() ?? [];
+      controller.add(playerHand);
+    } else controller.add([]);
+  }
+  update();
+  final subscription = html.window.onStorage.listen((_) => update());
+  ref.onDispose(() { subscription.cancel(); controller.close(); });
+  return controller.stream;
 });
 
 final playedCardsProvider = StreamProvider.family<List<Map<String, dynamic>>, String>((ref, roomId) {
-  final supabase = Supabase.instance.client;
-  return supabase
-      .from('player_cards')
-      .stream(primaryKey: ['id'])
-      .eq('room_id', roomId)
-      .order('played_at', ascending: true)
-      .map((data) => data.where((m) => m['is_played'] == true).toList());
+  final controller = StreamController<List<Map<String, dynamic>>>();
+  void update() {
+    final played = LocalStorageSync.getData<List<Map<String, dynamic>>>(LocalStorageSync.playedCardsKey, 
+      (j) => (j as List).cast<Map<String, dynamic>>());
+    controller.add(played ?? []);
+  }
+  update();
+  final subscription = html.window.onStorage.listen((_) => update());
+  ref.onDispose(() { subscription.cancel(); controller.close(); });
+  return controller.stream;
 });
 
 final playableCardsProvider = Provider.family<Set<String>, String>((ref, roomId) {
-  final roomCode = ref.watch(currentRoomCodeProvider);
-  if (roomCode == null) return <String>{};
+  final room = ref.watch(roomMetadataProvider(roomId)).value;
+  final localId = ref.watch(localPlayerIdProvider);
+  if (room == null || localId == null || room.status != 'playing') return {};
+  
+  final players = ref.watch(playersStreamProvider(room.id)).value;
+  if (players == null) return {};
 
-  final roomAsync = ref.watch(roomMetadataProvider(roomCode));
-  final playedCardsAsync = ref.watch(playedCardsProvider(roomId));
-  final localPlayerId = ref.watch(localPlayerIdProvider);
+  final hand = ref.watch(playerHandProvider(localId)).value ?? [];
+  final playedCards = ref.watch(playedCardsProvider(room.id)).value ?? [];
+  final cardsInHand = hand.map((c) => c['card_value'] as String).toList();
+  
+  // Trick Logic
+  final trickSize = playedCards.length % 4;
+  if (trickSize == 0) return cardsInHand.toSet(); // Lead any card
+  
+  final currentTrick = playedCards.sublist(playedCards.length - trickSize);
+  final leadCard = currentTrick.first['card_value'] as String;
+  final leadSuit = leadCard.substring(leadCard.length - 1);
+  final trumpSuit = room.trumpSuit;
 
-  if (localPlayerId == null) return <String>{};
+  // 1. Must follow suit
+  final cardsOfLeadSuit = cardsInHand.where((c) => c.endsWith(leadSuit)).toList();
+  
+  if (cardsOfLeadSuit.isNotEmpty) {
+    // 2. MUST WIN RULE: enforced in mock too!
+    // Find highest card currently in trick of the lead suit
+    int highestRank = 0;
+    for (var m in currentTrick) {
+      final cVal = m['card_value'] as String;
+      if (cVal.endsWith(leadSuit)) {
+        final r = _getRankValue(cVal.substring(0, cVal.length - 1));
+        if (r > highestRank) highestRank = r;
+      }
+    }
+    
+    final winners = cardsOfLeadSuit.where((c) => _getRankValue(c.substring(0, c.length - 1)) > highestRank).toList();
+    if (winners.isNotEmpty) return winners.toSet(); // Forced to win
+    return cardsOfLeadSuit.toSet(); // Just follow suit
+  }
+  
+  // 3. No lead suit -> Can play Trump or anything
+  if (trumpSuit != null) {
+     final trumps = cardsInHand.where((c) => c.endsWith(trumpSuit)).toList();
+     if (trumps.isNotEmpty) return trumps.toSet(); // Simple mock: forced to trump if no lead suit
+  }
 
-  return roomAsync.maybeWhen(
-    data: (room) {
-      if (room == null || room.currentPhase != 'playing') return <String>{};
-      
-      return playedCardsAsync.maybeWhen(
-        data: (allPlayed) {
-          final trickSize = allPlayed.length % 4;
-          final trick = allPlayed.sublist(allPlayed.length - trickSize);
-          
-          final handsAsync = ref.watch(playerHandProvider(localPlayerId));
-          return handsAsync.maybeWhen(
-            data: (handMaps) {
-              final hand = handMaps.map((m) => CardModel.fromId(m['card_value'] as String)).toList();
-              if (hand.isEmpty) return <String>{};
-              if (trickSize == 0) return hand.map((c) => c.id).toSet().cast<String>();
+  return cardsInHand.toSet();
+});
 
-              final leadCard = CardModel.fromId(trick[0]['card_value'] as String);
-              final leadSuit = leadCard.suit;
-              final trumpSuitCode = room.trumpSuit;
+int _getRankValue(String v) {
+  if (v == 'A') return 14;
+  if (v == 'K') return 13;
+  if (v == 'Q') return 12;
+  if (v == 'J') return 11;
+  return int.parse(v);
+}
 
-              // 1. Identify best card currently on table
-              CardModel bestOnTable = leadCard;
-              for (var i = 1; i < trick.length; i++) {
-                final current = CardModel.fromId(trick[i]['card_value'] as String);
-                bool isBetter = false;
-                if (current.suit.code == trumpSuitCode && bestOnTable.suit.code != trumpSuitCode) {
-                  isBetter = true;
-                } else if (current.suit == bestOnTable.suit && current.rank > bestOnTable.rank) {
-                  isBetter = true;
-                }
-                if (isBetter) bestOnTable = current;
-              }
-
-              // Rule 1: MUST follow suit if possible
-              final handLeadSuit = hand.where((c) => c.suit == leadSuit).toList();
-              if (handLeadSuit.isNotEmpty) {
-                // Must Play Higher for lead suit
-                if (bestOnTable.suit == leadSuit) {
-                  final higherLead = handLeadSuit.where((c) => c.rank > bestOnTable.rank).toList();
-                  if (higherLead.isNotEmpty) {
-                    return higherLead.map((c) => c.id).toSet().cast<String>();
-                  }
-                }
-                return handLeadSuit.map((c) => c.id).toSet().cast<String>();
-              }
-
-              // Rule 2: If OUT of lead suit, player can play ANY SUIT.
-              // Logic: If they choose to play a Spade, and can beat the table, they MUST play a higher Spade.
-              final otherSuits = hand.where((c) => c.suit.code != 'S').toList();
-              final spadsInHand = hand.where((c) => c.suit.code == 'S').toList();
-              
-              int maxSpadeOnTable = 0;
-              for (var tc in trick) {
-                final c = CardModel.fromId(tc['card_value'] as String);
-                if (c.suit.code == 'S' && c.rank > maxSpadeOnTable) maxSpadeOnTable = c.rank;
-              }
-
-              final higherSpades = spadsInHand.where((c) => c.rank > maxSpadeOnTable).toList();
-              
-              final Set<String> validIds = otherSuits.map((c) => c.id).toSet().cast<String>();
-              if (higherSpades.isNotEmpty) {
-                validIds.addAll(higherSpades.map((c) => c.id));
-              } else {
-                validIds.addAll(spadsInHand.map((c) => c.id));
-              }
-
-              return validIds;
-            },
-            orElse: () => <String>{},
-          );
-        },
-        orElse: () => <String>{},
-      );
-    },
-    orElse: () => <String>{},
-  );
+final isLocalPlayerTurnProvider = Provider.family<bool, String>((ref, code) {
+  final room = ref.watch(roomMetadataProvider(code)).value;
+  final players = ref.watch(playersStreamProvider(room?.id ?? "")).value;
+  final localId = ref.watch(localPlayerIdProvider);
+  if (room == null || players == null || localId == null) return false;
+  if (room.status == 'waiting') return false;
+  if (room.status == 'cutting') {
+    final cutterIndex = (room.dealerIndex + 3) % players.length;
+    return players[cutterIndex].id == localId;
+  }
+  if (room.status == 'bidding' || room.status == 'bidding_2' || room.status == 'playing') {
+    final currentPlayer = players[room.turnIndex % players.length];
+    return currentPlayer.id == localId;
+  }
+  return false;
 });
 
 final isCutterProvider = Provider.family<bool, String>((ref, code) {
-  final roomAsync = ref.watch(roomMetadataProvider(code));
-  final localPlayerId = ref.watch(localPlayerIdProvider);
-
-  return roomAsync.maybeWhen(
-    data: (room) {
-      if (room == null || localPlayerId == null) return false;
-      final playersAsync = ref.watch(playersStreamProvider(room.id));
-      return playersAsync.maybeWhen(
-        data: (players) {
-          final cutterIndex = (room.dealerIndex - 1 + players.length) % players.length;
-          return players[cutterIndex].id == localPlayerId;
-        },
-        orElse: () => false,
-      );
-    },
-    orElse: () => false,
-  );
+  final room = ref.watch(roomMetadataProvider(code)).value;
+  final players = ref.watch(playersStreamProvider(room?.id ?? "")).value;
+  final localId = ref.watch(localPlayerIdProvider);
+  if (room == null || players == null || localId == null) return false;
+  final cutterIndex = (room.dealerIndex + 3) % players.length;
+  return players[cutterIndex].id == localId;
 });
+
+final lobbyServiceProvider = Provider<LobbyService>((ref) => MockLobbyService());
+final cardServiceProvider = Provider((ref) => MockCardService());
+
+class MockLobbyService extends LobbyService {
+  @override
+  Future<Map<String, String>> createRoom(String hostName) async {
+    LocalStorageSync.reset(); // Always start fresh for a new Host session
+    const roomId = 'mock-room-123';
+    const roomCode = 'MOCK12';
+    const playerId = 'p1';
+    final room = Room(id: roomId, code: roomCode, status: 'waiting', hostId: playerId, currentPhase: 'lobby', dealerIndex: 0, turnIndex: 0);
+    final player = Player(id: playerId, roomId: roomId, name: hostName, isHost: true, totalScore: 0);
+    LocalStorageSync.setData(LocalStorageSync.roomKey, room.toJson());
+    LocalStorageSync.setData(LocalStorageSync.playersKey, [player.toJson()]);
+    LocalStorageSync.setData(LocalStorageSync.handsKey, {});
+    LocalStorageSync.setData(LocalStorageSync.playedCardsKey, []);
+    return {'roomCode': roomCode, 'playerId': playerId};
+  }
+
+  @override
+  Future<Map<String, String>?> joinRoom(String code, String playerName) async {
+    final room = LocalStorageSync.getData(LocalStorageSync.roomKey, (j) => Room.fromJson(j));
+    if (room == null || room.code != code) return null;
+    final players = LocalStorageSync.getData<List<Player>>(LocalStorageSync.playersKey, (j) => (j as List).map<Player>((p) => Player.fromJson(p)).toList());
+    if (players.length >= 4) return null;
+    final playerId = 'p${players.length + 1}';
+    final newPlayer = Player(id: playerId, roomId: room.id, name: playerName, isHost: false, totalScore: 0);
+    players.add(newPlayer);
+    LocalStorageSync.setData(LocalStorageSync.playersKey, players.map((p) => p.toJson()).toList());
+    return {'playerId': playerId};
+  }
+
+  @override
+  Future<void> startGame(String roomId) async {
+    final room = LocalStorageSync.getData(LocalStorageSync.roomKey, (j) => Room.fromJson(j));
+    final nextRoom = room.copyWith(status: 'shuffling', currentPhase: 'shuffling');
+    LocalStorageSync.setData(LocalStorageSync.roomKey, nextRoom.toJson());
+    await MockCardService().shuffleDeck(roomId);
+  }
+}
+
+class MockCardService extends CardService {
+  @override
+  Future<void> shuffleDeck(String roomId) async {
+    final suits = ['S', 'H', 'D', 'C'];
+    final values = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
+    List<String> deck = [];
+    for (var s in suits) for (var v in values) deck.add('$v$s');
+    deck.shuffle();
+    final room = LocalStorageSync.getData(LocalStorageSync.roomKey, (j) => Room.fromJson(j));
+    final nextRoom = room.copyWith(shuffledDeck: deck, status: 'cutting', currentPhase: 'cutting');
+    LocalStorageSync.setData(LocalStorageSync.roomKey, nextRoom.toJson());
+  }
+
+  @override
+  Future<void> cutDeck(String roomId, int cutPoint) async {
+    final room = LocalStorageSync.getData(LocalStorageSync.roomKey, (j) => Room.fromJson(j));
+    final deck = room.shuffledDeck;
+    final splitIndex = (deck.length * (cutPoint / 100)).round();
+    final newDeck = [...deck.sublist(splitIndex), ...deck.sublist(0, splitIndex)];
+    final nextRoom = room.copyWith(shuffledDeck: newDeck, deckCutValue: cutPoint, status: 'dealing', currentPhase: 'dealing', turnIndex: (room.dealerIndex + 1) % 4);
+    LocalStorageSync.setData(LocalStorageSync.roomKey, nextRoom.toJson());
+    // Auto deal initial 5
+    final players = LocalStorageSync.getData<List<Player>>(LocalStorageSync.playersKey, (j) => (j as List).map<Player>((p) => Player.fromJson(p)).toList());
+    await dealInitialFive(roomId, players.map((p) => p.id).toList());
+  }
+
+  @override
+  Future<void> dealInitialFive(String roomId, List<String> playerIds) async {
+    final room = LocalStorageSync.getData(LocalStorageSync.roomKey, (j) => Room.fromJson(j));
+    final deck = room.shuffledDeck;
+    final hands = <String, dynamic>{};
+    for (int i = 0; i < playerIds.length; i++) hands[playerIds[i]] = deck.skip(i * 5).take(5).map((c) => {'card_value': c}).toList();
+    LocalStorageSync.setData(LocalStorageSync.handsKey, hands);
+    final nextRoom = room.copyWith(status: 'bidding', currentPhase: 'bidding', turnIndex: (room.dealerIndex + 1) % 4);
+    LocalStorageSync.setData(LocalStorageSync.roomKey, nextRoom.toJson());
+  }
+
+  @override
+  Future<void> dealRemainingEight(String roomId, List<String> playerIds) async {
+    final room = LocalStorageSync.getData(LocalStorageSync.roomKey, (j) => Room.fromJson(j));
+    final deck = room.shuffledDeck;
+    final hands = LocalStorageSync.getData(LocalStorageSync.handsKey, (j) => j as Map<String, dynamic>);
+    for (int i = 0; i < playerIds.length; i++) {
+       final existing = (hands[playerIds[i]] as List).cast<Map<String, dynamic>>();
+       final extra = deck.skip(20 + i * 8).take(8).map((c) => {'card_value': c}).toList();
+       hands[playerIds[i]] = [...existing, ...extra];
+    }
+    LocalStorageSync.setData(LocalStorageSync.handsKey, hands);
+    final nextRoom = room.copyWith(
+      status: 'bidding_2', 
+      currentPhase: 'bidding_2', 
+      turnIndex: (room.dealerIndex + 1) % 4
+    );
+    LocalStorageSync.setData(LocalStorageSync.roomKey, nextRoom.toJson());
+  }
+
+  @override
+  Future<void> placeBid(String roomId, String playerId, int bid, {String? suit}) async {
+    final players = LocalStorageSync.getData<List<Player>>(LocalStorageSync.playersKey, (j) => (j as List).map<Player>((p) => Player.fromJson(p)).toList());
+    final room = LocalStorageSync.getData(LocalStorageSync.roomKey, (j) => Room.fromJson(j));
+    final pIdx = players.indexWhere((p) => p.id == playerId);
+    players[pIdx] = players[pIdx].copyWith(bid: bid);
+    LocalStorageSync.setData(LocalStorageSync.playersKey, players.map((p) => p.toJson()).toList());
+    var nextRoom = room.copyWith(turnIndex: room.turnIndex + 1);
+    if (suit != null) nextRoom = nextRoom.copyWith(trumpSuit: suit, trumpLocked: bid >= 5);
+    
+    // Check for phase transitions
+    if (room.status == 'bidding') {
+      if (bid >= 5 || (nextRoom.turnIndex % 4 == (room.dealerIndex + 1) % 4)) {
+        LocalStorageSync.setData(LocalStorageSync.roomKey, nextRoom.toJson()); // Save bid first
+        await dealRemainingEight(roomId, players.map((p) => p.id).toList());
+        return;
+      }
+    } else if (room.status == 'bidding_2') {
+      if (nextRoom.turnIndex % 4 == (room.dealerIndex + 1) % 4) {
+        nextRoom = nextRoom.copyWith(status: 'playing', currentPhase: 'playing', turnIndex: (room.dealerIndex + 3) % 4); // Cutter starts (P4)
+      }
+    }
+    LocalStorageSync.setData(LocalStorageSync.roomKey, nextRoom.toJson());
+  }
+
+  @override
+  Future<void> playCard(String roomId, String playerId, String cardValue) async {
+    final allHands = LocalStorageSync.getData(LocalStorageSync.handsKey, (j) => j as Map<String, dynamic>);
+    final hand = allHands[playerId] as List;
+    hand.removeWhere((c) => c['card_value'] == cardValue);
+    LocalStorageSync.setData(LocalStorageSync.handsKey, allHands);
+    final playedCards = LocalStorageSync.getData<List<Map<String, dynamic>>>(LocalStorageSync.playedCardsKey, (j) => (j as List).cast<Map<String, dynamic>>());
+    playedCards.add({'player_id': playerId, 'card_value': cardValue});
+    LocalStorageSync.setData(LocalStorageSync.playedCardsKey, playedCards);
+    final room = LocalStorageSync.getData(LocalStorageSync.roomKey, (j) => Room.fromJson(j));
+    var nextRoom = room.copyWith(turnIndex: room.turnIndex + 1);
+    if (playedCards.length % 4 == 0) {
+      // Evaluate winner and scoring... (Phase 6)
+      if (playedCards.length == 52) { // Round Finished
+         final playersData = LocalStorageSync.getData<List<Player>>(LocalStorageSync.playersKey, (j) => (j as List).map<Player>((p) => Player.fromJson(p)).toList());
+         // Simple mock score calc:
+         for (int i = 0; i < playersData.length; i++) {
+           final p = playersData[i];
+           final scoreChange = (p.tricksWon >= (p.bid ?? 0)) ? (p.bid ?? 0) : -(p.bid ?? 0);
+           playersData[i] = p.copyWith(totalScore: p.totalScore + scoreChange, bid: null, tricksWon: 0);
+         }
+         LocalStorageSync.setData(LocalStorageSync.playersKey, playersData.map((p) => p.toJson()).toList());
+         nextRoom = nextRoom.copyWith(status: 'game_over', currentPhase: 'game_over');
+      }
+    }
+    LocalStorageSync.setData(LocalStorageSync.roomKey, nextRoom.toJson());
+  }
+}

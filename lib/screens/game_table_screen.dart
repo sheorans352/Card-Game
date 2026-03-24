@@ -1,476 +1,385 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/room_provider.dart';
+import '../services/card_service.dart';
 import '../models/game_models.dart';
 import '../models/card_model.dart';
+import '../widgets/playing_card.dart';
 import '../widgets/bidding_overlay.dart';
 import '../widgets/deck_cut_overlay.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-import 'home_screen.dart';
+import '../widgets/scoreboard_overlay.dart';
+import '../widgets/spade_background.dart';
 
-class GameTableScreen extends ConsumerWidget {
+class GameTableScreen extends ConsumerStatefulWidget {
   const GameTableScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final code = ref.watch(currentRoomCodeProvider);
-    if (code == null) return const Scaffold(body: Center(child: Text('Error: No Room Code')));
+  ConsumerState<GameTableScreen> createState() => _GameTableScreenState();
+}
 
-    final roomAsync = ref.watch(roomMetadataProvider(code));
+class _GameTableScreenState extends ConsumerState<GameTableScreen> {
+  final Map<String, GlobalKey> _playerKeys = {
+    'bottom': GlobalKey(),
+    'left': GlobalKey(),
+    'top': GlobalKey(),
+    'right': GlobalKey(),
+  };
 
-    // Handle Phase 2 Dealing (Host only)
-    ref.listen<AsyncValue<Room?>>(roomMetadataProvider(code), (previous, next) {
-      final room = next.value;
-      if (room != null && room.currentPhase == 'dealing_2') {
-        final players = ref.read(playersStreamProvider(room.id)).value ?? [];
-        final localId = ref.read(localPlayerIdProvider);
-        final isHost = players.any((p) => p.id == localId && p.isHost);
-        
-        if (isHost) {
-          ref.read(cardServiceProvider).dealRemainingEight(
-            room.id, 
-            players.map((p) => p.id).toList()
-          );
-        }
-      }
+  @override
+  Widget build(BuildContext context) {
+    final roomCode = ref.watch(currentRoomCodeProvider);
+    if (roomCode == null) return const Scaffold(body: Center(child: Text('No room code')));
 
-      // Handle transition from Deck Cut to Dealing 1
-      if (room != null && room.currentPhase == 'dealing_1') {
-        final players = ref.read(playersStreamProvider(room.id)).value ?? [];
-        final localId = ref.read(localPlayerIdProvider);
-        final isHost = players.any((p) => p.id == localId && p.isHost);
-        
-        if (isHost) {
-          ref.read(cardServiceProvider).dealInitialFive(
-            room.id, 
-            players.map((p) => p.id).toList()
-          );
-        }
-      }
-    });
+    final roomAsync = ref.watch(roomMetadataProvider(roomCode));
 
     return Scaffold(
-      body: Stack(
-        children: [
-          const SpadeBackground(), // Reusing the background
-          roomAsync.when(
-            data: (room) {
-              if (room == null) return const Center(child: Text('Room not found'));
-              final playersAsync = ref.watch(playersStreamProvider(room.id));
+      body: roomAsync.when(
+        data: (room) {
+          if (room == null) return const Center(child: Text('Room not found'));
+          final playersAsync = ref.watch(playersStreamProvider(room.id));
 
-              return playersAsync.when(
-                data: (players) {
-                   // Layout the table
-                   return _buildTable(context, ref, room, players);
-                },
-                loading: () => const Center(child: CircularProgressIndicator()),
-                error: (e, s) => Center(child: Text('Error: $e')),
+          return playersAsync.when(
+            data: (players) {
+              final localPlayerId = ref.watch(localPlayerIdProvider);
+              final localIndex = players.indexWhere((p) => p.id == localPlayerId);
+              if (localIndex == -1) return const Center(child: Text('You are not in this room'));
+
+              // Rotate players so local is at bottom (index 0)
+              final rotatedPlayers = List.generate(4, (i) {
+                return players[(localIndex + i) % players.length];
+              });
+
+              return Stack(
+                children: [
+                   const SpadeBackground(),
+                  // The Table
+                  const Center(child: TableLayer()),
+                  
+                  // Player Avatars
+                  _buildPlayerAvatar(rotatedPlayers[0], 'bottom', room.turnIndex == localIndex, room.dealerIndex == localIndex),
+                  _buildPlayerAvatar(rotatedPlayers[1], 'left', room.turnIndex == (localIndex + 1) % 4, room.dealerIndex == (localIndex + 1) % 4),
+                  _buildPlayerAvatar(rotatedPlayers[2], 'top', room.turnIndex == (localIndex + 2) % 4, room.dealerIndex == (localIndex + 2) % 4),
+                  _buildPlayerAvatar(rotatedPlayers[3], 'right', room.turnIndex == (localIndex + 3) % 4, room.dealerIndex == (localIndex + 3) % 4),
+
+                  // Cards Layer
+                  CardsLayer(
+                    roomId: room.id,
+                    players: rotatedPlayers,
+                    localPlayerId: localPlayerId!,
+                    currentPhase: room.currentPhase ?? 'playing',
+                    playerPositions: _playerKeys,
+                  ),
+
+                   // Overlays
+                  if ((room.currentPhase == 'bidding' || room.currentPhase == 'bidding_2') && 
+                      ref.watch(isLocalPlayerTurnProvider(roomCode)))
+                    BiddingOverlay(
+                      onBidSubmitted: (score, trump) {
+                        final suitCode = trump?.toString().split('.').last[0].toUpperCase();
+                        ref.read(cardServiceProvider).placeBid(room.id, localPlayerId!, score, suit: suitCode);
+                      },
+                      onPass: () {
+                         ref.read(cardServiceProvider).placeBid(room.id, localPlayerId!, 1);
+                      },
+                    ),
+                  
+                  if ((room.currentPhase == 'bidding' || room.currentPhase == 'bidding_2') && 
+                      !ref.watch(isLocalPlayerTurnProvider(roomCode)))
+                    const Align(
+                      alignment: Alignment.bottomCenter,
+                      child: Padding(
+                        padding: EdgeInsets.only(bottom: 100),
+                        child: Text('Waiting for other players to bid...', 
+                          style: TextStyle(color: Colors.white54, fontStyle: FontStyle.italic)),
+                      ),
+                    ),
+                  
+                  if (room.currentPhase == 'cutting')
+                    const DeckCutOverlay(),
+
+                  // Scoreboard Trigger
+                  Positioned(
+                    top: 40,
+                    right: 20,
+                    child: IconButton(
+                      icon: const Icon(Icons.leaderboard, color: Colors.amber, size: 32),
+                      onPressed: () => showDialog(
+                        context: context,
+                        builder: (context) => ScoreboardOverlay(roomId: room.id),
+                      ),
+                    ),
+                  ),
+                  if (room.status == 'game_over')
+                    Center(
+                      child: Container(
+                        padding: const EdgeInsets.all(32),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.9),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: Colors.amber, width: 2),
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Text('GAME OVER', style: TextStyle(fontSize: 48, fontWeight: FontWeight.bold, color: Colors.amber)),
+                            const SizedBox(height: 20),
+                            ...players.map((p) => Text('${p.name}: ${p.totalScore}', style: const TextStyle(color: Colors.white, fontSize: 24))),
+                            const SizedBox(height: 30),
+                            ElevatedButton(
+                              onPressed: () {
+                                LocalStorageSync.reset();
+                                Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+                              },
+                              child: const Text('RESTART MOCK'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // TRUMP HUD
+                  if (room.trumpSuit != null)
+                    Positioned(
+                      top: 40,
+                      left: 20,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.7),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: Colors.amber.withOpacity(0.5), width: 1),
+                          boxShadow: [BoxShadow(color: Colors.black54, blurRadius: 10)],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Text('TRUMP: ', style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold)),
+                            Text(_getSuitEmojiStatic(room.trumpSuit!), style: const TextStyle(fontSize: 24)),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
               );
             },
             loading: () => const Center(child: CircularProgressIndicator()),
             error: (e, s) => Center(child: Text('Error: $e')),
-          ),
-        ],
+          );
+        },
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, s) => Center(child: Text('Error: $e')),
       ),
     );
   }
 
-  Widget _buildTable(BuildContext context, WidgetRef ref, Room room, List<Player> players) {
-    final size = MediaQuery.of(context).size;
-    final tableSize = size.shortestSide * 0.7;
-    final localId = ref.watch(localPlayerIdProvider);
+  Widget _buildPlayerAvatar(Player player, String position, bool isActive, bool isDealer) {
+    Alignment alignment;
+    double? top, bottom, left, right;
 
-    // Rotate players list so local player is always at index 0 (Bottom)
-    final rotatedPlayers = [...players];
-    if (localId != null) {
-      final localIdx = rotatedPlayers.indexWhere((p) => p.id == localId);
-      if (localIdx != -1) {
-        for (int i = 0; i < localIdx; i++) {
-          rotatedPlayers.add(rotatedPlayers.removeAt(0));
-        }
-      }
+    switch (position) {
+      case 'bottom': alignment = Alignment.bottomCenter; bottom = 20; break;
+      case 'left': alignment = Alignment.centerLeft; left = 20; break;
+      case 'top': alignment = Alignment.topCenter; top = 40; break;
+      case 'right': alignment = Alignment.centerRight; right = 20; break;
+      default: alignment = Alignment.center;
     }
 
-    final localHand = localId != null ? ref.watch(playerHandProvider(localId)).value : null;
-    final isHandDealt = localHand != null && (
-      (room.currentPhase == 'bidding' && localHand.length >= 5) ||
-      (room.currentPhase == 'bidding_2' && localHand.length >= 13) ||
-      (room.currentPhase == 'playing')
-    );
-
-    return Stack(
-      alignment: Alignment.center,
-      children: [
-        // The Felt Table
-        Container(
-          width: tableSize,
-          height: tableSize,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: RadialGradient(
-              colors: [
-                const Color(0xFF076324), // Center green
-                const Color(0xFF043F17), // Outer dark green
-              ],
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.5),
-                blurRadius: 30,
-                spreadRadius: 5,
-              ),
-            ],
-            border: Border.all(color: Colors.white10, width: 2),
-          ),
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-               // Table info
-               Positioned(
-                 top: tableSize * 0.15,
-                 child: Column(
-                   children: [
-                     Text(
-                        room.trumpSuit != null ? 'TRUMP: ${_getSuitEmoji(room.trumpSuit)}' : 'SELECTING TRUMP...',
-                        style: const TextStyle(color: Colors.white30, fontSize: 14, fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'ROOM: ${room.code}',
-                        style: const TextStyle(color: Colors.white12, fontSize: 10),
-                      ),
-                   ],
-                 ),
-               ),
-               // CURRENT TRICK CARDS
-               _buildTableCenter(ref, room.id, players),
-
-               // DECK VISUAL (for cut phase)
-               if (room.currentPhase == 'deck_cut')
-                 _buildDeckVisual(room.deckCutValue),
-            ],
-          ),
+    return Align(
+      alignment: alignment,
+      child: Padding(
+        padding: EdgeInsets.only(
+          top: top ?? 0, bottom: bottom ?? 0, left: left ?? 0, right: right ?? 0
         ),
-
-        // Scoreboard Button
-        Positioned(
-          top: 60,
-          right: 20,
-          child: IconButton(
-            icon: const Icon(Icons.leaderboard, color: Colors.amber, size: 30),
-            onPressed: () => _showScoreboard(context, ref, room.id, players),
-            tooltip: 'Match History',
-          ),
-        ),
-
-        // Player Labels and Hands
-        ...rotatedPlayers.asMap().entries.map((entry) {
-          final index = entry.key;
-          final player = entry.value;
-          
-          // Position players around the circle
-          double? top, left, right, bottom;
-          if (index == 0) { // Bottom (User)
-            bottom = 40; left = 0; right = 0;
-          } else if (index == 1) { // Left
-            left = 40; top = 0; bottom = 0;
-          } else if (index == 2) { // Top
-            top = 40; left = 0; right = 0;
-          } else { // Right
-            right = 40; top = 0; bottom = 0;
-          }
-
-          // Important: use original players list for turn checking
-          final originalIdx = players.indexOf(player);
-          final isTurn = room.turnIndex == originalIdx;
-
-          return Positioned(
-            top: top, left: left, right: right, bottom: bottom,
-            child: _buildPlayerArea(ref, room, player, player.id == localId, isTurn),
-          );
-        }).toList(),
-
-        // Deck Cut Overlay
-        if (room.currentPhase == 'deck_cut' && ref.watch(isCutterProvider(room.code)))
-          Align(
-            alignment: Alignment.center,
-            child: DeckCutOverlay(
-              onCutConfirmed: (cutPoint) async {
-                await ref.read(cardServiceProvider).cutDeck(room.id, cutPoint);
-              },
-            ),
-          ),
-        
-        // Bidding Overlay
-        if (isHandDealt && (room.currentPhase == 'bidding' || room.currentPhase == 'bidding_2') && ref.watch(isLocalPlayerTurnProvider(room.code)))
-          Align(
-            alignment: Alignment.bottomCenter,
-            child: BiddingOverlay(
-              onPass: () async {
-                final supabase = Supabase.instance.client;
-                final nextTurn = (room.turnIndex + 1);
-                
-                if (nextTurn >= players.length) {
-                  if (room.currentPhase == 'bidding') {
-                    // End of 5-card bidding phase
-                    await supabase.from('rooms').update({
-                      'current_phase': 'dealing_2',
-                      'turn_index': (room.dealerIndex + 1) % players.length,
-                    }).eq('id', room.id);
-                  } else {
-                    // End of Phase 2 bidding
-                    await supabase.from('rooms').update({
-                      'current_phase': 'playing',
-                      'turn_index': (room.dealerIndex + 1) % players.length,
-                    }).eq('id', room.id);
-                  }
-                } else {
-                  await supabase.from('rooms').update({
-                    'turn_index': nextTurn,
-                  }).eq('id', room.id);
-                }
-              },
-              onBidSubmitted: (bid, trump) async {
-                final supabase = Supabase.instance.client;
-                final localId = ref.read(localPlayerIdProvider);
-
-                // Override Logic for Phase 2
-                if (room.currentPhase == 'bidding_2') {
-                  if (!room.trumpLocked && bid < 9 && trump != null && trump.code != room.trumpSuit) {
-                    // Cannot change trump unless bid >= 9
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('You must bid 9+ to change the Trump suit!')),
-                    );
-                    return;
-                  }
-                }
-
-                // Update player's bid
-                await supabase.from('players').update({'bid': bid}).eq('id', localId!);
-                
-                if (bid >= 5 && trump != null && room.currentPhase == 'bidding') {
-                   // TRUMP LOCK in Phase 1
-                   await supabase.from('rooms').update({
-                     'trump_suit': trump.code,
-                     'trump_locked': true,
-                     'current_phase': 'dealing_2',
-                     'turn_index': (room.dealerIndex + 1) % players.length,
-                   }).eq('id', room.id);
-                } else if (trump != null && room.currentPhase == 'bidding_2') {
-                   // Possible Trump Change in Phase 2 (Override checked above)
-                   await supabase.from('rooms').update({
-                     'trump_suit': trump.code,
-                     'current_phase': 'playing',
-                     'turn_index': (room.dealerIndex + 1) % players.length,
-                   }).eq('id', room.id);
-                } else {
-                   // Move to next turn
-                   final nextTurn = (room.turnIndex + 1);
-                   if (nextTurn >= players.length) {
-                      final nextPhase = room.currentPhase == 'bidding' ? 'dealing_2' : 'playing';
-                      await supabase.from('rooms').update({
-                        'current_phase': nextPhase,
-                        'turn_index': (room.dealerIndex + 1) % players.length,
-                      }).eq('id', room.id);
-                   } else {
-                      await supabase.from('rooms').update({
-                        'turn_index': nextTurn,
-                      }).eq('id', room.id);
-                   }
-                }
-              },
-            ),
-          ),
-        
-        // Game Over Overlay
-        if (room.status == 'finished')
-           Center(
-             child: Container(
-               padding: const EdgeInsets.all(32),
-               decoration: BoxDecoration(
-                 color: Colors.black.withOpacity(0.9),
-                 borderRadius: BorderRadius.circular(24),
-                 border: Border.all(color: Colors.amber, width: 2),
-               ),
-               child: Column(
-                 mainAxisSize: MainAxisSize.min,
-                 children: [
-                   const Text('GAME OVER', style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.amber)),
-                   const SizedBox(height: 24),
-                   ...players.map((p) => Padding(
-                     padding: const EdgeInsets.symmetric(vertical: 4),
-                     child: Text('${p.name}: ${p.totalScore} pts', style: const TextStyle(fontSize: 18, color: Colors.white)),
-                   )).toList(),
-                   const SizedBox(height: 32),
-                   ElevatedButton(
-                     onPressed: () => Navigator.of(context).pushAndRemoveUntil(
-                       MaterialPageRoute(builder: (context) => const HomeScreen()), 
-                       (route) => false
-                     ),
-                     child: const Text('RETURN TO HOME'),
-                   ),
-                 ],
-               ),
-             ),
-           ),
-      ],
-    );
-  }
-
-  Widget _buildPlayerArea(WidgetRef ref, Room room, Player player, bool isLocalPlayer, bool isTurn) {
-    final cardsAsync = ref.watch(playerHandProvider(player.id));
-
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          padding: const EdgeInsets.all(4),
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: isTurn ? Border.all(color: Colors.amber, width: 2) : null,
-            boxShadow: isTurn ? [BoxShadow(color: Colors.amber.withOpacity(0.5), blurRadius: 10)] : null,
-          ),
-          child: CircleAvatar(
-            backgroundColor: isTurn ? Colors.amber : Colors.white10,
-            radius: 20,
-            child: Text(
-              player.name.isNotEmpty ? player.name[0] : '?', 
-              style: TextStyle(color: isTurn ? Colors.black : Colors.white, fontWeight: FontWeight.bold),
-            ),
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          player.name,
-          style: TextStyle(
-            color: isTurn ? Colors.amber : Colors.white, 
-            fontWeight: isTurn ? FontWeight.bold : FontWeight.normal,
-            fontSize: 12,
-          ),
-        ),
-        Row(
+        child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (player.bid != null)
-              Text('BID: ${player.bid}', style: const TextStyle(color: Colors.amber, fontSize: 10, fontWeight: FontWeight.bold)),
-            const SizedBox(width: 8),
-            Text('WON: ${player.tricksWon}', style: const TextStyle(color: Colors.greenAccent, fontSize: 10)),
-            const SizedBox(width: 8),
-            Text('TOT: ${player.totalScore}', style: const TextStyle(color: Colors.white70, fontSize: 10)),
-          ],
-        ),
-        const SizedBox(height: 8),
-        SizedBox(
-          height: 80,
-          child: cardsAsync.when(
-            data: (cards) => _buildHand(ref, room, player, cards, isLocalPlayer, isTurn),
-            loading: () => const SizedBox(),
-            error: (e, s) => const SizedBox(),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildHand(WidgetRef ref, Room room, Player player, List<Map<String, dynamic>> cards, bool isLocalPlayer, bool isTurn) {
-    final playableCards = ref.watch(playableCardsProvider(room.id));
-
-    return Stack(
-      clipBehavior: Clip.none,
-      children: cards.asMap().entries.map((entry) {
-        final i = entry.key;
-        final card = entry.value;
-        final cardValue = card['card_value'];
-        final isPlayable = !isLocalPlayer || !isTurn || playableCards.isEmpty || playableCards.contains(cardValue);
-        
-        return Positioned(
-          left: i * 20.0,
-          child: GestureDetector(
-            onTap: (isLocalPlayer && isTurn && room.currentPhase == 'playing' && isPlayable) 
-              ? () async {
-                  final service = ref.read(cardServiceProvider);
-                  await service.playCard(room.id, player.id, cardValue);
-                }
-              : null,
-            child: Opacity(
-              opacity: isPlayable ? 1.0 : 0.4,
-              child: _buildCard(cardValue, isLocalPlayer),
-            ),
-          ),
-        );
-      }).toList(),
-    );
-  }
-
-  Widget _buildCard(String cardValue, bool isVisible) {
-    final card = CardModel.fromId(cardValue);
-    final isRed = card.suit == Suit.hearts || card.suit == Suit.diamonds;
-
-    return Container(
-      width: 50,
-      height: 75,
-      decoration: BoxDecoration(
-        color: isVisible ? Colors.white : Colors.blueGrey,
-        borderRadius: BorderRadius.circular(6),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.3),
-            blurRadius: 4,
-            offset: const Offset(2, 2),
-          ),
-        ],
-        border: Border.all(color: Colors.white24, width: 0.5),
-      ),
-      child: isVisible
-          ? Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+            Stack(
+              clipBehavior: Clip.none,
               children: [
-                Text(
-                  card.value,
-                  style: TextStyle(
-                    color: isRed ? Colors.red : Colors.black,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
+                Container(
+                  key: _playerKeys[position],
+                  width: 70,
+                  height: 70,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withOpacity(0.1),
+                    border: Border.all(
+                      color: isActive ? Colors.amber : Colors.white24,
+                      width: isActive ? 3 : 1,
+                    ),
+                    boxShadow: isActive ? [
+                      BoxShadow(color: Colors.amber.withOpacity(0.5), blurRadius: 15, spreadRadius: 2)
+                    ] : [],
+                  ),
+                  child: Center(
+                    child: Text(
+                      player.name[0].toUpperCase(),
+                      style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
+                    ),
                   ),
                 ),
-                Text(
-                  _getSuitEmoji(card.suit.code),
-                  style: const TextStyle(fontSize: 16),
-                ),
+                if (isDealer)
+                  Positioned(
+                    right: -5,
+                    bottom: -5,
+                    child: Container(
+                      width: 24,
+                      height: 24,
+                      decoration: const BoxDecoration(shape: BoxShape.circle, color: Colors.amber),
+                      child: const Center(
+                        child: Text('D', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 12)),
+                      ),
+                    ),
+                  ),
               ],
-            )
-          : const Center(child: Text('♠', style: TextStyle(color: Colors.white24, fontSize: 24))),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.5),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                '${player.name}\nScore: ${player.totalScore}',
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.white, fontSize: 12),
+              ),
+            ),
+            if (player.bid != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  'Bid: ${player.bid} | Trkf: ${player.tricksWon}',
+                  style: const TextStyle(color: Colors.amber, fontSize: 11, fontWeight: FontWeight.bold),
+                ),
+              ),
+          ],
+        ),
+      ),
     );
   }
+}
 
-  Widget _buildTableCenter(WidgetRef ref, String roomId, List<Player> players) {
+class TableLayer extends StatelessWidget {
+  const TableLayer({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: math.min(MediaQuery.of(context).size.width * 0.8, 600),
+      height: math.min(MediaQuery.of(context).size.width * 0.8, 600),
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: const Color(0xFF076324),
+        border: Border.all(color: const Color(0xFF054D1C), width: 15),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.5), blurRadius: 40, spreadRadius: 10),
+        ],
+      ),
+      child: Center(
+        child: Consumer(builder: (context, ref, _) {
+          final roomCode = ref.watch(currentRoomCodeProvider);
+          final room = roomCode != null ? ref.watch(roomMetadataProvider(roomCode)).value : null;
+          final players = room != null ? ref.watch(playersStreamProvider(room.id)).value : null;
+          final localId = ref.watch(localPlayerIdProvider);
+
+          if (room == null || players == null || localId == null) return const SizedBox();
+
+          final localIndex = players.indexWhere((p) => p.id == localId);
+          final playerTurnIndexInRotated = (room.turnIndex - localIndex + 4) % 4;
+          
+          Alignment alignment;
+          switch (playerTurnIndexInRotated) {
+             case 0: alignment = Alignment.bottomCenter; break;
+             case 1: alignment = Alignment.centerLeft; break;
+             case 2: alignment = Alignment.topCenter; break;
+             case 3: alignment = Alignment.centerRight; break;
+             default: alignment = Alignment.center;
+          }
+
+          return AnimatedAlign(
+            duration: const Duration(milliseconds: 500),
+            alignment: alignment,
+            child: Container(
+              width: 150, height: 150,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [Colors.amber.withOpacity(0.2), Colors.transparent],
+                ),
+              ),
+            ),
+          );
+        }),
+      ),
+    );
+  }
+}
+
+String _getSuitEmojiStatic(String code) {
+  switch (code) {
+    case 'S': return '♠️';
+    case 'H': return '♥️';
+    case 'D': return '♦️';
+    case 'C': return '♣️';
+    default: return '';
+  }
+}
+
+class CardsLayer extends ConsumerWidget {
+  final String roomId;
+  final List<Player> players;
+  final String localPlayerId;
+  final String currentPhase;
+  final Map<String, GlobalKey> playerPositions;
+
+  const CardsLayer({
+    super.key,
+    required this.roomId,
+    required this.players,
+    required this.localPlayerId,
+    required this.currentPhase,
+    required this.playerPositions,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
     final playedCardsAsync = ref.watch(playedCardsProvider(roomId));
+    final roomCode = ref.watch(currentRoomCodeProvider);
+    final room = roomCode != null ? ref.watch(roomMetadataProvider(roomCode)).value : null;
 
     return playedCardsAsync.when(
-      data: (allPlayedCards) {
-        // Only show last 4 cards (current trick)
-        final trickSize = allPlayedCards.length % 4;
-        final currentTrick = trickSize == 0 && allPlayedCards.isNotEmpty
-            ? allPlayedCards.sublist(allPlayedCards.length - 4)
-            : allPlayedCards.sublist(allPlayedCards.length - trickSize);
+      data: (playedMaps) {
+        // 1. Identify current trick (last 1-4 cards)
+        final trickSize = playedMaps.length % 4;
+        final trickStartIndex = playedMaps.length - (trickSize == 0 && playedMaps.isNotEmpty ? 4 : trickSize);
+        if (trickStartIndex < 0) return const SizedBox();
+        
+        final currentTrick = playedMaps.sublist(trickStartIndex);
 
         return Stack(
-          alignment: Alignment.center,
-          children: currentTrick.map((played) {
-            final playerIndex = players.indexWhere((p) => p.id == played['player_id']);
+          children: [
+            // Cards in Hand
+            ..._buildPlayerHands(ref),
             
-            // Position played cards slightly offset towards their player
-            double dx = 0, dy = 0;
-            if (playerIndex == 0) dy = 40; // Bottom
-            else if (playerIndex == 1) dx = -40; // Left
-            else if (playerIndex == 2) dy = -40; // Top
-            else if (playerIndex == 3) dx = 40; // Right
-
-            return Transform.translate(
-              offset: Offset(dx, dy),
-              child: _buildCard(played['card_value'], true),
-            );
-          }).toList(),
+            // Cards on Table
+            ...currentTrick.map((m) {
+              final player = players.cast<Player?>().firstWhere((p) => p?.id == m['player_id'], orElse: () => null);
+              if (player == null) return const SizedBox();
+              
+              final playerIdxInRotated = players.indexOf(player);
+              final pos = _getPositionFromIndex(playerIdxInRotated);
+              
+              return PlayedCardWidget(
+                card: CardModel.fromId(m['card_value']),
+                position: pos,
+                order: currentTrick.indexOf(m),
+              );
+            }),
+          ],
         );
       },
       loading: () => const SizedBox(),
@@ -478,98 +387,201 @@ class GameTableScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildDeckVisual(int? cutValue) {
-    // Simple representation of a deck of cards
-    return Stack(
-      alignment: Alignment.center,
-      children: List.generate(10, (index) {
-        return Transform.translate(
-          offset: Offset(index * 0.5, -index * 0.5),
-          child: Container(
-            width: 50,
-            height: 75,
-            decoration: BoxDecoration(
-              color: Colors.blueGrey.shade800,
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(color: Colors.white24),
-              boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 2)],
-            ),
-            child: const Center(child: Text('♠', style: TextStyle(color: Colors.white12, fontSize: 24))),
+  String _getPositionFromIndex(int index) {
+    switch (index) {
+      case 0: return 'bottom';
+      case 1: return 'left';
+      case 2: return 'top';
+      case 3: return 'right';
+      default: return 'bottom';
+    }
+  }
+
+  List<Widget> _buildPlayerHands(WidgetRef ref) {
+    final localHandAsync = ref.watch(playerHandProvider(localPlayerId));
+    final playableIds = ref.watch(playableCardsProvider(roomId));
+
+    List<Widget> handWidgets = [];
+
+    // Local Player Hand (Bottom)
+    localHandAsync.whenData((hand) {
+      for (var i = 0; i < hand.length; i++) {
+        final cardId = hand[i]['card_value'] as String;
+        final isPlayable = playableIds.contains(cardId);
+        
+        handWidgets.add(
+          HandCardWidget(
+            card: CardModel.fromId(cardId),
+            index: i,
+            total: hand.length,
+            isPlayable: isPlayable,
+            onTap: isPlayable ? () => ref.read(cardServiceProvider).playCard(roomId, localPlayerId, cardId) : null,
           ),
         );
-      }),
-    );
-  }
+      }
+    });
 
-  void _showScoreboard(BuildContext context, WidgetRef ref, String roomId, List<Player> players) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: const Color(0xFF1E1E1E),
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (context) {
-        return StreamBuilder<List<Map<String, dynamic>>>(
-          stream: Supabase.instance.client
-              .from('round_results')
-              .stream(primaryKey: ['id'])
-              .eq('room_id', roomId)
-              .order('round_number', ascending: true),
-          builder: (context, snapshot) {
-            if (snapshot.hasError) return Center(child: Text('Error: ${snapshot.error}'));
-            if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-
-            final results = snapshot.data!;
-            final roundNumbers = results.map((r) => r['round_number'] as int).toSet().toList()..sort();
-
-            return Padding(
-              padding: const EdgeInsets.all(24.0),
-              child: Column(
-                children: [
-                   const Text('MATCH HISTORY', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.amber)),
-                   const SizedBox(height: 16),
-                   Expanded(
-                     child: SingleChildScrollView(
-                       scrollDirection: Axis.horizontal,
-                       child: DataTable(
-                         columnSpacing: 20,
-                         columns: [
-                           const DataColumn(label: Text('Rd', style: TextStyle(color: Colors.white70))),
-                           ...players.map((p) => DataColumn(label: Text(p.name, style: const TextStyle(color: Colors.white70)))),
-                         ],
-                         rows: roundNumbers.map((rd) {
-                           return DataRow(
-                             cells: [
-                               DataCell(Text('$rd', style: const TextStyle(color: Colors.white38))),
-                               ...players.map((p) {
-                                  final res = results.firstWhere(
-                                    (r) => r['round_number'] == rd && r['player_id'] == p.id,
-                                    orElse: () => {'bid': '-', 'tricks_won': '-'},
-                                  );
-                                  return DataCell(Text('${res['bid']} (${res['tricks_won']})', 
-                                    style: TextStyle(color: (res['tricks_won'] is int && res['bid'] is int && res['tricks_won'] >= res['bid']) ? Colors.green : Colors.redAccent)));
-                               }),
-                             ],
-                           );
-                         }).toList(),
-                       ),
-                     ),
-                   ),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  String _getSuitEmoji(String? code) {
-    if (code == null) return '';
-    switch (code) {
-      case 'S': return '♠️';
-      case 'H': return '♥️';
-      case 'D': return '♦️';
-      case 'C': return '♣️';
-      default: return '';
+    // Opponent Hands (Face Down)
+    for (var i = 1; i < 4; i++) {
+      final p = players[i];
+      final pos = _getPositionFromIndex(i);
+      final pHandAsync = ref.watch(playerHandProvider(p.id));
+      
+      pHandAsync.whenData((hand) {
+        for (var j = 0; j < hand.length; j++) {
+          handWidgets.add(OpponentCardWidget(position: pos, index: j, total: hand.length));
+        }
+      });
     }
+
+    return handWidgets;
+  }
+}
+
+class HandCardWidget extends StatelessWidget {
+  final CardModel card;
+  final int index;
+  final int total;
+  final bool isPlayable;
+  final VoidCallback? onTap;
+
+  const HandCardWidget({
+    super.key,
+    required this.card,
+    required this.index,
+    required this.total,
+    required this.isPlayable,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final fanOffset = (index - (total - 1) / 2) * 30.0;
+    final rotation = (index - (total - 1) / 2) * 0.1;
+
+    return AnimatedAlign(
+      duration: const Duration(milliseconds: 500),
+      alignment: Alignment.bottomCenter,
+      child: Transform.translate(
+        offset: Offset(fanOffset, -110),
+        child: Transform.rotate(
+          angle: rotation,
+          child: GestureDetector(
+            onTap: onTap,
+            child: Opacity(
+              opacity: isPlayable ? 1.0 : 0.6,
+              child: PlayingCard(
+                card: card,
+                isFaceUp: true,
+                isPlayable: isPlayable,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class OpponentCardWidget extends StatelessWidget {
+  final String position;
+  final int index;
+  final int total;
+
+  const OpponentCardWidget({
+    super.key,
+    required this.position,
+    required this.index,
+    required this.total,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final fanOffset = (index - (total - 1) / 2) * 10.0;
+    final rotation = (index - (total - 1) / 2) * 0.05;
+
+    Alignment alignment;
+    double? top, bottom, left, right;
+    double? angle;
+
+    switch (position) {
+      case 'left':
+        alignment = Alignment.centerLeft;
+        left = 100;
+        top = fanOffset;
+        angle = math.pi / 2 + rotation;
+        break;
+      case 'top':
+        alignment = Alignment.topCenter;
+        top = 110;
+        left = fanOffset;
+        angle = math.pi + rotation;
+        break;
+      case 'right':
+        alignment = Alignment.centerRight;
+        right = 100;
+        bottom = fanOffset;
+        angle = -math.pi / 2 + rotation;
+        break;
+      default:
+        alignment = Alignment.center;
+    }
+
+    return Align(
+      alignment: alignment,
+      child: Transform.translate(
+        offset: Offset(
+          (position == 'left' ? 100 : (position == 'right' ? -100 : fanOffset)),
+          (position == 'top' ? 110 : (position == 'left' ? fanOffset : (position == 'right' ? -fanOffset : 0))),
+        ),
+        child: Transform.rotate(
+          angle: angle ?? 0,
+          child: const PlayingCard(isFaceUp: false),
+        ),
+      ),
+    );
+  }
+}
+
+class PlayedCardWidget extends StatelessWidget {
+  final CardModel card;
+  final String position;
+  final int order;
+
+  const PlayedCardWidget({
+    super.key,
+    required this.card,
+    required this.position,
+    required this.order,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    double offsetX = 0;
+    double offsetY = 0;
+    double rotation = 0;
+
+    switch (position) {
+      case 'bottom': offsetY = 60; rotation = 0; break;
+      case 'left': offsetX = -60; rotation = math.pi / 2; break;
+      case 'top': offsetY = -60; rotation = math.pi; break;
+      case 'right': offsetX = 60; rotation = -math.pi / 2; break;
+    }
+
+    return Center(
+      child: TweenAnimationBuilder<double>(
+        tween: Tween(begin: 0.0, end: 1.0),
+        duration: const Duration(milliseconds: 300),
+        builder: (context, value, child) {
+          return Transform.translate(
+            offset: Offset(offsetX * value, offsetY * value),
+            child: Transform.rotate(
+              angle: rotation + (order * 0.1),
+              child: PlayingCard(card: card, isFaceUp: true),
+            ),
+          );
+        },
+      ),
+    );
   }
 }

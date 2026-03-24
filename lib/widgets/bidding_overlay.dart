@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/card_model.dart';
+import 'dart:ui';
 
 class BiddingOverlay extends ConsumerStatefulWidget {
   final Function(int bid, Suit? trump) onBidSubmitted;
@@ -17,114 +18,141 @@ class _BiddingOverlayState extends ConsumerState<BiddingOverlay> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1E1E1E),
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.5),
-            blurRadius: 20,
-            offset: const Offset(0, -5),
-          ),
-        ],
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Text(
-            'Place your Bid',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
-          ),
-          const SizedBox(height: 24),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              IconButton(
-                onPressed: () => setState(() => _selectedBid = (_selectedBid > 1) ? _selectedBid - 1 : 1),
-                icon: const Icon(Icons.remove_circle_outline, color: Colors.white70, size: 32),
+    return ClipRRect(
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(40)),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          decoration: BoxDecoration(
+            color: Colors.black.withOpacity(0.85),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+            border: Border.all(color: Colors.white.withOpacity(0.1), width: 1),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.4),
+                blurRadius: 30,
+                spreadRadius: 10,
               ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Pull Handle
               Container(
-                width: 100,
-                alignment: Alignment.center,
-                child: Text(
-                  '$_selectedBid',
-                  style: const TextStyle(fontSize: 48, fontWeight: FontWeight.bold, color: Colors.amber),
-                ),
+                width: 40, height: 4, 
+                decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)),
               ),
-              IconButton(
-                onPressed: () => setState(() => _selectedBid = (_selectedBid < 13) ? _selectedBid + 1 : 13),
-                icon: const Icon(Icons.add_circle_outline, color: Colors.white70, size: 32),
+              const SizedBox(height: 24),
+              const Text(
+                'PLACE YOUR BID',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.amber, letterSpacing: 2),
               ),
-            ],
-          ),
-          const SizedBox(height: 24),
-          if (_selectedBid >= 5) ...[
-            const Text(
-              'Select Trump Suit',
-              style: TextStyle(fontSize: 16, color: Colors.white70),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: Suit.values.map((suit) {
-                final isSelected = _selectedTrump == suit;
-                return GestureDetector(
-                  onTap: () => setState(() => _selectedTrump = suit),
-                  child: Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: isSelected ? Colors.amber.withOpacity(0.2) : Colors.transparent,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: isSelected ? Colors.amber : Colors.white10),
-                    ),
+              const SizedBox(height: 24),
+              
+              // Bid Selector
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _buildBidControl(Icons.remove, () => setState(() => _selectedBid = (_selectedBid > 1) ? _selectedBid - 1 : 1)),
+                  Container(
+                    width: 80,
+                    alignment: Alignment.center,
                     child: Text(
-                      _getSuitEmoji(suit),
-                      style: const TextStyle(fontSize: 32),
+                      '$_selectedBid',
+                      style: const TextStyle(fontSize: 48, fontWeight: FontWeight.w900, color: Colors.white, shadows: [
+                        Shadow(color: Colors.amber, blurRadius: 15),
+                      ]),
                     ),
                   ),
-                );
-              }).toList(),
-            ),
-            const SizedBox(height: 24),
-          ],
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: widget.onPass,
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.white70,
-                    side: const BorderSide(color: Colors.white10),
-                    minimumSize: const Size(0, 60),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  ),
-                  child: const Text('PASS'),
-                ),
+                  _buildBidControl(Icons.add, () => setState(() => _selectedBid = (_selectedBid < 13) ? _selectedBid + 1 : 13)),
+                ],
               ),
-              const SizedBox(width: 16),
-              Expanded(
-                flex: 2,
-                child: ElevatedButton(
-                  onPressed: (_selectedBid >= 5 && _selectedTrump == null)
-                      ? null
-                      : () => widget.onBidSubmitted(_selectedBid, _selectedTrump),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.amber,
-                    foregroundColor: Colors.black,
-                    minimumSize: const Size(0, 60),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  ),
-                  child: Text(
-                    _selectedBid >= 5 ? 'LOCK TRUMP & BID' : 'BID ${_selectedBid}',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
+              
+              const SizedBox(height: 24),
+              
+              // Trump Selector (Only if bid >= 5)
+              if (_selectedBid >= 5) ...[
+                const Text(
+                  'CHOOSE TRUMP SUIT',
+                  style: TextStyle(fontSize: 14, color: Colors.white60, fontWeight: FontWeight.bold),
                 ),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: Suit.values.map((suit) {
+                    final isSelected = _selectedTrump == suit;
+                    return GestureDetector(
+                      onTap: () => setState(() => _selectedTrump = suit),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 300),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: isSelected ? Colors.amber.withOpacity(0.3) : Colors.white.withOpacity(0.05),
+                          shape: BoxShape.circle,
+                          border: Border.all(color: isSelected ? Colors.amber : Colors.transparent, width: 2),
+                        ),
+                        child: Text(
+                          _getSuitEmoji(suit),
+                          style: const TextStyle(fontSize: 24),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 16),
+              ],
+              
+              // Actions
+              Row(
+                children: [
+                  Expanded(
+                    child: TextButton(
+                      onPressed: widget.onPass,
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.white60,
+                        padding: const EdgeInsets.symmetric(vertical: 18),
+                      ),
+                      child: const Text('PASS', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    flex: 2,
+                    child: ElevatedButton(
+                      onPressed: (_selectedBid >= 5 && _selectedTrump == null)
+                          ? null
+                          : () => widget.onBidSubmitted(_selectedBid, _selectedTrump),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.amber,
+                        foregroundColor: Colors.black,
+                        elevation: 8,
+                        padding: const EdgeInsets.symmetric(vertical: 18),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      ),
+                      child: Text(
+                        _selectedBid >= 5 ? 'LOCK TRUMP & BID' : 'BID ${_selectedBid}',
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
-        ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBidControl(IconData icon, VoidCallback onPressed) {
+    return Material(
+      color: Colors.white.withOpacity(0.1),
+      shape: const CircleBorder(),
+      child: IconButton(
+        onPressed: onPressed,
+        icon: Icon(icon, color: Colors.white, size: 28),
       ),
     );
   }
