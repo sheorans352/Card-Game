@@ -17,19 +17,16 @@ final currentRoomCodeProvider = StateProvider<String?>((ref) {
     // Check for both query params and hash-based query params
     final uri = Uri.parse(html.window.location.href.replaceFirst('/#/', '/'));
     final room = uri.queryParameters['room'];
-    if (room != null) return room;
+    return room;
   }
   return null;
 });
 
 final localPlayerIdProvider = StateProvider<String?>((ref) {
   if (kIsWeb) {
-    var search = html.window.location.search;
-    if (search != null && search.startsWith('?')) {
-      final uri = Uri.parse(html.window.location.href);
-      final id = uri.queryParameters['playerId'];
-      if (id != null) return id;
-    }
+    final uri = Uri.parse(html.window.location.href.replaceFirst('/#/', '/'));
+    final id = uri.queryParameters['playerId'];
+    return id;
   }
   return null;
 });
