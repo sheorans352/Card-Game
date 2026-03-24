@@ -37,7 +37,16 @@ class SupabaseLobbyService extends LobbyService {
   @override
   Future<Map<String, String>?> joinRoom(String code, String playerName) async {
     final room = await _supabase.from('rooms').select().eq('code', code).maybeSingle();
-    if (room == null) return null;
+    if (room == null || room['status'] != 'waiting') return null;
+
+    // Check current player count
+    final playersResponse = await _supabase
+        .from('players')
+        .select('id', const FetchOptions(count: CountOption.exact))
+        .eq('room_id', room['id']);
+    
+    final count = playersResponse.count ?? 0;
+    if (count >= 4) return null;
 
     final playerResponse = await _supabase.from('players').insert({
       'room_id': room['id'],

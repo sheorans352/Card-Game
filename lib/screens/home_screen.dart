@@ -16,6 +16,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   final _codeController = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    // Auto-fill room code from URL parameters (e.g., ?code=123456)
+    final code = Uri.base.queryParameters['code'];
+    if (code != null) {
+      _codeController.text = code;
+      // Also update the provider so providers listening to currentRoomCodeProvider are in sync
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ref.read(currentRoomCodeProvider.notifier).state = code;
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     // Sync Room Code from URL if available
     ref.listen<String?>(currentRoomCodeProvider, (previous, next) {
