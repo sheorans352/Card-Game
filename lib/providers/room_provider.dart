@@ -6,6 +6,7 @@ import '../models/game_models.dart';
 import '../models/card_model.dart';
 import '../services/lobby_service.dart';
 import '../services/card_service.dart';
+import '../config/env_config.dart';
 
 // Conditionally import dart:html for web
 import 'dart:html' as html;
@@ -206,8 +207,17 @@ final isCutterProvider = Provider.family<bool, String>((ref, code) {
   return players[cutterIndex].id == localId;
 });
 
-final lobbyServiceProvider = Provider<LobbyService>((ref) => MockLobbyService());
-final cardServiceProvider = Provider((ref) => MockCardService());
+final lobbyServiceProvider = Provider<LobbyService>((ref) {
+  final config = ref.watch(appConfigProvider);
+  if (config.useMock) return MockLobbyService();
+  return SupabaseLobbyService(); // Placeholder for future real service
+});
+
+final cardServiceProvider = Provider<CardService>((ref) {
+  final config = ref.watch(appConfigProvider);
+  if (config.useMock) return MockCardService();
+  return SupabaseCardService(); // Placeholder for future real service
+});
 
 class MockLobbyService extends LobbyService {
   @override
