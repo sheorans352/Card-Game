@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -27,11 +28,28 @@ final localPlayerIdProvider = StateProvider<String?>((ref) {
   return null;
 });
 
-// Mock storage disabled for production stability
+// Shared state for Mock (In-memory to avoid dart:html conflicts)
 class LocalStorageSync {
-  static void reset() {}
-  static T getData<T>(String key, T Function(dynamic) fromJson) => null as T;
-  static void setData(String key, dynamic data) {}
+  static const String roomKey = 'minus_mock_room';
+  static const String playersKey = 'minus_mock_players';
+  static const String handsKey = 'minus_mock_hands';
+  static const String playedCardsKey = 'minus_mock_played';
+
+  static final Map<String, String> _storage = {};
+
+  static void reset() {
+    _storage.clear();
+  }
+
+  static T getData<T>(String key, T Function(dynamic) fromJson) {
+    final data = _storage[key];
+    if (data == null) return null as T;
+    return fromJson(jsonDecode(data));
+  }
+
+  static void setData(String key, dynamic data) {
+    _storage[key] = jsonEncode(data);
+  }
 }
 
 final roomMetadataProvider = StreamProvider.family<Room?, String>((ref, code) {
