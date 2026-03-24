@@ -47,11 +47,10 @@ class SupabaseLobbyService extends LobbyService {
     // Check current player count
     final playersResponse = await _supabase
         .from('players')
-        .select('id', const FetchOptions(count: CountOption.exact))
+        .select('id')
         .eq('room_id', room['id']);
     
-    final count = playersResponse.count ?? 0;
-    if (count >= 4) return null;
+    if (playersResponse.length >= 4) return null;
 
     final playerResponse = await _supabase.from('players').insert({
       'room_id': room['id'],

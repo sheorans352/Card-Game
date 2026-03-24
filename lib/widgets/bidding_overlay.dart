@@ -132,7 +132,7 @@ class _BiddingOverlayState extends ConsumerState<BiddingOverlay> {
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                       ),
                       child: Text(
-                        _selectedBid >= 5 ? 'LOCK TRUMP & BID' : 'BID ${_selectedBid}',
+                        _selectedBid >= 5 ? 'LOCK TRUMP & BID' : 'BID $_selectedBid',
                         style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                       ),
                     ),
