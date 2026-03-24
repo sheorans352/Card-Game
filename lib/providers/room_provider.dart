@@ -8,77 +8,36 @@ import '../services/lobby_service.dart';
 import '../services/card_service.dart';
 import '../config/env_config.dart';
 
-// Conditionally import dart:html for web
-import 'dart:html' as html;
+// Removed dart:html to fix Vercel compilation issues
 
 // Mock Providers for Verification
 final currentRoomCodeProvider = StateProvider<String?>((ref) {
   if (kIsWeb) {
-    // Check for both query params and hash-based query params
-    final uri = Uri.parse(html.window.location.href.replaceFirst('/#/', '/'));
-    final room = uri.queryParameters['room'];
-    return room;
+    final uri = Uri.parse(Uri.base.toString().replaceFirst('/#/', '/'));
+    return uri.queryParameters['room'];
   }
   return null;
 });
 
 final localPlayerIdProvider = StateProvider<String?>((ref) {
   if (kIsWeb) {
-    final uri = Uri.parse(html.window.location.href.replaceFirst('/#/', '/'));
-    final id = uri.queryParameters['playerId'];
-    return id;
+    final uri = Uri.parse(Uri.base.toString().replaceFirst('/#/', '/'));
+    return uri.queryParameters['playerId'];
   }
   return null;
 });
 
-// Shared state via LocalStorage
+// Mock storage disabled for production stability
 class LocalStorageSync {
-  static const String roomKey = 'minus_mock_room';
-  static const String playersKey = 'minus_mock_players';
-  static const String handsKey = 'minus_mock_hands';
-  static const String playedCardsKey = 'minus_mock_played';
-
-  static void reset() {
-    if (!kIsWeb) return;
-    html.window.localStorage.remove(roomKey);
-    html.window.localStorage.remove(playersKey);
-    html.window.localStorage.remove(handsKey);
-    html.window.localStorage.remove(playedCardsKey);
-  }
-
-  static T getData<T>(String key, T Function(dynamic) fromJson) {
-    if (!kIsWeb) return null as T;
-    final data = html.window.localStorage[key];
-    if (data == null) return null as T;
-    return fromJson(jsonDecode(data));
-  }
-
-  static void setData(String key, dynamic data) {
-    if (!kIsWeb) return;
-    final encoded = jsonEncode(data);
-    html.window.localStorage[key] = encoded;
-    // Explicitly dispatch event for SAME TAB listeners
-    html.window.dispatchEvent(html.StorageEvent('storage', 
-      key: key,
-      newValue: encoded,
-      storageArea: html.window.localStorage,
-    ));
-  }
+  static void reset() {}
+  static T getData<T>(String key, T Function(dynamic) fromJson) => null as T;
+  static void setData(String key, dynamic data) {}
 }
 
 final roomMetadataProvider = StreamProvider.family<Room?, String>((ref, code) {
   final config = ref.watch(appConfigProvider);
   if (config.useMock) {
-    final controller = StreamController<Room?>();
-    void update() {
-      final room = LocalStorageSync.getData(LocalStorageSync.roomKey, (j) => Room.fromJson(j));
-      if (room != null && room.code == code) controller.add(room);
-      else controller.add(null);
-    }
-    update();
-    final subscription = html.window.onStorage.listen((_) => update());
-    ref.onDispose(() { subscription.cancel(); controller.close(); });
-    return controller.stream;
+    return Stream.value(null);
   } else {
     final supabase = Supabase.instance.client;
     return supabase
@@ -92,16 +51,7 @@ final roomMetadataProvider = StreamProvider.family<Room?, String>((ref, code) {
 final playersStreamProvider = StreamProvider.family<List<Player>, String>((ref, roomId) {
   final config = ref.watch(appConfigProvider);
   if (config.useMock) {
-    final controller = StreamController<List<Player>>();
-    void update() {
-      final playersData = LocalStorageSync.getData<List<Player>>(LocalStorageSync.playersKey, 
-        (j) => (j as List).map<Player>((p) => Player.fromJson(p)).toList());
-      controller.add(playersData ?? []);
-    }
-    update();
-    final subscription = html.window.onStorage.listen((_) => update());
-    ref.onDispose(() { subscription.cancel(); controller.close(); });
-    return controller.stream;
+    return Stream.value([]);
   } else {
     final supabase = Supabase.instance.client;
     return supabase
@@ -115,16 +65,7 @@ final playersStreamProvider = StreamProvider.family<List<Player>, String>((ref, 
 final playerHandProvider = StreamProvider.family<List<Map<String, dynamic>>, String>((ref, playerId) {
   final config = ref.watch(appConfigProvider);
   if (config.useMock) {
-    final controller = StreamController<List<Map<String, dynamic>>>();
-    void update() {
-      final hands = LocalStorageSync.getData(LocalStorageSync.handsKey, (j) => j as Map<String, dynamic>);
-      final myHand = hands[playerId] as List?;
-      controller.add(myHand?.cast<Map<String, dynamic>>() ?? []);
-    }
-    update();
-    final subscription = html.window.onStorage.listen((_) => update());
-    ref.onDispose(() { subscription.cancel(); controller.close(); });
-    return controller.stream;
+    return Stream.value([]);
   } else {
     final supabase = Supabase.instance.client;
     return supabase
@@ -138,16 +79,7 @@ final playerHandProvider = StreamProvider.family<List<Map<String, dynamic>>, Str
 final playedCardsProvider = StreamProvider.family<List<Map<String, dynamic>>, String>((ref, roomId) {
   final config = ref.watch(appConfigProvider);
   if (config.useMock) {
-    final controller = StreamController<List<Map<String, dynamic>>>();
-    void update() {
-      final played = LocalStorageSync.getData<List<Map<String, dynamic>>>(LocalStorageSync.playedCardsKey, 
-        (j) => (j as List).cast<Map<String, dynamic>>());
-      controller.add(played ?? []);
-    }
-    update();
-    final subscription = html.window.onStorage.listen((_) => update());
-    ref.onDispose(() { subscription.cancel(); controller.close(); });
-    return controller.stream;
+    return Stream.value([]);
   } else {
     final supabase = Supabase.instance.client;
     return supabase
