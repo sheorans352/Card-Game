@@ -365,4 +365,28 @@ class MockCardService extends CardService {
     }
     LocalStorageSync.setData(LocalStorageSync.roomKey, nextRoom.toJson());
   }
+
+  @override
+  List<CardModel> generateDeck() {
+    final List<CardModel> deck = [];
+    final suits = Suit.values;
+    for (final suit in suits) {
+      for (int r = 2; r <= 14; r++) {
+        String val;
+        if (r == 14) val = 'A';
+        else if (r == 13) val = 'K';
+        else if (r == 12) val = 'Q';
+        else if (r == 11) val = 'J';
+        else val = r.toString();
+        deck.add(CardModel(suit: suit, value: val, rank: r));
+      }
+    }
+    return deck;
+  }
+
+  @override
+  Future<bool> validateMove(String roomId, String playerId, String cardValue, List<Map<String, dynamic>> currentTrick, List<String> playerHand, String? trumpSuit) async {
+    // In mock, allow all moves for now to simplify testing
+    return true;
+  }
 }

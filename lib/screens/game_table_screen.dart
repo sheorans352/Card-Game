@@ -137,7 +137,6 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
                         ),
                       ),
                     ),
-                  ),
 
                   // TRUMP HUD
                   if (room.trumpSuit != null)
