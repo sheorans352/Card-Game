@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:share_plus/share_plus.dart';
 import '../providers/room_provider.dart';
 import '../models/game_models.dart';
 import '../widgets/spade_background.dart';
@@ -72,29 +70,7 @@ class LobbyScreen extends ConsumerWidget {
                                   color: Colors.white,
                                 ),
                               ),
-                              Column(
-                                children: [
-                                  IconButton(
-                                    icon: const Icon(Icons.copy, size: 20, color: Colors.white54),
-                                    onPressed: () {
-                                      final origin = Uri.base.origin;
-                                      final link = '$origin/#/?room=$code';
-                                      Clipboard.setData(ClipboardData(text: link));
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(content: Text('Invite link copied!')),
-                                      );
-                                    },
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(Icons.share, size: 20, color: Colors.white54),
-                                    onPressed: () {
-                                      final origin = Uri.base.origin;
-                                      final link = '$origin/#/?room=$code';
-                                      Share.share('Join my Minus game: $link');
-                                    },
-                                  ),
-                                ],
-                              ),
+                                  // Share and Copy temporarily disabled for build debugging
                             ],
                           ),
                         ),
