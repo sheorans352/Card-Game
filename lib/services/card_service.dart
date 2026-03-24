@@ -1,7 +1,5 @@
 import '../models/card_model.dart';
-
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../models/card_model.dart';
 
 abstract class CardService {
   List<CardModel> generateDeck();

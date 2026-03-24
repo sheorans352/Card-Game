@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'screens/home_screen.dart';
-import 'dart:html' as html;
-import 'package:flutter/foundation.dart';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'config/env_config.dart';
@@ -15,8 +13,6 @@ Future<void> main() async {
       url: AppConfig.supabaseUrl,
       anonKey: AppConfig.supabaseAnonKey,
     );
-    // Force clear local storage to prevent Mock ghosts
-    html.window.localStorage.clear();
   }
 
   runApp(const ProviderScope(child: MyApp()));
