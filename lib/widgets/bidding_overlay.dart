@@ -4,17 +4,32 @@ import '../models/card_model.dart';
 import 'dart:ui';
 
 class BiddingOverlay extends ConsumerStatefulWidget {
+  final bool isRoundTwo;
+  final int? lockedBid; // If bid was locked in round 1
   final Function(int bid, Suit? trump) onBidSubmitted;
   final VoidCallback onPass;
-  const BiddingOverlay({super.key, required this.onBidSubmitted, required this.onPass});
+  
+  const BiddingOverlay({
+    super.key, 
+    this.isRoundTwo = false,
+    this.lockedBid,
+    required this.onBidSubmitted, 
+    required this.onPass
+  });
 
   @override
   ConsumerState<BiddingOverlay> createState() => _BiddingOverlayState();
 }
 
 class _BiddingOverlayState extends ConsumerState<BiddingOverlay> {
-  int _selectedBid = 1;
+  late int _selectedBid;
   Suit? _selectedTrump;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedBid = widget.lockedBid ?? (widget.isRoundTwo ? 2 : 1);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -55,7 +70,10 @@ class _BiddingOverlayState extends ConsumerState<BiddingOverlay> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  _buildBidControl(Icons.remove, () => setState(() => _selectedBid = (_selectedBid > 1) ? _selectedBid - 1 : 1)),
+                  _buildBidControl(Icons.remove, () {
+                    final min = widget.lockedBid ?? (widget.isRoundTwo ? 2 : 1);
+                    setState(() => _selectedBid = (_selectedBid > min) ? _selectedBid - 1 : min);
+                  }),
                   Container(
                     width: 80,
                     alignment: Alignment.center,
@@ -66,14 +84,18 @@ class _BiddingOverlayState extends ConsumerState<BiddingOverlay> {
                       ]),
                     ),
                   ),
-                  _buildBidControl(Icons.add, () => setState(() => _selectedBid = (_selectedBid < 13) ? _selectedBid + 1 : 13)),
+                  _buildBidControl(Icons.add, () {
+                    final max = widget.lockedBid != null ? widget.lockedBid! : 13;
+                    setState(() => _selectedBid = (_selectedBid < max) ? _selectedBid + 1 : max);
+                  }),
                 ],
               ),
               
               const SizedBox(height: 24),
               
-              // Trump Selector (Only if bid >= 5)
-              if (_selectedBid >= 5) ...[
+              // Trump Selector (Only if bid >= 5 in Round 1, or bid >= 9 in Round 2)
+              bool showTrump = (!widget.isRoundTwo && _selectedBid >= 5) || (widget.isRoundTwo && _selectedBid >= 9);
+              if (showTrump) ...[
                 const Text(
                   'CHOOSE TRUMP SUIT',
                   style: TextStyle(fontSize: 14, color: Colors.white60, fontWeight: FontWeight.bold),
@@ -107,21 +129,23 @@ class _BiddingOverlayState extends ConsumerState<BiddingOverlay> {
               // Actions
               Row(
                 children: [
-                  Expanded(
-                    child: TextButton(
-                      onPressed: widget.onPass,
-                      style: TextButton.styleFrom(
-                        foregroundColor: Colors.white60,
-                        padding: const EdgeInsets.symmetric(vertical: 18),
+                  if (!widget.isRoundTwo && widget.lockedBid == null)
+                    Expanded(
+                      child: TextButton(
+                        onPressed: widget.onPass,
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.white60,
+                          padding: const EdgeInsets.symmetric(vertical: 18),
+                        ),
+                        child: const Text('PASS', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                       ),
-                      child: const Text('PASS', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                     ),
-                  ),
-                  const SizedBox(width: 16),
+                  if (!widget.isRoundTwo && widget.lockedBid == null)
+                    const SizedBox(width: 16),
                   Expanded(
                     flex: 2,
                     child: ElevatedButton(
-                      onPressed: (_selectedBid >= 5 && _selectedTrump == null)
+                      onPressed: (showTrump && _selectedTrump == null)
                           ? null
                           : () => widget.onBidSubmitted(_selectedBid, _selectedTrump),
                       style: ElevatedButton.styleFrom(
@@ -132,7 +156,7 @@ class _BiddingOverlayState extends ConsumerState<BiddingOverlay> {
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                       ),
                       child: Text(
-                        _selectedBid >= 5 ? 'LOCK TRUMP & BID' : 'BID $_selectedBid',
+                        showTrump ? 'LOCK TRUMP & BID' : 'BID $_selectedBid',
                         style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                       ),
                     ),

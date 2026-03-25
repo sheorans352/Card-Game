@@ -302,25 +302,45 @@ class MockCardService extends CardService {
     final hands = <String, dynamic>{};
     for (int i = 0; i < playerIds.length; i++) hands[playerIds[i]] = deck.skip(i * 5).take(5).map((c) => {'card_value': c}).toList();
     LocalStorageSync.setData(LocalStorageSync.handsKey, hands);
-    final nextRoom = room.copyWith(status: 'bidding', currentPhase: 'bidding', turnIndex: (room.dealerIndex + 1) % 4);
+    final nextRoom = room.copyWith(
+      status: 'bidding', 
+      currentPhase: 'bidding', 
+      trumpSuit: 'S',
+      turnIndex: (room.dealerIndex + 3) % 4, // Cutter starts
+    );
     LocalStorageSync.setData(LocalStorageSync.roomKey, nextRoom.toJson());
   }
 
   @override
-  Future<void> dealRemainingEight(String roomId, List<String> playerIds) async {
+  Future<void> dealNextFour(String roomId, List<String> playerIds) async {
     final room = LocalStorageSync.getData(LocalStorageSync.roomKey, (j) => Room.fromJson(j));
     final deck = room.shuffledDeck;
     final hands = LocalStorageSync.getData(LocalStorageSync.handsKey, (j) => j as Map<String, dynamic>);
     for (int i = 0; i < playerIds.length; i++) {
        final existing = (hands[playerIds[i]] as List).cast<Map<String, dynamic>>();
-       final extra = deck.skip(20 + i * 8).take(8).map((c) => {'card_value': c}).toList();
+       final extra = deck.skip(20 + i * 4).take(4).map((c) => {'card_value': c}).toList();
+       hands[playerIds[i]] = [...existing, ...extra];
+    }
+    LocalStorageSync.setData(LocalStorageSync.handsKey, hands);
+    final nextRoom = room.copyWith(status: 'dealing_2', currentPhase: 'dealing_2');
+    LocalStorageSync.setData(LocalStorageSync.roomKey, nextRoom.toJson());
+  }
+
+  @override
+  Future<void> dealFinalFour(String roomId, List<String> playerIds) async {
+    final room = LocalStorageSync.getData(LocalStorageSync.roomKey, (j) => Room.fromJson(j));
+    final deck = room.shuffledDeck;
+    final hands = LocalStorageSync.getData(LocalStorageSync.handsKey, (j) => j as Map<String, dynamic>);
+    for (int i = 0; i < playerIds.length; i++) {
+       final existing = (hands[playerIds[i]] as List).cast<Map<String, dynamic>>();
+       final extra = deck.skip(36 + i * 4).take(4).map((c) => {'card_value': c}).toList();
        hands[playerIds[i]] = [...existing, ...extra];
     }
     LocalStorageSync.setData(LocalStorageSync.handsKey, hands);
     final nextRoom = room.copyWith(
       status: 'bidding_2', 
       currentPhase: 'bidding_2', 
-      turnIndex: (room.dealerIndex + 1) % 4
+      turnIndex: (room.dealerIndex + 3) % 4 // Cutter starts
     );
     LocalStorageSync.setData(LocalStorageSync.roomKey, nextRoom.toJson());
   }
@@ -333,18 +353,24 @@ class MockCardService extends CardService {
     players[pIdx] = players[pIdx].copyWith(bid: bid);
     LocalStorageSync.setData(LocalStorageSync.playersKey, players.map((p) => p.toJson()).toList());
     var nextRoom = room.copyWith(turnIndex: room.turnIndex + 1);
-    if (suit != null) nextRoom = nextRoom.copyWith(trumpSuit: suit, trumpLocked: bid >= 5);
-    
-    // Check for phase transitions
+
     if (room.status == 'bidding') {
-      if (bid >= 5 || (nextRoom.turnIndex % 4 == (room.dealerIndex + 1) % 4)) {
-        LocalStorageSync.setData(LocalStorageSync.roomKey, nextRoom.toJson()); // Save bid first
-        await dealRemainingEight(roomId, players.map((p) => p.id).toList());
+      if (bid >= 5 && suit != null) {
+        nextRoom = nextRoom.copyWith(trumpSuit: suit, trumpLocked: true);
+      }
+      if (nextRoom.turnIndex % 4 == (room.dealerIndex + 1) % 4) {
+        LocalStorageSync.setData(LocalStorageSync.roomKey, nextRoom.toJson());
+        final pIds = players.map((p) => p.id).toList();
+        await dealNextFour(roomId, pIds);
+        await dealFinalFour(roomId, pIds);
         return;
       }
     } else if (room.status == 'bidding_2') {
+      if (bid >= 9 && suit != null) {
+        nextRoom = nextRoom.copyWith(trumpSuit: suit, trumpLocked: true);
+      }
       if (nextRoom.turnIndex % 4 == (room.dealerIndex + 1) % 4) {
-        nextRoom = nextRoom.copyWith(status: 'playing', currentPhase: 'playing', turnIndex: (room.dealerIndex + 3) % 4); // Cutter starts (P4)
+        nextRoom = nextRoom.copyWith(status: 'playing', currentPhase: 'playing', turnIndex: (room.dealerIndex + 1) % 4);
       }
     }
     LocalStorageSync.setData(LocalStorageSync.roomKey, nextRoom.toJson());

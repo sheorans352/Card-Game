@@ -99,11 +99,16 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
                   if ((room.currentPhase == 'bidding' || room.currentPhase == 'bidding_2') && 
                       ref.watch(isLocalPlayerTurnProvider(roomCode)))
                     BiddingOverlay(
+                      isRoundTwo: room.currentPhase == 'bidding_2',
+                      lockedBid: (room.currentPhase == 'bidding_2' && room.trumpLocked == true && players[localIndex].bid != null) 
+                          ? players[localIndex].bid 
+                          : null,
                       onBidSubmitted: (score, trump) {
                         final suitCode = trump?.toString().split('.').last[0].toUpperCase();
                         ref.read(cardServiceProvider).placeBid(room.id, localPlayerId!, score, suit: suitCode);
                       },
                       onPass: () {
+                         // A bid of 1 (or 0) represents a Pass in Round 1
                          ref.read(cardServiceProvider).placeBid(room.id, localPlayerId!, 1);
                       },
                     ),
@@ -119,7 +124,7 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
                       ),
                     ),
                   
-                  if (room.currentPhase == 'cutting')
+                  if (room.currentPhase == 'cutting' && ref.watch(isCutterProvider(roomCode)))
                     const DeckCutOverlay(),
 
                   // TRUMP HUD
