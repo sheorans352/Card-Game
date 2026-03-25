@@ -41,18 +41,23 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
     ref.listen<AsyncValue<Room?>>(roomMetadataProvider(roomCode), (previous, next) {
       next.whenData((room) {
         if (room == null) return;
-        final isDealer = ref.read(isLocalPlayerDealerProvider(roomCode));
+        
+        final players = ref.read(playersStreamProvider(room.id)).value;
+        if (players == null || players.length < 4) return;
+        
+        final localId = ref.read(localPlayerIdProvider);
+        final dealerIndexInList = room.dealerIndex % players.length;
+        final isDealer = players[dealerIndexInList].id == localId;
+        
         if (!isDealer) return;
 
+        print('DEBUG: Dealer detecting state change: ${room.status}');
+
         if (room.status == 'shuffling') {
-          // Auto-trigger shuffle
           ref.read(cardServiceProvider).shuffleDeck(room.id);
         } else if (room.status == 'dealing') {
-          // Auto-trigger initial deal (5 cards each)
-          final players = ref.read(playersStreamProvider(room.id)).value;
-          if (players != null && players.length == 4) {
-             ref.read(cardServiceProvider).dealInitialFive(room.id, players.map((p) => p.id).toList());
-          }
+           print('DEBUG: Dealer triggering initial deal for room: ${room.id}');
+           ref.read(cardServiceProvider).dealInitialFive(room.id, players.map((p) => p.id).toList());
         }
       });
     });
