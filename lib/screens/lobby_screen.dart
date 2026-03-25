@@ -285,22 +285,22 @@ class LobbyScreen extends ConsumerWidget {
 
   Widget _buildWhatsAppButton(String code) {
     final message = 'Join my Minus card game room: ${Uri.base.origin}/?code=$code';
-    return ElevatedButton.styleFrom(
-      backgroundColor: whatsappGreen,
-      foregroundColor: Colors.white,
-      minimumSize: const Size(double.infinity, 60),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-    ).build(
-      child: Row(
+    return ElevatedButton(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: whatsappGreen,
+        foregroundColor: Colors.white,
+        minimumSize: const Size(double.infinity, 60),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      ),
+      onPressed: () => Share.share(message),
+      child: const Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.share, size: 20),
+          Icon(Icons.share, size: 20),
           const SizedBox(width: 12),
           const Text('Share via WhatsApp / SMS', style: TextStyle(fontWeight: FontWeight.bold)),
         ],
       ),
-      onPressed: () => Share.share(message),
-      onLongPress: null,
     );
   }
 }

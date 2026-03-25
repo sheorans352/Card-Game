@@ -222,62 +222,117 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
             Stack(
               clipBehavior: Clip.none,
               children: [
+                // Animated Outer Ring for active player
+                if (isActive)
+                  TweenAnimationBuilder<double>(
+                    tween: Tween(begin: 0.0, end: 1.0),
+                    duration: const Duration(seconds: 2),
+                    builder: (context, value, child) {
+                      return Container(
+                        width: 86,
+                        height: 86,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: accentGold.withOpacity(0.5 + 0.5 * math.sin(value * math.pi * 2)),
+                            width: 2,
+                          ),
+                        ),
+                      );
+                    },
+                    onEnd: () {}, // Handled by repeating logic if needed, but simple glow is fine
+                  ),
                 Container(
                   key: _playerKeys[position],
-                  width: 70,
-                  height: 70,
+                  width: 80,
+                  height: 80,
+                  padding: const EdgeInsets.all(4),
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: Colors.white.withOpacity(0.1),
+                    color: Colors.black45,
                     border: Border.all(
-                      color: isActive ? _GameTableScreenState.accentGold : Colors.white24,
-                      width: isActive ? 3 : 1,
+                      color: isActive ? accentGold : Colors.white10,
+                      width: 1.5,
                     ),
                     boxShadow: isActive ? [
-                      BoxShadow(color: _GameTableScreenState.accentGold.withOpacity(0.5), blurRadius: 15, spreadRadius: 2)
+                      BoxShadow(color: accentGold.withOpacity(0.3), blurRadius: 15, spreadRadius: 2)
                     ] : [],
                   ),
-                  child: Center(
-                    child: Text(
-                      player.name[0].toUpperCase(),
-                      style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: isActive ? accentGold.withOpacity(0.1) : Colors.white.withOpacity(0.05),
+                    ),
+                    child: Center(
+                      child: Text(
+                        player.name[0].toUpperCase(),
+                        style: TextStyle(
+                          fontSize: 28, 
+                          fontWeight: FontWeight.w900, 
+                          color: isActive ? accentGold : Colors.white70,
+                          letterSpacing: 1.5,
+                        ),
+                      ),
                     ),
                   ),
                 ),
                 if (isDealer)
                   Positioned(
-                    right: -5,
-                    bottom: -5,
+                    right: -2,
+                    bottom: -2,
                     child: Container(
-                      width: 24,
-                      height: 24,
-                      decoration: const BoxDecoration(shape: BoxShape.circle, color: _GameTableScreenState.accentGold),
+                      width: 26,
+                      height: 26,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle, 
+                        color: accentGold,
+                        border: Border.all(color: primaryBg, width: 2),
+                        boxShadow: [BoxShadow(color: Colors.black54, blurRadius: 4)],
+                      ),
                       child: const Center(
-                        child: Text('D', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 12)),
+                        child: Text('D', style: TextStyle(color: primaryBg, fontWeight: FontWeight.bold, fontSize: 13)),
                       ),
                     ),
                   ),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
               decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.5),
-                borderRadius: BorderRadius.circular(12),
+                color: Colors.black87,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.white10, width: 0.5),
               ),
-              child: Text(
-                '${player.name}\nScore: ${player.totalScore}',
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.white, fontSize: 12),
+              child: Column(
+                children: [
+                   Text(
+                    player.name,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: isActive ? accentGold : Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Score: ${player.totalScore}',
+                    style: const TextStyle(color: Colors.white38, fontSize: 11),
+                  ),
+                ],
               ),
             ),
             if (player.bid != null)
               Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Text(
-                  'Bid: ${player.bid} | Trkf: ${player.tricksWon}',
-                  style: const TextStyle(color: _GameTableScreenState.accentGold, fontSize: 11, fontWeight: FontWeight.bold),
+                padding: const EdgeInsets.only(top: 6),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: accentGold.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: accentGold.withOpacity(0.3), width: 0.5),
+                  ),
+                  child: Text(
+                    'Bid: ${player.bid} | Won: ${player.tricksWon}',
+                    style: const TextStyle(color: accentGold, fontSize: 10, fontWeight: FontWeight.w800),
+                  ),
                 ),
               ),
           ],
@@ -297,10 +352,11 @@ class TableLayer extends StatelessWidget {
       height: math.min(MediaQuery.of(context).size.width * 0.8, 600),
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: const Color(0xFF0F3018), // Slightly lighter green for table felt
-        border: Border.all(color: _GameTableScreenState.primaryBg, width: 15),
+        color: const Color(0xFF0F3018), // Table felt
+        border: Border.all(color: const Color(0xFF0B2111), width: 12),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.5), blurRadius: 40, spreadRadius: 10),
+          BoxShadow(color: Colors.black.withOpacity(0.6), blurRadius: 40, spreadRadius: 5),
+          BoxShadow(color: _GameTableScreenState.accentGold.withOpacity(0.1), blurRadius: 10, spreadRadius: 0),
         ],
       ),
       child: Center(

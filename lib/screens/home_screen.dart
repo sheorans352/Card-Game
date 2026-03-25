@@ -135,13 +135,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.spades, color: Colors.white.withOpacity(0.15), size: 24),
+                          _buildSuitIcon('♠', Colors.white.withOpacity(0.15)),
                           const SizedBox(width: 16),
-                          Icon(Icons.favorite, color: Colors.red.withOpacity(0.5), size: 24),
+                          _buildSuitIcon('♥', Colors.red.withOpacity(0.5)),
                           const SizedBox(width: 16),
-                          const Icon(Icons.diamond, color: Colors.blue, size: 24),
+                          _buildSuitIcon('♦', Colors.blue.withOpacity(0.5)),
                           const SizedBox(width: 16),
-                          Icon(Icons.clubs, color: Colors.white.withOpacity(0.15), size: 24),
+                          _buildSuitIcon('♣', Colors.white.withOpacity(0.15)),
                         ],
                       ),
                       const SizedBox(height: 48),
@@ -261,6 +261,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildSuitIcon(String char, Color color) {
+    return Text(
+      char,
+      style: TextStyle(color: color, fontSize: 24),
     );
   }
 
