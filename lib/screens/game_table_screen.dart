@@ -352,14 +352,34 @@ class TableLayer extends StatelessWidget {
       height: math.min(MediaQuery.of(context).size.width * 0.8, 600),
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: const Color(0xFF0F3018), // Table felt
-        border: Border.all(color: const Color(0xFF0B2111), width: 12),
+        gradient: RadialGradient(
+          colors: [
+            const Color(0xFF144525), // Lighter center
+            const Color(0xFF0F3018), // Standard felt
+            const Color(0xFF0B2111), // Deep edge
+          ],
+          stops: const [0.0, 0.7, 1.0],
+        ),
         boxShadow: [
           BoxShadow(color: Colors.black.withOpacity(0.6), blurRadius: 40, spreadRadius: 5),
-          BoxShadow(color: _GameTableScreenState.accentGold.withOpacity(0.1), blurRadius: 10, spreadRadius: 0),
+          BoxShadow(color: _GameTableScreenState.accentGold.withOpacity(0.05), blurRadius: 20, spreadRadius: 2),
         ],
+        border: Border.all(color: const Color(0xFF1A1A1A), width: 12),
       ),
-      child: Center(
+      child: Stack(
+        children: [
+          // Subtle Felt Texture Overlay
+          Positioned.fill(
+            child: Opacity(
+              opacity: 0.03,
+              child: Image.network(
+                'https://www.transparenttextures.com/patterns/felt.png',
+                repeat: ImageRepeat.repeat,
+                errorBuilder: (context, error, stackTrace) => const SizedBox(),
+              ),
+            ),
+          ),
+          Center(
         child: Consumer(builder: (context, ref, _) {
           final roomCode = ref.watch(currentRoomCodeProvider);
           final room = roomCode != null ? ref.watch(roomMetadataProvider(roomCode)).value : null;
@@ -539,26 +559,37 @@ class HandCardWidget extends StatelessWidget {
     final fanOffset = (index - (total - 1) / 2) * 30.0;
     final rotation = (index - (total - 1) / 2) * 0.1;
 
-    return AnimatedAlign(
-      duration: const Duration(milliseconds: 500),
-      alignment: Alignment.bottomCenter,
-      child: Transform.translate(
-        offset: Offset(fanOffset, -110),
-        child: Transform.rotate(
-          angle: rotation,
-          child: GestureDetector(
-            onTap: onTap,
-            child: Opacity(
-              opacity: isPlayable ? 1.0 : 0.6,
-              child: PlayingCard(
-                card: card,
-                isFaceUp: true,
-                isPlayable: isPlayable,
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0.0, end: 1.0),
+      duration: Duration(milliseconds: 600 + (index * 100)),
+      curve: Curves.easeOutBack,
+      builder: (context, value, child) {
+        return Align(
+          alignment: Alignment.bottomCenter,
+          child: Transform.translate(
+            offset: Offset(
+              fanOffset * value, 
+              -110 - (1 - value) * 400 // Fly from center
+            ),
+            child: Transform.rotate(
+              angle: rotation * value,
+              child: GestureDetector(
+                onTap: onTap,
+                child: Opacity(
+                  opacity: isPlayable ? 1.0 : 0.6,
+                  child: PlayingCard(
+                    card: card,
+                    isFaceUp: true,
+                    isPlayable: isPlayable,
+                    width: 70, // Slightly larger hand cards
+                    height: 105,
+                  ),
+                ),
               ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }
@@ -607,18 +638,29 @@ class OpponentCardWidget extends StatelessWidget {
         alignment = Alignment.center;
     }
 
-    return Align(
-      alignment: alignment,
-      child: Transform.translate(
-        offset: Offset(
-          (position == 'left' ? 100 : (position == 'right' ? -100 : fanOffset)),
-          (position == 'top' ? 110 : (position == 'left' ? fanOffset : (position == 'right' ? -fanOffset : 0))),
-        ),
-        child: Transform.rotate(
-          angle: angle ?? 0,
-          child: const PlayingCard(isFaceUp: false),
-        ),
-      ),
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0.0, end: 1.0),
+      duration: Duration(milliseconds: 500 + (index * 80)),
+      curve: Curves.easeOutCubic,
+      builder: (context, value, child) {
+        double offX = 0, offY = 0;
+        switch (position) {
+          case 'left': offX = 140; offY = fanOffset; break;
+          case 'top': offX = fanOffset; offY = 140; break;
+          case 'right': offX = -140; offY = -fanOffset; break;
+        }
+
+        return Align(
+          alignment: alignment,
+          child: Transform.translate(
+            offset: Offset(offX * value, offY * value),
+            child: Transform.rotate(
+              angle: (angle ?? 0) * value,
+              child: const PlayingCard(isFaceUp: false, width: 50, height: 75),
+            ),
+          ),
+        );
+      },
     );
   }
 }
