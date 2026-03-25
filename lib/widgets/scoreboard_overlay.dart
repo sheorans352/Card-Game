@@ -6,14 +6,6 @@ class ScoreboardOverlay extends ConsumerWidget {
   final String roomId;
   const ScoreboardOverlay({super.key, required this.roomId});
 
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final playersAsync = ref.watch(playersStreamProvider(roomId));
-
-class ScoreboardOverlay extends ConsumerWidget {
-  final String roomId;
-  const ScoreboardOverlay({super.key, required this.roomId});
-
   static const Color accentGold = Color(0xFFC7A14C);
   static const Color cardDark = Color(0xFF141414);
 
