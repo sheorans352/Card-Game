@@ -277,7 +277,7 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
                 padding: const EdgeInsets.only(top: 4),
                 child: Text(
                   'Bid: ${player.bid} | Trkf: ${player.tricksWon}',
-                  style: const TextStyle(color: Colors.amber, fontSize: 11, fontWeight: FontWeight.bold),
+                  style: const TextStyle(color: _GameTableScreenState.accentGold, fontSize: 11, fontWeight: FontWeight.bold),
                 ),
               ),
           ],
