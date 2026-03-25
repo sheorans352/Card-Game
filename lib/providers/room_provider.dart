@@ -11,6 +11,8 @@ import '../config/env_config.dart';
 
 // Removed dart:html to fix Vercel compilation issues
 
+SupabaseClient get supabase => Supabase.instance.client;
+
 // Mock Providers for Verification
 final currentRoomCodeProvider = StateProvider<String?>((ref) {
   if (kIsWeb) {
@@ -57,12 +59,15 @@ final roomMetadataProvider = StreamProvider.family<Room?, String>((ref, code) {
   if (config.useMock) {
     return Stream.value(null);
   } else {
-    final supabase = Supabase.instance.client;
     return supabase
         .from('rooms')
         .stream(primaryKey: ['id'])
         .eq('code', code)
-        .map<Room?>((data) => data.isEmpty ? null : Room.fromJson(Map<String, dynamic>.from(data.first)));
+        .map<Room?>((data) => data.isEmpty ? null : Room.fromJson(Map<String, dynamic>.from(data.first)))
+        .handleError((error) {
+          debugPrint('Supabase Stream Error (Room): $error');
+          throw error;
+        });
   }
 });
 
@@ -71,12 +76,15 @@ final playersStreamProvider = StreamProvider.family<List<Player>, String>((ref, 
   if (config.useMock) {
     return Stream.value([]);
   } else {
-    final supabase = Supabase.instance.client;
     return supabase
         .from('players')
         .stream(primaryKey: ['id'])
         .eq('room_id', roomId)
-        .map((data) => data.map<Player>((p) => Player.fromJson(p)).toList());
+        .map((data) => data.map<Player>((p) => Player.fromJson(p)).toList())
+        .handleError((error) {
+          debugPrint('Supabase Stream Error (Players): $error');
+          throw error;
+        });
   }
 });
 
@@ -85,12 +93,15 @@ final playerHandProvider = StreamProvider.family<List<Map<String, dynamic>>, Str
   if (config.useMock) {
     return Stream.value([]);
   } else {
-    final supabase = Supabase.instance.client;
     return supabase
         .from('hands')
         .stream(primaryKey: ['id'])
         .eq('player_id', playerId)
-        .map((data) => data.map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e)).toList());
+        .map((data) => data.map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e)).toList())
+        .handleError((error) {
+          debugPrint('Supabase Stream Error (Hand): $error');
+          throw error;
+        });
   }
 });
 
@@ -99,12 +110,15 @@ final playedCardsProvider = StreamProvider.family<List<Map<String, dynamic>>, St
   if (config.useMock) {
     return Stream.value([]);
   } else {
-    final supabase = Supabase.instance.client;
     return supabase
         .from('played_cards')
         .stream(primaryKey: ['id'])
         .eq('room_id', roomId)
-        .map((data) => data.map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e)).toList());
+        .map((data) => data.map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e)).toList())
+        .handleError((error) {
+          debugPrint('Supabase Stream Error (PlayedCards): $error');
+          throw error;
+        });
   }
 });
 

@@ -49,7 +49,6 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
           ref.read(cardServiceProvider).shuffleDeck(room.id);
         } else if (room.status == 'dealing') {
           // Auto-trigger initial deal (5 cards each)
-          // We need player IDs
           final players = ref.read(playersStreamProvider(room.id)).value;
           if (players != null && players.length == 4) {
              ref.read(cardServiceProvider).dealInitialFive(room.id, players.map((p) => p.id).toList());
@@ -96,7 +95,7 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
                     playerPositions: _playerKeys,
                   ),
 
-                   // Overlays
+                   // Overlays (Bidding)
                   if ((room.currentPhase == 'bidding' || room.currentPhase == 'bidding_2') && 
                       ref.watch(isLocalPlayerTurnProvider(roomCode)))
                     BiddingOverlay(
@@ -123,46 +122,6 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
                   if (room.currentPhase == 'cutting')
                     const DeckCutOverlay(),
 
-                  // Scoreboard Trigger
-                  Positioned(
-                    top: 40,
-                    right: 20,
-                    child: IconButton(
-                      icon: const Icon(Icons.leaderboard, color: _GameTableScreenState.accentGold, size: 32),
-                      onPressed: () => showDialog(
-                        context: context,
-                        builder: (context) => ScoreboardOverlay(roomId: room.id),
-                      ),
-                    ),
-                  ),
-                  if (room.status == 'game_over')
-                    Center(
-                      child: Container(
-                        padding: const EdgeInsets.all(32),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.9),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: _GameTableScreenState.accentGold, width: 2),
-                        ),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Text('GAME OVER', style: TextStyle(fontSize: 48, fontWeight: FontWeight.bold, color: _GameTableScreenState.accentGold)),
-                            const SizedBox(height: 20),
-                            ...players.map((p) => Text('${p.name}: ${p.totalScore}', style: const TextStyle(color: Colors.white, fontSize: 24))),
-                            const SizedBox(height: 30),
-                            ElevatedButton(
-                              onPressed: () {
-                                LocalStorageSync.reset();
-                                Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
-                              },
-                              child: const Text('RESTART MOCK'),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-
                   // TRUMP HUD
                   if (room.trumpSuit != null)
                     Positioned(
@@ -173,7 +132,7 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
                         decoration: BoxDecoration(
                           color: Colors.black.withOpacity(0.7),
                           borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: _GameTableScreenState.accentGold.withOpacity(0.5), width: 1),
+                          border: Border.all(color: accentGold.withOpacity(0.5), width: 1),
                           boxShadow: [BoxShadow(color: Colors.black54, blurRadius: 10)],
                         ),
                         child: Row(
@@ -185,15 +144,59 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
                         ),
                       ),
                     ),
+
+                  // Scoreboard Trigger
+                  Positioned(
+                    top: 40,
+                    right: 20,
+                    child: IconButton(
+                      icon: const Icon(Icons.leaderboard, color: accentGold, size: 32),
+                      onPressed: () => showDialog(
+                        context: context,
+                        builder: (context) => ScoreboardOverlay(roomId: room.id),
+                      ),
+                    ),
+                  ),
+
+                  // Game Over Overlay
+                  if (room.status == 'game_over')
+                    Center(
+                      child: Container(
+                        padding: const EdgeInsets.all(32),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.9),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: accentGold, width: 2),
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Text('GAME OVER', style: TextStyle(fontSize: 48, fontWeight: FontWeight.bold, color: accentGold)),
+                            const SizedBox(height: 16),
+                            ElevatedButton(
+                              style: ElevatedButton.styleFrom(backgroundColor: accentGold, foregroundColor: Colors.black),
+                              onPressed: () => Navigator.of(context).pop(),
+                              child: const Text('BACK TO LOBBY'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                 ],
               );
             },
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, s) => Center(child: Text('Error: $e')),
+            loading: () => const Center(child: CircularProgressIndicator(color: accentGold)),
+            error: (err, stack) => _ErrorView(
+              message: 'Players sync lost',
+              onRetry: () => ref.refresh(playersStreamProvider(room.id)),
+            ),
           );
         },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, s) => Center(child: Text('Error: $e')),
+        loading: () => const Center(child: CircularProgressIndicator(color: accentGold)),
+        error: (err, stack) => _ErrorView(
+          message: 'Connection timed out',
+          onRetry: () => ref.refresh(roomMetadataProvider(roomCode)),
+        ),
       ),
     );
   }
@@ -222,7 +225,6 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
             Stack(
               clipBehavior: Clip.none,
               children: [
-                // Animated Outer Ring for active player
                 if (isActive)
                   TweenAnimationBuilder<double>(
                     tween: Tween(begin: 0.0, end: 1.0),
@@ -240,12 +242,9 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
                         ),
                       );
                     },
-                    onEnd: () {}, // Handled by repeating logic if needed, but simple glow is fine
                   ),
                 Container(
-                  key: _playerKeys[position],
-                  width: 80,
-                  height: 80,
+                  width: 80, height: 80,
                   padding: const EdgeInsets.all(4),
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
@@ -278,11 +277,9 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
                 ),
                 if (isDealer)
                   Positioned(
-                    right: -2,
-                    bottom: -2,
+                    right: -2, bottom: -2,
                     child: Container(
-                      width: 26,
-                      height: 26,
+                      width: 26, height: 26,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle, 
                         color: accentGold,
@@ -319,22 +316,50 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
                 ],
               ),
             ),
-            if (player.bid != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 6),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: accentGold.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: accentGold.withOpacity(0.3), width: 0.5),
-                  ),
-                  child: Text(
-                    'Bid: ${player.bid} | Won: ${player.tricksWon}',
-                    style: const TextStyle(color: accentGold, fontSize: 10, fontWeight: FontWeight.w800),
-                  ),
-                ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ErrorView extends StatelessWidget {
+  final String message;
+  final VoidCallback onRetry;
+
+  const _ErrorView({required this.message, required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        margin: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: const Color(0xFF0B2111),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.redAccent.withOpacity(0.5)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.wifi_off, color: Colors.redAccent, size: 48),
+            const SizedBox(height: 16),
+            Text(message, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
+            const SizedBox(height: 8),
+            const Text('The Realtime connection was interrupted.', 
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.white70)),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              icon: const Icon(Icons.refresh),
+              label: const Text('RECONNECT NOW'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFC7A14C),
+                foregroundColor: Colors.black,
               ),
+              onPressed: onRetry,
+            ),
           ],
         ),
       ),
@@ -354,21 +379,20 @@ class TableLayer extends StatelessWidget {
         shape: BoxShape.circle,
         gradient: RadialGradient(
           colors: [
-            const Color(0xFF144525), // Lighter center
-            const Color(0xFF0F3018), // Standard felt
-            const Color(0xFF0B2111), // Deep edge
+            const Color(0xFF144525), 
+            const Color(0xFF0F3018), 
+            const Color(0xFF0B2111), 
           ],
           stops: const [0.0, 0.7, 1.0],
         ),
         boxShadow: [
           BoxShadow(color: Colors.black.withOpacity(0.6), blurRadius: 40, spreadRadius: 5),
-          BoxShadow(color: _GameTableScreenState.accentGold.withOpacity(0.05), blurRadius: 20, spreadRadius: 2),
+          BoxShadow(color: const Color(0xFFC7A14C).withOpacity(0.05), blurRadius: 20, spreadRadius: 2),
         ],
         border: Border.all(color: const Color(0xFF1A1A1A), width: 12),
       ),
       child: Stack(
         children: [
-          // Subtle Felt Texture Overlay
           Positioned.fill(
             child: Opacity(
               opacity: 0.03,
@@ -408,7 +432,7 @@ class TableLayer extends StatelessWidget {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     gradient: RadialGradient(
-                      colors: [_GameTableScreenState.accentGold.withOpacity(0.2), Colors.transparent],
+                      colors: [const Color(0xFFC7A14C).withOpacity(0.2), Colors.transparent],
                     ),
                   ),
                 ),
@@ -450,31 +474,22 @@ class CardsLayer extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final playedCardsAsync = ref.watch(playedCardsProvider(roomId));
-    final roomCode = ref.watch(currentRoomCodeProvider);
-    final room = roomCode != null ? ref.watch(roomMetadataProvider(roomCode)).value : null;
 
     return playedCardsAsync.when(
       data: (playedMaps) {
-        // 1. Identify current trick (last 1-4 cards)
         final trickSize = playedMaps.length % 4;
         final trickStartIndex = playedMaps.length - (trickSize == 0 && playedMaps.isNotEmpty ? 4 : trickSize);
         if (trickStartIndex < 0) return const SizedBox();
-        
         final currentTrick = playedMaps.sublist(trickStartIndex);
 
         return Stack(
           children: [
-            // Cards in Hand
             ..._buildPlayerHands(ref),
-            
-            // Cards on Table
             ...currentTrick.map((m) {
               final player = players.cast<Player?>().firstWhere((p) => p?.id == m['player_id'], orElse: () => null);
               if (player == null) return const SizedBox();
-              
               final playerIdxInRotated = players.indexOf(player);
               final pos = _getPositionFromIndex(playerIdxInRotated);
-              
               return PlayedCardWidget(
                 card: CardModel.fromId(m['card_value']),
                 position: pos,
@@ -502,15 +517,12 @@ class CardsLayer extends ConsumerWidget {
   List<Widget> _buildPlayerHands(WidgetRef ref) {
     final localHandAsync = ref.watch(playerHandProvider(localPlayerId));
     final playableIds = ref.watch(playableCardsProvider(roomId));
-
     List<Widget> handWidgets = [];
 
-    // Local Player Hand (Bottom)
     localHandAsync.whenData((hand) {
       for (var i = 0; i < hand.length; i++) {
         final cardId = hand[i]['card_value'] as String;
         final isPlayable = playableIds.contains(cardId);
-        
         handWidgets.add(
           HandCardWidget(
             card: CardModel.fromId(cardId),
@@ -523,19 +535,16 @@ class CardsLayer extends ConsumerWidget {
       }
     });
 
-    // Opponent Hands (Face Down)
     for (var i = 1; i < 4; i++) {
       final p = players[i];
       final pos = _getPositionFromIndex(i);
       final pHandAsync = ref.watch(playerHandProvider(p.id));
-      
       pHandAsync.whenData((hand) {
         for (var j = 0; j < hand.length; j++) {
           handWidgets.add(OpponentCardWidget(position: pos, index: j, total: hand.length));
         }
       });
     }
-
     return handWidgets;
   }
 }
@@ -569,10 +578,7 @@ class HandCardWidget extends StatelessWidget {
         return Align(
           alignment: Alignment.bottomCenter,
           child: Transform.translate(
-            offset: Offset(
-              fanOffset * value, 
-              -110 - (1 - value) * 400 // Fly from center
-            ),
+            offset: Offset(fanOffset * value, -110 - (1 - value) * 400),
             child: Transform.rotate(
               angle: rotation * value,
               child: GestureDetector(
@@ -583,7 +589,7 @@ class HandCardWidget extends StatelessWidget {
                     card: card,
                     isFaceUp: true,
                     isPlayable: isPlayable,
-                    width: 70, // Slightly larger hand cards
+                    width: 70, 
                     height: 105,
                   ),
                 ),
@@ -618,26 +624,10 @@ class OpponentCardWidget extends StatelessWidget {
     double? angle;
 
     switch (position) {
-      case 'left':
-        alignment = Alignment.centerLeft;
-        left = 100;
-        top = fanOffset;
-        angle = math.pi / 2 + rotation;
-        break;
-      case 'top':
-        alignment = Alignment.topCenter;
-        top = 110;
-        left = fanOffset;
-        angle = math.pi + rotation;
-        break;
-      case 'right':
-        alignment = Alignment.centerRight;
-        right = 100;
-        bottom = fanOffset;
-        angle = -math.pi / 2 + rotation;
-        break;
-      default:
-        alignment = Alignment.center;
+      case 'left': alignment = Alignment.centerLeft; left = 100; top = fanOffset; angle = math.pi / 2 + rotation; break;
+      case 'top': alignment = Alignment.topCenter; top = 110; left = fanOffset; angle = math.pi + rotation; break;
+      case 'right': alignment = Alignment.centerRight; right = 100; bottom = fanOffset; angle = -math.pi / 2 + rotation; break;
+      default: alignment = Alignment.center;
     }
 
     return TweenAnimationBuilder<double>(
