@@ -380,40 +380,42 @@ class TableLayer extends StatelessWidget {
             ),
           ),
           Center(
-        child: Consumer(builder: (context, ref, _) {
-          final roomCode = ref.watch(currentRoomCodeProvider);
-          final room = roomCode != null ? ref.watch(roomMetadataProvider(roomCode)).value : null;
-          final players = room != null ? ref.watch(playersStreamProvider(room.id)).value : null;
-          final localId = ref.watch(localPlayerIdProvider);
+            child: Consumer(builder: (context, ref, _) {
+              final roomCode = ref.watch(currentRoomCodeProvider);
+              final room = roomCode != null ? ref.watch(roomMetadataProvider(roomCode)).value : null;
+              final players = room != null ? ref.watch(playersStreamProvider(room.id)).value : null;
+              final localId = ref.watch(localPlayerIdProvider);
 
-          if (room == null || players == null || localId == null) return const SizedBox();
+              if (room == null || players == null || localId == null) return const SizedBox();
 
-          final localIndex = players.indexWhere((p) => p.id == localId);
-          final playerTurnIndexInRotated = (room.turnIndex - localIndex + 4) % 4;
-          
-          Alignment alignment;
-          switch (playerTurnIndexInRotated) {
-             case 0: alignment = Alignment.bottomCenter; break;
-             case 1: alignment = Alignment.centerLeft; break;
-             case 2: alignment = Alignment.topCenter; break;
-             case 3: alignment = Alignment.centerRight; break;
-             default: alignment = Alignment.center;
-          }
+              final localIndex = players.indexWhere((p) => p.id == localId);
+              final playerTurnIndexInRotated = (room.turnIndex - localIndex + 4) % 4;
+              
+              Alignment alignment;
+              switch (playerTurnIndexInRotated) {
+                 case 0: alignment = Alignment.bottomCenter; break;
+                 case 1: alignment = Alignment.centerLeft; break;
+                 case 2: alignment = Alignment.topCenter; break;
+                 case 3: alignment = Alignment.centerRight; break;
+                 default: alignment = Alignment.center;
+              }
 
-          return AnimatedAlign(
-            duration: const Duration(milliseconds: 500),
-            alignment: alignment,
-            child: Container(
-              width: 150, height: 150,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: [_GameTableScreenState.accentGold.withOpacity(0.2), Colors.transparent],
+              return AnimatedAlign(
+                duration: const Duration(milliseconds: 500),
+                alignment: alignment,
+                child: Container(
+                  width: 150, height: 150,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(
+                      colors: [_GameTableScreenState.accentGold.withOpacity(0.2), Colors.transparent],
+                    ),
+                  ),
                 ),
-              ),
-            ),
-          );
-        }),
+              );
+            }),
+          ),
+        ],
       ),
     );
   }

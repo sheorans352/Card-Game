@@ -14,6 +14,9 @@ class _DeckCutOverlayState extends ConsumerState<DeckCutOverlay> {
   static const Color accentGold = Color(0xFFC7A14C);
   static const Color cardDark = Color(0xFF141414);
 
+  double _cutPercentage = 0.5;
+  bool _isConfirming = false;
+
   @override
   Widget build(BuildContext context) {
     final roomCode = ref.watch(currentRoomCodeProvider);
