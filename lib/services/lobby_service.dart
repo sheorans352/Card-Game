@@ -13,20 +13,22 @@ class SupabaseLobbyService extends LobbyService {
   Future<Map<String, String>> createRoom(String hostName) async {
     final roomCode = (100000 + (DateTime.now().millisecondsSinceEpoch % 900000)).toString();
     
-    final roomResponse = await _supabase.from('rooms').insert({
+    final roomResponseList = await _supabase.from('rooms').insert({
       'code': roomCode,
       'status': 'waiting',
       'current_phase': 'lobby',
       'dealer_index': 0,
       'turn_index': 0,
-    }).select().single();
+    }).select();
+    final roomResponse = roomResponseList.first;
 
-    final playerResponse = await _supabase.from('players').insert({
+    final playerResponseList = await _supabase.from('players').insert({
       'room_id': roomResponse['id'],
       'name': hostName,
       'is_host': true,
       'total_score': 0,
-    }).select().single();
+    }).select();
+    final playerResponse = playerResponseList.first;
 
     // Update room with host_id
     await _supabase.from('rooms').update({
@@ -53,12 +55,13 @@ class SupabaseLobbyService extends LobbyService {
     
     if (playersResponse.length >= 4) return null;
 
-    final playerResponse = await _supabase.from('players').insert({
+    final playerResponseList = await _supabase.from('players').insert({
       'room_id': room['id'],
       'name': playerName,
       'is_host': false,
       'total_score': 0,
-    }).select().single();
+    }).select();
+    final playerResponse = playerResponseList.first;
 
     return {
       'playerId': playerResponse['id'],
