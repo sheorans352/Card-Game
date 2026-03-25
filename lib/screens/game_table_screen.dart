@@ -19,6 +19,10 @@ class GameTableScreen extends ConsumerStatefulWidget {
 }
 
 class _GameTableScreenState extends ConsumerState<GameTableScreen> {
+  static const Color primaryBg = Color(0xFF0B2111);
+  static const Color accentGold = Color(0xFFC7A14C);
+  static const Color cardDark = Color(0xFF141414);
+
   final Map<String, GlobalKey> _playerKeys = {
     'bottom': GlobalKey(),
     'left': GlobalKey(),
@@ -124,7 +128,7 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
                     top: 40,
                     right: 20,
                     child: IconButton(
-                      icon: const Icon(Icons.leaderboard, color: Colors.amber, size: 32),
+                      icon: const Icon(Icons.leaderboard, color: _GameTableScreenState.accentGold, size: 32),
                       onPressed: () => showDialog(
                         context: context,
                         builder: (context) => ScoreboardOverlay(roomId: room.id),
@@ -138,12 +142,12 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
                         decoration: BoxDecoration(
                           color: Colors.black.withOpacity(0.9),
                           borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: Colors.amber, width: 2),
+                          border: Border.all(color: _GameTableScreenState.accentGold, width: 2),
                         ),
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Text('GAME OVER', style: TextStyle(fontSize: 48, fontWeight: FontWeight.bold, color: Colors.amber)),
+                            const Text('GAME OVER', style: TextStyle(fontSize: 48, fontWeight: FontWeight.bold, color: _GameTableScreenState.accentGold)),
                             const SizedBox(height: 20),
                             ...players.map((p) => Text('${p.name}: ${p.totalScore}', style: const TextStyle(color: Colors.white, fontSize: 24))),
                             const SizedBox(height: 30),
@@ -169,7 +173,7 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
                         decoration: BoxDecoration(
                           color: Colors.black.withOpacity(0.7),
                           borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: Colors.amber.withOpacity(0.5), width: 1),
+                          border: Border.all(color: _GameTableScreenState.accentGold.withOpacity(0.5), width: 1),
                           boxShadow: [BoxShadow(color: Colors.black54, blurRadius: 10)],
                         ),
                         child: Row(
@@ -226,11 +230,11 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
                     shape: BoxShape.circle,
                     color: Colors.white.withOpacity(0.1),
                     border: Border.all(
-                      color: isActive ? Colors.amber : Colors.white24,
+                      color: isActive ? _GameTableScreenState.accentGold : Colors.white24,
                       width: isActive ? 3 : 1,
                     ),
                     boxShadow: isActive ? [
-                      BoxShadow(color: Colors.amber.withOpacity(0.5), blurRadius: 15, spreadRadius: 2)
+                      BoxShadow(color: _GameTableScreenState.accentGold.withOpacity(0.5), blurRadius: 15, spreadRadius: 2)
                     ] : [],
                   ),
                   child: Center(
@@ -247,7 +251,7 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
                     child: Container(
                       width: 24,
                       height: 24,
-                      decoration: const BoxDecoration(shape: BoxShape.circle, color: Colors.amber),
+                      decoration: const BoxDecoration(shape: BoxShape.circle, color: _GameTableScreenState.accentGold),
                       child: const Center(
                         child: Text('D', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 12)),
                       ),
@@ -293,8 +297,8 @@ class TableLayer extends StatelessWidget {
       height: math.min(MediaQuery.of(context).size.width * 0.8, 600),
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: const Color(0xFF076324),
-        border: Border.all(color: const Color(0xFF054D1C), width: 15),
+        color: const Color(0xFF0F3018), // Slightly lighter green for table felt
+        border: Border.all(color: _GameTableScreenState.primaryBg, width: 15),
         boxShadow: [
           BoxShadow(color: Colors.black.withOpacity(0.5), blurRadius: 40, spreadRadius: 10),
         ],
@@ -328,7 +332,7 @@ class TableLayer extends StatelessWidget {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: RadialGradient(
-                  colors: [Colors.amber.withOpacity(0.2), Colors.transparent],
+                  colors: [_GameTableScreenState.accentGold.withOpacity(0.2), Colors.transparent],
                 ),
               ),
             ),
