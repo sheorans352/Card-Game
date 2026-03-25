@@ -33,6 +33,7 @@ class _BiddingOverlayState extends ConsumerState<BiddingOverlay> {
 
   @override
   Widget build(BuildContext context) {
+    final showTrump = (!widget.isRoundTwo && _selectedBid >= 5) || (widget.isRoundTwo && _selectedBid >= 9);
     return ClipRRect(
       borderRadius: const BorderRadius.vertical(top: Radius.circular(40)),
       child: BackdropFilter(
@@ -94,7 +95,6 @@ class _BiddingOverlayState extends ConsumerState<BiddingOverlay> {
               const SizedBox(height: 24),
               
               // Trump Selector (Only if bid >= 5 in Round 1, or bid >= 9 in Round 2)
-              bool showTrump = (!widget.isRoundTwo && _selectedBid >= 5) || (widget.isRoundTwo && _selectedBid >= 9);
               if (showTrump) ...[
                 const Text(
                   'CHOOSE TRUMP SUIT',
