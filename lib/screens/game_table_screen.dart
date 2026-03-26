@@ -113,34 +113,9 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
                     playerPositions: _playerKeys,
                   ),
 
-                    // Overlays (Bidding & Trump Selection)
-                   if ((room.currentPhase == 'bidding' || room.currentPhase == 'bidding_2' || room.currentPhase == 'trump_selection') && 
-                       ref.watch(isLocalPlayerTurnProvider(room.code)))
-                     BiddingOverlay(
-                       currentHighBid: room.highestBid,
-                       isTrumpSelection: room.currentPhase == 'trump_selection',
-                       onBidSubmitted: (score) => ref.read(cardServiceProvider).placeBid(room.id, localPlayerId!, score),
-                       onTrumpSelected: (suit) => ref.read(cardServiceProvider).selectTrump(room.id, localPlayerId!, suit.name.toUpperCase().substring(0, 1)),
-                       onPass: () => ref.read(cardServiceProvider).placeBid(room.id, localPlayerId!, 0),
-                     ),
-                   
-                   if ((room.currentPhase == 'bidding' || room.currentPhase == 'bidding_2' || room.currentPhase == 'trump_selection') && 
-                       !ref.watch(isLocalPlayerTurnProvider(room.code)))
-                    const Align(
-                      alignment: Alignment.bottomCenter,
-                      child: Padding(
-                        padding: EdgeInsets.only(bottom: 100),
-                        child: Text('Waiting for other players to bid...', 
-                          style: TextStyle(color: Colors.white54, fontStyle: FontStyle.italic)),
-                      ),
-                    ),
-                  
-                  if (room.currentPhase == 'cutting')
-                    const DeckCutOverlay(),
-
-                  // Bottom Tricks HUD
+                  // Fixed Bottom Tricks HUD (Moved up in Stack)
                   _buildBottomTricksHUD(players, localIndex, room),
-
+                  
                   // TRUMP HUD (Floating bottom left)
                   if (room.trumpSuit != null)
                     _buildTrumpHUD(room.trumpSuit!, room),
@@ -162,6 +137,33 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
                       ),
                     ),
                   ),
+
+                  // FULL SCREEN OVERLAYS (Must be last for Z-index)
+                  
+                  // Bidding & Trump Selection
+                  if ((room.currentPhase == 'bidding' || room.currentPhase == 'bidding_2' || room.currentPhase == 'trump_selection') && 
+                      ref.watch(isLocalPlayerTurnProvider(room.code)))
+                    BiddingOverlay(
+                      currentHighBid: room.highestBid,
+                      isTrumpSelection: room.currentPhase == 'trump_selection',
+                      onBidSubmitted: (score) => ref.read(cardServiceProvider).placeBid(room.id, localPlayerId!, score),
+                      onTrumpSelected: (suit) => ref.read(cardServiceProvider).selectTrump(room.id, localPlayerId!, suit.name.toUpperCase().substring(0, 1)),
+                      onPass: () => ref.read(cardServiceProvider).placeBid(room.id, localPlayerId!, 0),
+                    ),
+                  
+                  if ((room.currentPhase == 'bidding' || room.currentPhase == 'bidding_2' || room.currentPhase == 'trump_selection') && 
+                      !ref.watch(isLocalPlayerTurnProvider(room.code)))
+                   const Align(
+                     alignment: Alignment.bottomCenter,
+                     child: Padding(
+                       padding: EdgeInsets.only(bottom: 100),
+                       child: Text('Waiting for other players to bid...', 
+                         style: TextStyle(color: Colors.white54, fontStyle: FontStyle.italic)),
+                     ),
+                   ),
+                  
+                  if (room.currentPhase == 'cutting')
+                    const DeckCutOverlay(),
 
                   // Scoreboard Overlay
                   if (_showScoreboard)
