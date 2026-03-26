@@ -83,22 +83,22 @@ class SupabaseCardService extends CardService {
     final int dealerIndex = room['dealer_index'];
     final int cutterIndex = (dealerIndex + 3) % 4; // Cutter is to the right of dealer
     
-    // Clear any leftover hands from previous rounds
+    // Clear any leftover hands from previous rounds for this room
     try {
-      await _supabase.from('hands').delete().eq('room_id', roomId); // Clean room-wide
+      await _supabase.from('hands').delete().eq('room_id', roomId); 
     } catch (e) {
       print('Error clearing hands: $e');
     }
     
     // Sequence: [Cutter, (Cutter+1)%4, (Cutter+2)%4, Dealer]
-    // Example: Dealer=3, Cutter=2 -> [2, 0, 1, 3]
     final List<int> dealOrder = [
       cutterIndex,
+      (cutterIndex + 1) % 4,
       (cutterIndex + 2) % 4,
-      (cutterIndex + 3) % 4,
       dealerIndex
     ];
 
+    // Clockwise turns for dealing first 5 cards
     for (int i = 0; i < dealOrder.length; i++) {
         final pIdx = dealOrder[i];
         final playerId = playerIds[pIdx];
@@ -107,17 +107,22 @@ class SupabaseCardService extends CardService {
           'player_id': playerId, 
           'card_value': c
         }).toList();
+        
         await _supabase.from('hands').insert(hand);
+        
+        // Brief delay to simulate "clockwise motion" as requested
+        await Future.delayed(const Duration(milliseconds: 600));
     }
 
     await _supabase.from('rooms').update({
       'status': 'bidding',
       'current_phase': 'bidding',
-      'trump_suit': null, // No default trump
+      'trump_suit': null,
       'highest_bid': 0,
       'highest_bidder_id': null,
       'pass_count': 0,
-      'turn_index': cutterIndex, // Bidding starts with Cutter
+      'current_round': 1,
+      'turn_index': cutterIndex, // Bidding Round 1 starts with Cutter
     }).eq('id', roomId);
   }
 
@@ -133,8 +138,8 @@ class SupabaseCardService extends CardService {
     // Sequence: [Cutter, (Cutter+1)%4, (Cutter+2)%4, Dealer]
     final List<int> dealOrder = [
       cutterIndex,
+      (cutterIndex + 1) % 4,
       (cutterIndex + 2) % 4,
-      (cutterIndex + 3) % 4,
       dealerIndex
     ];
 
@@ -143,12 +148,14 @@ class SupabaseCardService extends CardService {
         final playerId = playerIds[pIdx];
         // 20 cards were dealt initially (4 players * 5 cards). 
         // Next 32 cards (4 * 8) start at index 20.
-        final hand = deck.skip(20 + i * 8).take(8).map((c) => {
+        final hand = deck.skip(20 + (i * 8)).take(8).map((c) => {
           'room_id': roomId,
           'player_id': playerId, 
           'card_value': c
         }).toList();
         await _supabase.from('hands').insert(hand);
+        // Delay for sequenced feel
+        await Future.delayed(const Duration(milliseconds: 400));
     }
   }
 

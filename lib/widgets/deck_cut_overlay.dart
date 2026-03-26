@@ -156,6 +156,7 @@ class _DeckCutOverlayState extends ConsumerState<DeckCutOverlay> {
                 ),
                 const SizedBox(height: 40),
                 GestureDetector(
+                  behavior: HitTestBehavior.opaque,
                   onTap: _isConfirming
                       ? null
                       : () async {

@@ -343,8 +343,8 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
           const SizedBox(width: 8),
           const Text('•', style: TextStyle(color: Colors.white24)),
           const SizedBox(width: 8),
-          Text('Round ${room.currentRound}  •  Trick ${(room.currentRound ?? 1)} of 13', 
-            style: const TextStyle(color: Colors.white38, fontSize: 11)), // Refined below
+          Text('Round ${room.currentRound}  •  Trick ${(room.turnIndex % 13) + 1} of 13', 
+            style: const TextStyle(color: Colors.white38, fontSize: 11)),
         ],
       )
     );
@@ -751,6 +751,7 @@ class HandCardWidget extends StatelessWidget {
                 clipBehavior: Clip.none,
                 children: [
                   GestureDetector(
+                  behavior: HitTestBehavior.opaque,
                     onTap: onTap,
                     child: Opacity(
                       opacity: isPlayable ? 1.0 : 0.6,
