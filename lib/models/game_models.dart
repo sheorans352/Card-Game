@@ -10,6 +10,10 @@ class Room {
   final String? currentPhase;
   final List<String> shuffledDeck;
   final int? deckCutValue;
+  final int currentRound;
+  final int highestBid;
+  final String? highestBidderId;
+  final int passCount;
 
   Room({
     required this.id,
@@ -23,6 +27,10 @@ class Room {
     this.currentPhase,
     this.shuffledDeck = const [],
     this.deckCutValue,
+    this.currentRound = 1,
+    this.highestBid = 0,
+    this.highestBidderId,
+    this.passCount = 0,
   });
 
   factory Room.fromMap(Map<String, dynamic> map) {
@@ -38,6 +46,10 @@ class Room {
       currentPhase: map['current_phase'],
       shuffledDeck: List<String>.from(map['shuffled_deck'] ?? []),
       deckCutValue: map['deck_cut_value'],
+      currentRound: map['current_round'] ?? 1,
+      highestBid: map['highest_bid'] ?? 0,
+      highestBidderId: map['highest_bidder_id'],
+      passCount: map['pass_count'] ?? 0,
     );
   }
 
@@ -54,6 +66,10 @@ class Room {
       'current_phase': currentPhase,
       'shuffled_deck': shuffledDeck,
       'deck_cut_value': deckCutValue,
+      'current_round': currentRound,
+      'highest_bid': highestBid,
+      'highest_bidder_id': highestBidderId,
+      'pass_count': passCount,
     };
   }
 
@@ -72,6 +88,10 @@ class Room {
     String? currentPhase,
     List<String>? shuffledDeck,
     int? deckCutValue,
+    int? currentRound,
+    int? highestBid,
+    String? highestBidderId,
+    int? passCount,
   }) {
     return Room(
       id: id ?? this.id,
@@ -85,6 +105,10 @@ class Room {
       currentPhase: currentPhase ?? this.currentPhase,
       shuffledDeck: shuffledDeck ?? this.shuffledDeck,
       deckCutValue: deckCutValue ?? this.deckCutValue,
+      currentRound: currentRound ?? this.currentRound,
+      highestBid: highestBid ?? this.highestBid,
+      highestBidderId: highestBidderId ?? this.highestBidderId,
+      passCount: passCount ?? this.passCount,
     );
   }
 }

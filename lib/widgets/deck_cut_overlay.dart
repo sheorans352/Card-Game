@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/room_provider.dart';
+import '../services/audio_service.dart';
 
 class DeckCutOverlay extends ConsumerStatefulWidget {
   const DeckCutOverlay({super.key});
@@ -144,7 +145,12 @@ class _DeckCutOverlayState extends ConsumerState<DeckCutOverlay> {
                       value: _cutPercentage,
                       onChanged: _isConfirming
                           ? null
-                          : (val) => setState(() => _cutPercentage = val),
+                          : (val) {
+                              if ((val * 51).round() != (_cutPercentage * 51).round()) {
+                                gameAudio.playBiddingTick();
+                              }
+                              setState(() => _cutPercentage = val);
+                            },
                     ),
                   ),
                 ),
@@ -154,6 +160,7 @@ class _DeckCutOverlayState extends ConsumerState<DeckCutOverlay> {
                       ? null
                       : () async {
                           setState(() => _isConfirming = true);
+                          gameAudio.playShuffle();
                           final cutIndex = (_cutPercentage * 51).round();
                           await ref
                               .read(cardServiceProvider)

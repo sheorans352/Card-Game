@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'screens/home_screen.dart';
 import 'config/env_config.dart';
+import 'services/audio_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -11,6 +12,8 @@ Future<void> main() async {
     url: AppConfig.supabaseUrl,
     anonKey: AppConfig.supabaseAnonKey,
   );
+
+  await gameAudio.initialize();
 
   runApp(const ProviderScope(child: MyApp()));
 }

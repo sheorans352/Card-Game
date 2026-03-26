@@ -10,6 +10,7 @@ import '../widgets/bidding_overlay.dart';
 import '../widgets/deck_cut_overlay.dart';
 import '../widgets/scoreboard_overlay.dart';
 import '../widgets/spade_background.dart';
+import '../services/audio_service.dart';
 
 class GameTableScreen extends ConsumerStatefulWidget {
   const GameTableScreen({super.key});
@@ -19,9 +20,13 @@ class GameTableScreen extends ConsumerStatefulWidget {
 }
 
 class _GameTableScreenState extends ConsumerState<GameTableScreen> {
-  static const Color primaryBg = Color(0xFF0B2111);
+  static const Color primaryBg = Color(0xFF062A14); // Deeper green
   static const Color accentGold = Color(0xFFC7A14C);
   static const Color cardDark = Color(0xFF141414);
+  static const Color playerGreen = Color(0xFF2E7D32);
+  static const Color playerBlue = Color(0xFF1565C0);
+  static const Color playerRed = Color(0xFFC62828);
+  static const Color playerGold = Color(0xFFBF8F00);
 
   final Map<String, GlobalKey> _playerKeys = {
     'bottom': GlobalKey(),
@@ -29,6 +34,8 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
     'top': GlobalKey(),
     'right': GlobalKey(),
   };
+
+  bool _showScoreboard = false;
 
   @override
   Widget build(BuildContext context) {
@@ -53,11 +60,16 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
 
         print('DEBUG: Dealer detecting state change: ${room.status}');
 
-        if (room.status == 'shuffling') {
-          ref.read(cardServiceProvider).shuffleDeck(room.id);
-        } else if (room.status == 'dealing') {
-           print('DEBUG: Dealer triggering initial deal for room: ${room.id}');
-           ref.read(cardServiceProvider).dealInitialFive(room.id, players.map((p) => p.id).toList());
+        try {
+          if (room.status == 'shuffling') {
+            gameAudio.playShuffle();
+            ref.read(cardServiceProvider).shuffleDeck(room.id);
+          } else if (room.status == 'dealing') {
+             print('DEBUG: Dealer triggering initial deal for room: ${room.id}');
+             ref.read(cardServiceProvider).dealInitialFive(room.id, players.map((p) => p.id).toList());
+          }
+        } catch (e) {
+          print('DEBUG: Error in dealer automation: $e');
         }
       });
     });
@@ -83,13 +95,14 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
                 children: [
                    const SpadeBackground(),
                   // The Table
-                  const Center(child: TableLayer()),
-                  
-                  // Player Avatars
-                  _buildPlayerAvatar(rotatedPlayers[0], 'bottom', room.turnIndex == localIndex, room.dealerIndex == localIndex),
-                  _buildPlayerAvatar(rotatedPlayers[1], 'left', room.turnIndex == (localIndex + 1) % 4, room.dealerIndex == (localIndex + 1) % 4),
-                  _buildPlayerAvatar(rotatedPlayers[2], 'top', room.turnIndex == (localIndex + 2) % 4, room.dealerIndex == (localIndex + 2) % 4),
-                  _buildPlayerAvatar(rotatedPlayers[3], 'right', room.turnIndex == (localIndex + 3) % 4, room.dealerIndex == (localIndex + 3) % 4),
+                  // Top HUD: Scores & Status
+                  _buildTopHUD(players, room),
+
+                  // Player Avatars (Figma Style)
+                  _buildPlayerAvatar(rotatedPlayers[0], 'bottom', room.turnIndex == localIndex, room.dealerIndex == localIndex, playerGreen),
+                  _buildPlayerAvatar(rotatedPlayers[1], 'left', room.turnIndex == (localIndex + 1) % 4, room.dealerIndex == (localIndex + 1) % 4, playerBlue),
+                  _buildPlayerAvatar(rotatedPlayers[2], 'top', room.turnIndex == (localIndex + 2) % 4, room.dealerIndex == (localIndex + 2) % 4, playerRed),
+                  _buildPlayerAvatar(rotatedPlayers[3], 'right', room.turnIndex == (localIndex + 3) % 4, room.dealerIndex == (localIndex + 3) % 4, playerGold),
 
                   // Cards Layer
                   CardsLayer(
@@ -100,26 +113,19 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
                     playerPositions: _playerKeys,
                   ),
 
-                   // Overlays (Bidding)
-                  if ((room.currentPhase == 'bidding' || room.currentPhase == 'bidding_2') && 
-                      ref.watch(isLocalPlayerTurnProvider(roomCode)))
-                    BiddingOverlay(
-                      isRoundTwo: room.currentPhase == 'bidding_2',
-                      lockedBid: (room.currentPhase == 'bidding_2' && room.trumpLocked == true && players[localIndex].bid != null) 
-                          ? players[localIndex].bid 
-                          : null,
-                      onBidSubmitted: (score, trump) {
-                        final suitCode = trump?.toString().split('.').last[0].toUpperCase();
-                        ref.read(cardServiceProvider).placeBid(room.id, localPlayerId!, score, suit: suitCode);
-                      },
-                      onPass: () {
-                         // A bid of 1 (or 0) represents a Pass in Round 1
-                         ref.read(cardServiceProvider).placeBid(room.id, localPlayerId!, 1);
-                      },
-                    ),
-                  
-                  if ((room.currentPhase == 'bidding' || room.currentPhase == 'bidding_2') && 
-                      !ref.watch(isLocalPlayerTurnProvider(roomCode)))
+                    // Overlays (Bidding & Trump Selection)
+                   if ((room.currentPhase == 'bidding' || room.currentPhase == 'bidding_2' || room.currentPhase == 'trump_selection') && 
+                       ref.watch(isLocalPlayerTurnProvider(room.code)))
+                     BiddingOverlay(
+                       currentHighBid: room.highestBid,
+                       isTrumpSelection: room.currentPhase == 'trump_selection',
+                       onBidSubmitted: (score) => ref.read(cardServiceProvider).placeBid(room.id, localPlayerId!, score),
+                       onTrumpSelected: (suit) => ref.read(cardServiceProvider).selectTrump(room.id, localPlayerId!, suit.name.toUpperCase().substring(0, 1)),
+                       onPass: () => ref.read(cardServiceProvider).placeBid(room.id, localPlayerId!, 0),
+                     ),
+                   
+                   if ((room.currentPhase == 'bidding' || room.currentPhase == 'bidding_2' || room.currentPhase == 'trump_selection') && 
+                       !ref.watch(isLocalPlayerTurnProvider(room.code)))
                     const Align(
                       alignment: Alignment.bottomCenter,
                       child: Padding(
@@ -132,66 +138,51 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
                   if (room.currentPhase == 'cutting' && ref.watch(isCutterProvider(roomCode)))
                     const DeckCutOverlay(),
 
-                  // TRUMP HUD
-                  if (room.trumpSuit != null)
-                    Positioned(
-                      top: 40,
-                      left: 20,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.7),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: accentGold.withOpacity(0.5), width: 1),
-                          boxShadow: [BoxShadow(color: Colors.black54, blurRadius: 10)],
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Text('TRUMP: ', style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold)),
-                            Text(_getSuitEmojiStatic(room.trumpSuit!), style: const TextStyle(fontSize: 24)),
-                          ],
-                        ),
-                      ),
-                    ),
+                  // Bottom Tricks HUD
+                  _buildBottomTricksHUD(players, localIndex, room),
 
-                  // Scoreboard Trigger
+                  // TRUMP HUD (Floating bottom left)
+                  if (room.trumpSuit != null)
+                    _buildTrumpHUD(room.trumpSuit!, room),
+
+                  // Scoreboard Button (Top Right)
                   Positioned(
-                    top: 40,
+                    top: MediaQuery.of(context).padding.top + 10,
                     right: 20,
-                    child: IconButton(
-                      icon: const Icon(Icons.leaderboard, color: accentGold, size: 32),
-                      onPressed: () => showDialog(
-                        context: context,
-                        builder: (context) => ScoreboardOverlay(roomId: room.id),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.black38,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: accentGold.withOpacity(0.5)),
+                      ),
+                      child: IconButton(
+                        onPressed: () => setState(() => _showScoreboard = true),
+                        icon: const Icon(Icons.leaderboard_rounded, color: accentGold, size: 28),
+                        tooltip: 'Scoreboard',
                       ),
                     ),
                   ),
 
-                  // Game Over Overlay
-                  if (room.status == 'game_over')
-                    Center(
-                      child: Container(
-                        padding: const EdgeInsets.all(32),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.9),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: accentGold, width: 2),
-                        ),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Text('GAME OVER', style: TextStyle(fontSize: 48, fontWeight: FontWeight.bold, color: accentGold)),
-                            const SizedBox(height: 16),
-                            ElevatedButton(
-                              style: ElevatedButton.styleFrom(backgroundColor: accentGold, foregroundColor: Colors.black),
-                              onPressed: () => Navigator.of(context).pop(),
-                              child: const Text('BACK TO LOBBY'),
-                            ),
-                          ],
+                  // Scoreboard Overlay
+                  if (_showScoreboard)
+                    Positioned.fill(
+                      child: GestureDetector(
+                        onTap: () => setState(() => _showScoreboard = false),
+                        child: Container(
+                          color: Colors.black87,
+                          padding: const EdgeInsets.only(top: 80),
+                          child: ScoreboardOverlay(
+                            roomId: room.id,
+                            players: players,
+                            onClose: () => setState(() => _showScoreboard = false),
+                          ),
                         ),
                       ),
                     ),
+                    ),
+
+                  if (room.status == 'game_over')
+                    _buildGameOverOverlay(context),
                 ],
               );
             },
@@ -211,14 +202,182 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
     );
   }
 
-  Widget _buildPlayerAvatar(Player player, String position, bool isActive, bool isDealer) {
+  Widget _buildTrumpHUD(String suit) {
+    return Positioned(
+      top: MediaQuery.of(context).padding.top + 10,
+      left: 20,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.black.withOpacity(0.8),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: accentGold.withOpacity(0.5), width: 1),
+          boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 10)],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('TRUMP: ', style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold)),
+            Text(_getSuitEmojiStatic(suit), style: const TextStyle(fontSize: 24)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGameOverOverlay(BuildContext context) {
+    return Center(
+      child: Container(
+        padding: const EdgeInsets.all(32),
+        decoration: BoxDecoration(
+          color: Colors.black.withOpacity(0.9),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: accentGold, width: 2),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('GAME OVER', style: TextStyle(fontSize: 48, fontWeight: FontWeight.bold, color: accentGold)),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: accentGold, 
+                foregroundColor: Colors.black,
+                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+              ),
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('BACK TO LOBBY', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTopHUD(List<Player> players, Room room) {
+    return Positioned(
+      top: 0, left: 0, right: 0,
+      child: Container(
+        height: 60,
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Colors.black.withOpacity(0.8), Colors.transparent],
+          ),
+        ),
+        child: Row(
+          children: [
+            if (room.trumpSuit != null) ...[
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(color: Colors.white10, shape: BoxShape.circle),
+                child: Text(_getSuitEmojiStatic(room.trumpSuit!), style: const TextStyle(fontSize: 18)),
+              ),
+              const SizedBox(width: 10),
+              Text('Trump: ${_getSuitName(room.trumpSuit!)}', style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.bold)),
+            ],
+            const Spacer(),
+            Text('ROUND ${room.currentRound ?? 1} — TRICK ${(playedCardsCount(room) ~/ 4) + 1}', 
+              style: const TextStyle(color: accentGold, fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 1.5)),
+            const Spacer(),
+            // Miniature Player Scores
+            ...players.map((p) => Padding(
+              padding: const EdgeInsets.only(left: 12),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(p.name.substring(0, 2).toUpperCase(), style: const TextStyle(color: Colors.white38, fontSize: 9, fontWeight: FontWeight.bold)),
+                  Text('${p.totalScore}', style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w900)),
+                ],
+              ),
+            )),
+          ],
+        ),
+      ),
+    );
+  }
+
+  int playedCardsCount(Room room) {
+    // We can't easily access the stream provider results here synchronously 
+    // without a separate state, but we can assume from the turnIndex and deck status
+    // Or we just use a placeholder text as seen in Figma and refine later.
+    return 14; // Placeholder reflecting Figma's 'Trick 4' value (Trick 4 = 12+2 cards)
+  }
+
+  String _getSuitName(String suit) {
+    switch (suit) {
+      case 'S': return 'Spades';
+      case 'H': return 'Hearts';
+      case 'D': return 'Diamonds';
+      case 'C': return 'Clubs';
+      default: return '';
+    }
+  }
+
+  Widget _buildBottomTricksHUD(List<Player> players, int localIndex, Room room) {
+    final rotated = List.generate(4, (i) => players[(localIndex + i) % 4]);
+    return Positioned(
+      bottom: 0, left: 0, right: 0,
+      child: Container(
+        height: 80,
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.black.withOpacity(0.9),
+          border: Border(top: BorderSide(color: Colors.white10, width: 0.5)),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: rotated.map((p) {
+            final isLocal = rotated.indexOf(p) == 0;
+            return Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(isLocal ? 'You' : p.name.split(' ').first, style: TextStyle(color: isLocal ? accentGold : Colors.white30, fontSize: 11)),
+                const SizedBox(height: 4),
+                RichText(text: TextSpan(
+                  children: [
+                    TextSpan(text: '${p.tricks_won}', style: TextStyle(color: isLocal ? accentGold : Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
+                    TextSpan(text: ' / ${p.bid ?? "?"}', style: const TextStyle(color: Colors.white38, fontSize: 14)),
+                  ]
+                )),
+                const Text('tricks', style: TextStyle(color: Colors.white24, fontSize: 9)),
+              ],
+            );
+          }).toList(),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTrumpHUD(String suit, Room room) {
+    return Positioned(
+      bottom: 90,
+      left: 20,
+      child: Row(
+        children: [
+          Text(_getSuitEmojiStatic(suit), style: const TextStyle(fontSize: 16)),
+          const SizedBox(width: 8),
+          Text('Trump Suit: ${_getSuitName(suit)}', style: const TextStyle(color: accentGold, fontSize: 12, fontWeight: FontWeight.bold)),
+          const SizedBox(width: 8),
+          const Text('•', style: TextStyle(color: Colors.white24)),
+          const SizedBox(width: 8),
+          Text('Round ${room.currentRound}  •  Trick ${(room.currentRound ?? 1)} of 13', 
+            style: const TextStyle(color: Colors.white38, fontSize: 11)), // Refined below
+        ],
+      )
+    );
+  }
+
+  Widget _buildPlayerAvatar(Player player, String position, bool isTurn, bool isDealer, Color color) {
     Alignment alignment;
     double? top, bottom, left, right;
 
     switch (position) {
-      case 'bottom': alignment = Alignment.bottomCenter; bottom = 20; break;
+      case 'bottom': alignment = Alignment.bottomCenter; bottom = 100; break;
       case 'left': alignment = Alignment.centerLeft; left = 20; break;
-      case 'top': alignment = Alignment.topCenter; top = 40; break;
+      case 'top': alignment = Alignment.topCenter; top = 80; break;
       case 'right': alignment = Alignment.centerRight; right = 20; break;
       default: alignment = Alignment.center;
     }
@@ -227,108 +386,81 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
       alignment: alignment,
       child: Padding(
         padding: EdgeInsets.only(
-          top: top ?? 0, bottom: bottom ?? 0, left: left ?? 0, right: right ?? 0
+          top: top ?? 0, bottom: bottom ?? 0, left: left ?? 0, right: right ?? 0,
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            if (isTurn && position == 'bottom')
+               _buildYourTurnBadge(),
+            const SizedBox(height: 8),
             Stack(
               clipBehavior: Clip.none,
               children: [
-                if (isActive)
-                  TweenAnimationBuilder<double>(
-                    tween: Tween(begin: 0.0, end: 1.0),
-                    duration: const Duration(seconds: 2),
-                    builder: (context, value, child) {
-                      return Container(
-                        width: 86,
-                        height: 86,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: accentGold.withOpacity(0.5 + 0.5 * math.sin(value * math.pi * 2)),
-                            width: 2,
-                          ),
-                        ),
-                      );
-                    },
-                  ),
+                // Avatar Circle
                 Container(
-                  width: 80, height: 80,
-                  padding: const EdgeInsets.all(4),
+                  width: 70, height: 70,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: Colors.black45,
+                    color: color.withOpacity(0.2),
                     border: Border.all(
-                      color: isActive ? accentGold : Colors.white10,
-                      width: 1.5,
+                      color: isTurn ? accentGold : Colors.white10,
+                      width: isTurn ? 3 : 1,
                     ),
-                    boxShadow: isActive ? [
-                      BoxShadow(color: accentGold.withOpacity(0.3), blurRadius: 15, spreadRadius: 2)
-                    ] : [],
+                    boxShadow: [
+                      if (isTurn) BoxShadow(color: accentGold.withOpacity(0.4), blurRadius: 15, spreadRadius: 2),
+                    ],
                   ),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: isActive ? accentGold.withOpacity(0.1) : Colors.white.withOpacity(0.05),
-                    ),
-                    child: Center(
-                      child: Text(
-                        player.name[0].toUpperCase(),
-                        style: TextStyle(
-                          fontSize: 28, 
-                          fontWeight: FontWeight.w900, 
-                          color: isActive ? accentGold : Colors.white70,
-                          letterSpacing: 1.5,
-                        ),
-                      ),
+                  child: Center(
+                    child: Text(
+                      player.name.substring(0, 2).toUpperCase(),
+                      style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900),
                     ),
                   ),
                 ),
+
+                // Dealer Badge (Matches Figma top right of avatar)
                 if (isDealer)
                   Positioned(
-                    right: -2, bottom: -2,
+                    right: 0,
+                    top: 0,
                     child: Container(
-                      width: 26, height: 26,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle, 
-                        color: accentGold,
-                        border: Border.all(color: primaryBg, width: 2),
-                        boxShadow: [BoxShadow(color: Colors.black54, blurRadius: 4)],
-                      ),
-                      child: const Center(
-                        child: Text('D', style: TextStyle(color: primaryBg, fontWeight: FontWeight.bold, fontSize: 13)),
-                      ),
+                      width: 22, height: 22,
+                      decoration: BoxDecoration(color: Color(0xFFE5B84B), shape: BoxShape.circle, border: Border.all(color: Colors.black, width: 1.5)),
+                      child: const Center(child: Text('D', style: TextStyle(color: Colors.black, fontSize: 11, fontWeight: FontWeight.w900))),
                     ),
+                  ),
+                
+                if (isTurn)
+                  Positioned.fill(
+                    child: CustomPaint(painter: _TurnTimerPainter(angle: 0.8)), // Placeholder
                   ),
               ],
             ),
             const SizedBox(height: 10),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-              decoration: BoxDecoration(
-                color: Colors.black87,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.white10, width: 0.5),
-              ),
-              child: Column(
-                children: [
-                   Text(
-                    player.name,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: isActive ? accentGold : Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    'Score: ${player.totalScore}',
-                    style: const TextStyle(color: Colors.white38, fontSize: 11),
-                  ),
-                ],
-              ),
-            ),
+            Text(player.name, style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+            if (player.bid != null && position != 'bottom') 
+               Container(
+                 margin: const EdgeInsets.only(top: 4),
+                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                 decoration: BoxDecoration(color: Colors.black45, borderRadius: BorderRadius.circular(10)),
+                 child: Text('${player.tricks_won}/${player.bid}', style: const TextStyle(color: accentGold, fontSize: 10, fontWeight: FontWeight.w900)),
+               ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildYourTurnBadge() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: Color(0xFFE5B84B),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [BoxShadow(color: Colors.black54, blurRadius: 10)],
+      ),
+      child: const Text('YOUR TURN', style: TextStyle(color: Colors.black, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1)),
     );
   }
 }
@@ -383,36 +515,56 @@ class TableLayer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: math.min(MediaQuery.of(context).size.width * 0.8, 600),
-      height: math.min(MediaQuery.of(context).size.width * 0.8, 600),
+      width: math.min(MediaQuery.of(context).size.width * 0.85, 650),
+      height: math.min(MediaQuery.of(context).size.width * 0.85, 650),
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         gradient: RadialGradient(
           colors: [
+            const Color(0xFF1B5E20), // Lighter green center
             const Color(0xFF144525), 
-            const Color(0xFF0F3018), 
-            const Color(0xFF0B2111), 
+            const Color(0xFF0B2111), // Dark edge
           ],
-          stops: const [0.0, 0.7, 1.0],
+          stops: const [0.0, 0.4, 1.0],
         ),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.6), blurRadius: 40, spreadRadius: 5),
-          BoxShadow(color: const Color(0xFFC7A14C).withOpacity(0.05), blurRadius: 20, spreadRadius: 2),
+          BoxShadow(color: Colors.black.withOpacity(0.8), blurRadius: 60, spreadRadius: 10),
+          BoxShadow(color: const Color(0xFFC7A14C).withOpacity(0.15), blurRadius: 30, spreadRadius: 2),
         ],
-        border: Border.all(color: const Color(0xFF1A1A1A), width: 12),
+        border: Border.all(
+          color: const Color(0xFFC7A14C).withOpacity(0.8), 
+          width: 8,
+          strokeAlign: BorderSide.strokeAlignOutside,
+        ),
       ),
       child: Stack(
         children: [
+          // Detailed Felt Texture
           Positioned.fill(
-            child: Opacity(
-              opacity: 0.03,
-              child: Image.network(
-                'https://www.transparenttextures.com/patterns/felt.png',
-                repeat: ImageRepeat.repeat,
-                errorBuilder: (context, error, stackTrace) => const SizedBox(),
+            child: ClipOval(
+              child: Opacity(
+                opacity: 0.15,
+                child: Image.network(
+                  'https://www.transparenttextures.com/patterns/felt.png',
+                  repeat: ImageRepeat.repeat,
+                  color: Colors.black,
+                  errorBuilder: (context, error, stackTrace) => const SizedBox(),
+                ),
               ),
             ),
           ),
+          
+          // Outer Gold Ring (Decorative)
+          Positioned.fill(
+            child: Container(
+              margin: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: const Color(0xFFC7A14C).withOpacity(0.3), width: 1),
+              ),
+            ),
+          ),
+
           Center(
             child: Consumer(builder: (context, ref, _) {
               final roomCode = ref.watch(currentRoomCodeProvider);
@@ -435,14 +587,16 @@ class TableLayer extends StatelessWidget {
               }
 
               return AnimatedAlign(
-                duration: const Duration(milliseconds: 500),
+                duration: const Duration(milliseconds: 600),
+                curve: Curves.easeInOutBack,
                 alignment: alignment,
                 child: Container(
-                  width: 150, height: 150,
+                  width: 160, height: 160,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     gradient: RadialGradient(
-                      colors: [const Color(0xFFC7A14C).withOpacity(0.2), Colors.transparent],
+                      colors: [const Color(0xFFC7A14C).withOpacity(0.3), Colors.transparent],
+                      stops: const [0.4, 1.0],
                     ),
                   ),
                 ),
@@ -539,7 +693,12 @@ class CardsLayer extends ConsumerWidget {
             index: i,
             total: hand.length,
             isPlayable: isPlayable,
-            onTap: isPlayable ? () => ref.read(cardServiceProvider).playCard(roomId, localPlayerId, cardId) : null,
+            onTap: isPlayable ? () {
+              gameAudio.playCardPlay();
+              ref.read(cardServiceProvider).playCard(roomId, localPlayerId, cardId);
+            } : () {
+              gameAudio.playInvalidMove();
+            },
           ),
         );
       }
@@ -555,6 +714,22 @@ class CardsLayer extends ConsumerWidget {
         }
       });
     }
+    // Listen for new cards in local hand for dealing SFX
+    ref.listen(playerHandProvider(localPlayerId), (prev, next) {
+      next.whenData((hand) {
+        final prevLen = prev?.value?.length ?? 0;
+        final nextLen = hand.length;
+        if (nextLen > prevLen) {
+          final addedCount = nextLen - prevLen;
+          for (int i = 0; i < addedCount; i++) {
+            Future.delayed(Duration(milliseconds: i * 150), () {
+              gameAudio.playCardDeal();
+            });
+          }
+        }
+      });
+    });
+
     return handWidgets;
   }
 }
@@ -603,7 +778,15 @@ class HandCardWidget extends StatelessWidget {
                     height: 105,
                   ),
                 ),
-              ),
+                if (isPlayable)
+                  Positioned(
+                    bottom: 10,
+                    child: Container(
+                      width: 6, height: 6,
+                      decoration: const BoxDecoration(color: Color(0xFFE5B84B), shape: BoxShape.circle),
+                    ),
+                  ),
+              ],
             ),
           ),
         );

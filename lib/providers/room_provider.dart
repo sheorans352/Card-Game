@@ -80,7 +80,11 @@ final playersStreamProvider = StreamProvider.family<List<Player>, String>((ref, 
         .from('players')
         .stream(primaryKey: ['id'])
         .eq('room_id', roomId)
-        .map((data) => data.map<Player>((p) => Player.fromJson(p)).toList())
+        .map((data) {
+          final sorted = List<Map<String, dynamic>>.from(data);
+          sorted.sort((a, b) => (a['created_at'] as String).compareTo(b['created_at'] as String));
+          return sorted.map<Player>((p) => Player.fromJson(p)).toList();
+        })
         .handleError((error) {
           debugPrint('Supabase Stream Error (Players): $error');
           throw error;
@@ -117,6 +121,23 @@ final playedCardsProvider = StreamProvider.family<List<Map<String, dynamic>>, St
         .map((data) => data.map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e)).toList())
         .handleError((error) {
           debugPrint('Supabase Stream Error (PlayedCards): $error');
+          throw error;
+        });
+  }
+});
+
+final roundResultsProvider = StreamProvider.family<List<Map<String, dynamic>>, String>((ref, roomId) {
+  final config = ref.watch(appConfigProvider);
+  if (config.useMock) {
+    return Stream.value([]);
+  } else {
+    return supabase
+        .from('round_results')
+        .stream(primaryKey: ['id'])
+        .eq('room_id', roomId)
+        .map((data) => data.map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e)).toList())
+        .handleError((error) {
+          debugPrint('Supabase Stream Error (RoundResults): $error');
           throw error;
         });
   }
