@@ -82,7 +82,7 @@ final playersStreamProvider = StreamProvider.family<List<Player>, String>((ref, 
         .eq('room_id', roomId)
         .map((data) {
           final sorted = List<Map<String, dynamic>>.from(data);
-          sorted.sort((a, b) => (a['created_at'] as String).compareTo(b['created_at'] as String));
+          sorted.sort((a, b) => (a['joined_at'] as String).compareTo(b['joined_at'] as String));
           return sorted.map<Player>((p) => Player.fromJson(p)).toList();
         })
         .handleError((error) {
@@ -373,7 +373,7 @@ class MockCardService extends CardService {
   Future<void> selectTrump(String roomId, String playerId, String suit) async {}
 
   @override
-  Future<void> placeBid(String roomId, String playerId, int bid, {String? suit}) async {
+  Future<void> placeBid(String roomId, String playerId, int bid) async {
     final players = LocalStorageSync.getData<List<Player>>(LocalStorageSync.playersKey, (j) => (j as List).map<Player>((p) => Player.fromJson(p)).toList());
     final room = LocalStorageSync.getData(LocalStorageSync.roomKey, (j) => Room.fromJson(j));
     final pIdx = players.indexWhere((p) => p.id == playerId);
