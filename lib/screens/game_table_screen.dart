@@ -135,7 +135,7 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
                       ),
                     ),
                   
-                  if (room.currentPhase == 'cutting' && ref.watch(isCutterProvider(roomCode)))
+                  if (room.currentPhase == 'cutting')
                     const DeckCutOverlay(),
 
                   // Bottom Tricks HUD

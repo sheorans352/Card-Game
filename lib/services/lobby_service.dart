@@ -74,5 +74,10 @@ class SupabaseLobbyService extends LobbyService {
       'status': 'shuffling',
       'current_phase': 'shuffling',
     }).eq('id', roomId);
+    
+    // Automatically trigger shuffle after a brief delay for UI/Sync
+    await Future.delayed(const Duration(milliseconds: 1500));
+    final cardService = SupabaseCardService();
+    await cardService.shuffleDeck(roomId);
   }
 }

@@ -59,8 +59,19 @@ class SupabaseCardService extends CardService {
       'deck_cut_value': cutPoint,
       'status': 'dealing',
       'current_phase': 'dealing',
-      // Turn index doesn't matter yet for dealing, but Bidding Round 1 starts with Cutter
     }).eq('id', roomId);
+
+    // Fetch players and start initial deal automatically
+    final playersResponse = await _supabase
+        .from('players')
+        .select('id')
+        .eq('room_id', roomId)
+        .order('joined_at', ascending: true);
+    
+    final playerIds = (playersResponse as List).map((p) => p['id'] as String).toList();
+    if (playerIds.length == 4) {
+      await dealInitialFive(roomId, playerIds);
+    }
   }
 
   @override
