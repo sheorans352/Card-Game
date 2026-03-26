@@ -381,11 +381,11 @@ class MockCardService extends CardService {
     LocalStorageSync.setData(LocalStorageSync.playersKey, players.map((p) => p.toJson()).toList());
     var nextRoom = room.copyWith(turnIndex: room.turnIndex + 1);
 
+    // In Round 1 (bidding), if everyone has acted:
     if (room.status == 'bidding') {
-      if (bid >= 5 && suit != null) {
-        nextRoom = nextRoom.copyWith(trumpSuit: suit, trumpLocked: true);
-      }
       if (nextRoom.turnIndex % 4 == (room.dealerIndex + 1) % 4) {
+        // Simple mock: if someone bid 5, they win and pick trump (mock just picks S)
+        // This is a mock so we just advance to Stage 2 for simplicity
         LocalStorageSync.setData(LocalStorageSync.roomKey, nextRoom.toJson());
         final pIds = players.map((p) => p.id).toList();
         await dealNextFour(roomId, pIds);
@@ -393,9 +393,6 @@ class MockCardService extends CardService {
         return;
       }
     } else if (room.status == 'bidding_2') {
-      if (bid >= 9 && suit != null) {
-        nextRoom = nextRoom.copyWith(trumpSuit: suit, trumpLocked: true);
-      }
       if (nextRoom.turnIndex % 4 == (room.dealerIndex + 1) % 4) {
         nextRoom = nextRoom.copyWith(status: 'playing', currentPhase: 'playing', turnIndex: (room.dealerIndex + 1) % 4);
       }
