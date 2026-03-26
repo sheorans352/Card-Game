@@ -179,7 +179,6 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
                         ),
                       ),
                     ),
-                    ),
 
                   if (room.status == 'game_over')
                     _buildGameOverOverlay(context),
@@ -202,28 +201,7 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
     );
   }
 
-  Widget _buildTrumpHUD(String suit) {
-    return Positioned(
-      top: MediaQuery.of(context).padding.top + 10,
-      left: 20,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: Colors.black.withOpacity(0.8),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: accentGold.withOpacity(0.5), width: 1),
-          boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 10)],
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('TRUMP: ', style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold)),
-            Text(_getSuitEmojiStatic(suit), style: const TextStyle(fontSize: 24)),
-          ],
-        ),
-      ),
-    );
-  }
+  // Duplicate removed
 
   Widget _buildGameOverOverlay(BuildContext context) {
     return Center(
@@ -338,7 +316,7 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
                 const SizedBox(height: 4),
                 RichText(text: TextSpan(
                   children: [
-                    TextSpan(text: '${p.tricks_won}', style: TextStyle(color: isLocal ? accentGold : Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
+                    TextSpan(text: '${p.tricksWon}', style: TextStyle(color: isLocal ? accentGold : Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
                     TextSpan(text: ' / ${p.bid ?? "?"}', style: const TextStyle(color: Colors.white38, fontSize: 14)),
                   ]
                 )),
@@ -444,7 +422,7 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
                  margin: const EdgeInsets.only(top: 4),
                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                  decoration: BoxDecoration(color: Colors.black45, borderRadius: BorderRadius.circular(10)),
-                 child: Text('${player.tricks_won}/${player.bid}', style: const TextStyle(color: accentGold, fontSize: 10, fontWeight: FontWeight.w900)),
+                 child: Text('${player.tricksWon}/${player.bid}', style: const TextStyle(color: accentGold, fontSize: 10, fontWeight: FontWeight.w900)),
                ),
           ],
         ),
@@ -766,27 +744,37 @@ class HandCardWidget extends StatelessWidget {
             offset: Offset(fanOffset * value, -110 - (1 - value) * 400),
             child: Transform.rotate(
               angle: rotation * value,
-              child: GestureDetector(
-                onTap: onTap,
-                child: Opacity(
-                  opacity: isPlayable ? 1.0 : 0.6,
-                  child: PlayingCard(
-                    card: card,
-                    isFaceUp: true,
-                    isPlayable: isPlayable,
-                    width: 70, 
-                    height: 105,
-                  ),
-                ),
-                if (isPlayable)
-                  Positioned(
-                    bottom: 10,
-                    child: Container(
-                      width: 6, height: 6,
-                      decoration: const BoxDecoration(color: Color(0xFFE5B84B), shape: BoxShape.circle),
+              child: Stack(
+                alignment: Alignment.center,
+                clipBehavior: Clip.none,
+                children: [
+                  GestureDetector(
+                    onTap: onTap,
+                    child: Opacity(
+                      opacity: isPlayable ? 1.0 : 0.6,
+                      child: PlayingCard(
+                        card: card,
+                        isFaceUp: true,
+                        isPlayable: isPlayable,
+                        width: 70, 
+                        height: 105,
+                      ),
                     ),
                   ),
-              ],
+                  if (isPlayable)
+                    Positioned(
+                      bottom: -10,
+                      child: Container(
+                        width: 10, height: 10,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFE5B84B), 
+                          shape: BoxShape.circle,
+                          boxShadow: [BoxShadow(color: Colors.amber, blurRadius: 4)],
+                        ),
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
         );
@@ -891,4 +879,24 @@ class PlayedCardWidget extends StatelessWidget {
       ),
     );
   }
+}
+
+class _TurnTimerPainter extends CustomPainter {
+  final double angle;
+  _TurnTimerPainter({required this.angle});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = const Color(0xFFE5B84B).withOpacity(0.8)
+      ..strokeWidth = 3
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+
+    final rect = Rect.fromLTWH(0, 0, size.width, size.height);
+    canvas.drawArc(rect, -1.57, angle * 6.28, false, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _TurnTimerPainter oldDelegate) => oldDelegate.angle != angle;
 }

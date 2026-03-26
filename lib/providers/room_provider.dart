@@ -367,6 +367,12 @@ class MockCardService extends CardService {
   }
 
   @override
+  Future<void> dealRemainingEight(String roomId, List<String> playerIds) async {}
+
+  @override
+  Future<void> selectTrump(String roomId, String playerId, String suit) async {}
+
+  @override
   Future<void> placeBid(String roomId, String playerId, int bid, {String? suit}) async {
     final players = LocalStorageSync.getData<List<Player>>(LocalStorageSync.playersKey, (j) => (j as List).map<Player>((p) => Player.fromJson(p)).toList());
     final room = LocalStorageSync.getData(LocalStorageSync.roomKey, (j) => Room.fromJson(j));
