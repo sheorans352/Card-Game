@@ -1,4 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'card_service.dart';
 
 abstract class LobbyService {
   Future<Map<String, String>> createRoom(String hostName);
