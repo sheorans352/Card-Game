@@ -80,39 +80,58 @@ class SupabaseCardService extends CardService {
     if (roomResponse.isEmpty) return;
     final room = roomResponse.first;
     final List<dynamic> deck = room['shuffled_deck'];
-    final int dealerIndex = room['dealer_index'];
-    final int cutterIndex = (dealerIndex + 3) % 4; // Cutter is to the right of dealer
+    final int dealerIndex = room['dealer_index'] ?? 0;
+    // Cutter sits to the right of dealer (clockwise: cutter is next after dealer)
+    final int cutterIndex = (dealerIndex + 1) % 4;
     
-    // Clear any leftover hands from previous rounds for this room
+    // Clear any leftover hands from previous rounds
     try {
       await _supabase.from('hands').delete().eq('room_id', roomId); 
     } catch (e) {
       print('Error clearing hands: $e');
     }
     
-    // Sequence: [Cutter, (Cutter+1)%4, (Cutter+2)%4, Dealer]
-    final List<int> dealOrder = [
-      cutterIndex,
-      (cutterIndex + 1) % 4,
-      (cutterIndex + 2) % 4,
-      dealerIndex
-    ];
+    // Build the ordered list of player IDs clockwise starting from cutter
+    // e.g. if cutter is index 2: [playerIds[2], playerIds[3], playerIds[0], playerIds[1]]
+    final List<String> orderedPlayers = List.generate(
+      4, 
+      (i) => playerIds[(cutterIndex + i) % 4]
+    );
 
-    // Clockwise turns for dealing first 5 cards
-    for (int i = 0; i < dealOrder.length; i++) {
-        final pIdx = dealOrder[i];
-        final playerId = playerIds[pIdx];
-        final hand = deck.skip(i * 5).take(5).map((c) => {
-          'room_id': roomId,
-          'player_id': playerId, 
-          'card_value': c
-        }).toList();
-        
-        await _supabase.from('hands').insert(hand);
-        
-        // Brief delay to simulate "clockwise motion" as requested
-        await Future.delayed(const Duration(milliseconds: 600));
+    // === PASS 1: 5 cards each ===  (deck indices 0-19)
+    for (int i = 0; i < 4; i++) {
+      final hand = deck.skip(i * 5).take(5).map((c) => {
+        'room_id': roomId,
+        'player_id': orderedPlayers[i],
+        'card_value': c,
+      }).toList();
+      await _supabase.from('hands').insert(hand);
+      await Future.delayed(const Duration(milliseconds: 600));
     }
+
+    // === PASS 2: 4 cards each ===  (deck indices 20-35)
+    for (int i = 0; i < 4; i++) {
+      final hand = deck.skip(20 + i * 4).take(4).map((c) => {
+        'room_id': roomId,
+        'player_id': orderedPlayers[i],
+        'card_value': c,
+      }).toList();
+      await _supabase.from('hands').insert(hand);
+      await Future.delayed(const Duration(milliseconds: 500));
+    }
+
+    // === PASS 3: 4 cards each ===  (deck indices 36-51)
+    for (int i = 0; i < 4; i++) {
+      final hand = deck.skip(36 + i * 4).take(4).map((c) => {
+        'room_id': roomId,
+        'player_id': orderedPlayers[i],
+        'card_value': c,
+      }).toList();
+      await _supabase.from('hands').insert(hand);
+      await Future.delayed(const Duration(milliseconds: 500));
+    }
+
+    // Total: 4 × (5 + 4 + 4) = 4 × 13 = 52 cards dealt ✓
 
     await _supabase.from('rooms').update({
       'status': 'bidding',
@@ -122,41 +141,15 @@ class SupabaseCardService extends CardService {
       'highest_bidder_id': null,
       'pass_count': 0,
       'current_round': 1,
-      'turn_index': cutterIndex, // Bidding Round 1 starts with Cutter
+      'turn_index': cutterIndex, // Bidding starts with Cutter
     }).eq('id', roomId);
   }
 
+
   @override
   Future<void> dealRemainingEight(String roomId, List<String> playerIds) async {
-    final roomResponse = await _supabase.from('rooms').select().eq('id', roomId);
-    if (roomResponse.isEmpty) return;
-    final room = roomResponse.first;
-    final List<dynamic> deck = room['shuffled_deck'];
-    final int dealerIndex = room['dealer_index'];
-    final int cutterIndex = (dealerIndex + 3) % 4;
-    
-    // Sequence: [Cutter, (Cutter+1)%4, (Cutter+2)%4, Dealer]
-    final List<int> dealOrder = [
-      cutterIndex,
-      (cutterIndex + 1) % 4,
-      (cutterIndex + 2) % 4,
-      dealerIndex
-    ];
-
-    for (int i = 0; i < dealOrder.length; i++) {
-        final pIdx = dealOrder[i];
-        final playerId = playerIds[pIdx];
-        // 20 cards were dealt initially (4 players * 5 cards). 
-        // Next 32 cards (4 * 8) start at index 20.
-        final hand = deck.skip(20 + (i * 8)).take(8).map((c) => {
-          'room_id': roomId,
-          'player_id': playerId, 
-          'card_value': c
-        }).toList();
-        await _supabase.from('hands').insert(hand);
-        // Delay for sequenced feel
-        await Future.delayed(const Duration(milliseconds: 400));
-    }
+    // No-op: Full 13-card deal (5+4+4) is now done in dealInitialFive.
+    // This method is kept for API compatibility.
   }
 
   @override
@@ -246,19 +239,11 @@ class SupabaseCardService extends CardService {
     final pIds = players.map<String>((p) => p['id'] as String).toList();
 
     if (room['status'] == 'trump_selection') {
-       final handsCount = await _supabase.from('hands')
-          .select('id')
-          .eq('room_id', roomId);
-          
-       if (handsCount.length < 52) {
-         await dealRemainingEight(roomId, pIds);
-       }
-       
        // Move to Bidding Round 2 (others give bids)
        await _supabase.from('rooms').update({
          'status': 'bidding_2',
          'current_phase': 'bidding_2',
-         'turn_index': (room['dealer_index'] + 3) % 4,
+         'turn_index': (room['dealer_index'] + 1) % 4, // Cutter starts bidding_2
          'pass_count': 0, // Reset for Round 2
        }).eq('id', roomId);
     }
