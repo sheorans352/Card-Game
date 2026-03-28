@@ -81,24 +81,18 @@ class SupabaseCardService extends CardService {
     final room = roomResponse.first;
     final List<dynamic> deck = room['shuffled_deck'];
     final int dealerIndex = room['dealer_index'] ?? 0;
-    // Cutter sits to the right of dealer (clockwise: cutter is next after dealer)
+    // Cutter is the player after the dealer (clockwise)
     final int cutterIndex = (dealerIndex + 1) % 4;
     
-    // Clear any leftover hands from previous rounds
-    try {
-      await _supabase.from('hands').delete().eq('room_id', roomId); 
-    } catch (e) {
-      print('Error clearing hands: $e');
+    // Clear all old hands for these players
+    for (final pid in playerIds) {
+      try { await _supabase.from('hands').delete().eq('player_id', pid); } catch (_) {}
     }
     
-    // Build the ordered list of player IDs clockwise starting from cutter
-    // e.g. if cutter is index 2: [playerIds[2], playerIds[3], playerIds[0], playerIds[1]]
-    final List<String> orderedPlayers = List.generate(
-      4, 
-      (i) => playerIds[(cutterIndex + i) % 4]
-    );
+    // Build clockwise order starting from cutter
+    final List<String> orderedPlayers = List.generate(4, (i) => playerIds[(cutterIndex + i) % 4]);
 
-    // === PASS 1: 5 cards each ===  (deck indices 0-19)
+    // === DEAL ROUND 1: 5 cards each (deck[0..19]) ===
     for (int i = 0; i < 4; i++) {
       final hand = deck.skip(i * 5).take(5).map((c) => {
         'room_id': roomId,
@@ -106,33 +100,10 @@ class SupabaseCardService extends CardService {
         'card_value': c,
       }).toList();
       await _supabase.from('hands').insert(hand);
-      await Future.delayed(const Duration(milliseconds: 600));
-    }
-
-    // === PASS 2: 4 cards each ===  (deck indices 20-35)
-    for (int i = 0; i < 4; i++) {
-      final hand = deck.skip(20 + i * 4).take(4).map((c) => {
-        'room_id': roomId,
-        'player_id': orderedPlayers[i],
-        'card_value': c,
-      }).toList();
-      await _supabase.from('hands').insert(hand);
       await Future.delayed(const Duration(milliseconds: 500));
     }
 
-    // === PASS 3: 4 cards each ===  (deck indices 36-51)
-    for (int i = 0; i < 4; i++) {
-      final hand = deck.skip(36 + i * 4).take(4).map((c) => {
-        'room_id': roomId,
-        'player_id': orderedPlayers[i],
-        'card_value': c,
-      }).toList();
-      await _supabase.from('hands').insert(hand);
-      await Future.delayed(const Duration(milliseconds: 500));
-    }
-
-    // Total: 4 × (5 + 4 + 4) = 4 × 13 = 52 cards dealt ✓
-
+    // Phase: bidding (5 cards in hand, bid on trump)
     await _supabase.from('rooms').update({
       'status': 'bidding',
       'current_phase': 'bidding',
@@ -145,11 +116,31 @@ class SupabaseCardService extends CardService {
     }).eq('id', roomId);
   }
 
+  // Deal 4 more cards per player (called after trump selection)
+  Future<void> _dealFourCardsRound(String roomId, List<String> playerIds, int deckOffset) async {
+    final roomResponse = await _supabase.from('rooms').select().eq('id', roomId);
+    if (roomResponse.isEmpty) return;
+    final room = roomResponse.first;
+    final List<dynamic> deck = room['shuffled_deck'];
+    final int dealerIndex = room['dealer_index'] ?? 0;
+    final int cutterIndex = (dealerIndex + 1) % 4;
+
+    final List<String> orderedPlayers = List.generate(4, (i) => playerIds[(cutterIndex + i) % 4]);
+
+    for (int i = 0; i < 4; i++) {
+      final hand = deck.skip(deckOffset + i * 4).take(4).map((c) => {
+        'room_id': roomId,
+        'player_id': orderedPlayers[i],
+        'card_value': c,
+      }).toList();
+      await _supabase.from('hands').insert(hand);
+      await Future.delayed(const Duration(milliseconds: 400));
+    }
+  }
 
   @override
   Future<void> dealRemainingEight(String roomId, List<String> playerIds) async {
-    // No-op: Full 13-card deal (5+4+4) is now done in dealInitialFive.
-    // This method is kept for API compatibility.
+    // No-op: replaced by _dealFourCardsRound called in 2 separate phases
   }
 
   @override
@@ -183,7 +174,7 @@ class SupabaseCardService extends CardService {
 
     // Termination logic
     if ((updates['pass_count'] ?? passCount) >= 3 && (updates['highest_bid'] ?? currentHigh) > 0) {
-      // Phase winner found!
+      // Bidding round winner found → trump selection
       updates['status'] = 'trump_selection';
       updates['current_phase'] = 'trump_selection';
       
@@ -191,33 +182,23 @@ class SupabaseCardService extends CardService {
       final players = await _supabase.from('players').select('id').eq('room_id', roomId).order('created_at');
       updates['turn_index'] = players.indexWhere((p) => p['id'] == winnerId);
     } else if ((updates['pass_count'] ?? passCount) >= 4 && (updates['highest_bid'] ?? currentHigh) == 0 && status == 'bidding') {
-      // EVERYONE PASSED in first round -> Deal 8 and move to bidding_2
-      final players = await _supabase.from('players').select('id').eq('room_id', roomId).order('created_at');
+      // EVERYONE PASSED in bidding_1 → deal round 2+3 silently, go to bidding_2
+      final players = await _supabase.from('players').select('id').eq('room_id', roomId).order('joined_at', ascending: true);
       final pIds = players.map<String>((p) => p['id'] as String).toList();
       
-      await dealRemainingEight(roomId, pIds);
+      await _dealFourCardsRound(roomId, pIds, 20); // Round 2: 4 cards
+      await _dealFourCardsRound(roomId, pIds, 36); // Round 3: 4 cards
       
       updates['status'] = 'bidding_2';
       updates['current_phase'] = 'bidding_2';
       updates['pass_count'] = 0;
-      updates['turn_index'] = (room['dealer_index'] + 3) % 4; // Start at Cutter
+      updates['highest_bid'] = 0;
+      updates['turn_index'] = (room['dealer_index'] + 1) % 4; // Cutter starts final bid
     } else if (status == 'bidding_2' && (updates['pass_count'] ?? passCount) >= 3) {
-       // Bidding War 2 finished. 
-       final String finalWinnerId = updates['highest_bidder_id'] ?? room['highest_bidder_id'] ?? "";
-       final bool isNewWinner = finalWinnerId != room['highest_bidder_id'];
-       
-       if (isNewWinner || room['trump_suit'] == null) {
-         // Either someone stole it, or no one won in Round 1
-         updates['status'] = 'trump_selection';
-         updates['current_phase'] = 'trump_selection';
-         final players = await _supabase.from('players').select('id').eq('room_id', roomId).order('created_at');
-         updates['turn_index'] = players.indexWhere((p) => p['id'] == finalWinnerId);
-       } else {
-         // Round 1 winner is still the leader
-         updates['status'] = 'playing';
-         updates['current_phase'] = 'playing';
-         updates['turn_index'] = (room['dealer_index'] + 3) % 4; // Cutter starts play
-       }
+      // Final bid complete → start playing
+      updates['status'] = 'playing';
+      updates['current_phase'] = 'playing';
+      updates['turn_index'] = (room['dealer_index'] + 1) % 4; // Cutter leads first trick
     }
 
     await _supabase.from('rooms').update(updates).eq('id', roomId);
@@ -239,12 +220,20 @@ class SupabaseCardService extends CardService {
     final pIds = players.map<String>((p) => p['id'] as String).toList();
 
     if (room['status'] == 'trump_selection') {
-       // Move to Bidding Round 2 (others give bids)
+       // Deal Round 2: 4 cards each (deck[20..35]) — silent, no bidding
+       await _dealFourCardsRound(roomId, pIds, 20);
+       
+       // Deal Round 3: 4 cards each (deck[36..51]) — still silent
+       await _dealFourCardsRound(roomId, pIds, 36);
+
+       // Now all 13 cards dealt (5+4+4). Move to final bidding round.
        await _supabase.from('rooms').update({
          'status': 'bidding_2',
          'current_phase': 'bidding_2',
-         'turn_index': (room['dealer_index'] + 1) % 4, // Cutter starts bidding_2
-         'pass_count': 0, // Reset for Round 2
+         'turn_index': (room['dealer_index'] + 1) % 4, // Cutter starts final bid
+         'pass_count': 0,
+         'highest_bid': 0,
+         'highest_bidder_id': null,
        }).eq('id', roomId);
     }
   }
