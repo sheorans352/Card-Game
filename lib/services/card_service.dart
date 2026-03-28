@@ -193,6 +193,7 @@ class SupabaseCardService extends CardService {
       updates['current_phase'] = 'bidding_2';
       updates['pass_count'] = 0;
       updates['highest_bid'] = 0;
+      updates['trump_suit'] = 'S'; // Default: Spades when all passed
       updates['turn_index'] = (room['dealer_index'] + 1) % 4; // Cutter starts final bid
     } else if (status == 'bidding_2' && (updates['pass_count'] ?? passCount) >= 3) {
       // Final bid complete → start playing

@@ -9,6 +9,7 @@ class BiddingOverlay extends ConsumerStatefulWidget {
   final int? lockedBid;
   final int currentHighBid;
   final bool isTrumpSelection;
+  final String? trumpSuit; // Shown in bidding_2
   final Function(int bid) onBidSubmitted;
   final Function(Suit suit) onTrumpSelected;
   final VoidCallback onPass;
@@ -19,6 +20,7 @@ class BiddingOverlay extends ConsumerStatefulWidget {
     this.lockedBid,
     this.currentHighBid = 0,
     this.isTrumpSelection = false,
+    this.trumpSuit,
     required this.onBidSubmitted, 
     required this.onTrumpSelected,
     required this.onPass,
@@ -35,7 +37,12 @@ class _BiddingOverlayState extends ConsumerState<BiddingOverlay> {
   @override
   void initState() {
     super.initState();
-    _selectedBid = widget.lockedBid ?? (widget.currentHighBid == 0 ? 5 : widget.currentHighBid + 1);
+    if (widget.isRoundTwo) {
+      // Round 2: minimum bid is 2, no pass allowed
+      _selectedBid = widget.currentHighBid == 0 ? 2 : widget.currentHighBid + 1;
+    } else {
+      _selectedBid = widget.lockedBid ?? (widget.currentHighBid == 0 ? 5 : widget.currentHighBid + 1);
+    }
   }
 
   @override
@@ -67,11 +74,36 @@ class _BiddingOverlayState extends ConsumerState<BiddingOverlay> {
                 decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)),
               ),
               const SizedBox(height: 24),
-              const Text(
-                'PLACE YOUR BID',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.amber, letterSpacing: 2),
+              // Title
+              Text(
+                widget.isRoundTwo ? 'FINAL BID' : 'PLACE YOUR BID',
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.amber, letterSpacing: 2),
               ),
-              const SizedBox(height: 24),
+
+              // Trump badge — shown only in Round 2
+              if (widget.isRoundTwo && widget.trumpSuit != null) ...[
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: Colors.amber.withOpacity(0.5)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(_getTrumpEmoji(widget.trumpSuit!), style: const TextStyle(fontSize: 18)),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Trump: ${_getTrumpName(widget.trumpSuit!)}',
+                        style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+              const SizedBox(height: 16),
               
               // Bid Selector (Hide if just selecting trump)
               if (!widget.isTrumpSelection)
@@ -80,7 +112,7 @@ class _BiddingOverlayState extends ConsumerState<BiddingOverlay> {
                   children: [
                     _buildBidControl(Icons.remove, () {
                       gameAudio.playBiddingTick();
-                      final min = widget.currentHighBid == 0 ? 5 : widget.currentHighBid + 1;
+                      final min = widget.isRoundTwo ? 2 : (widget.currentHighBid == 0 ? 5 : widget.currentHighBid + 1);
                       setState(() => _selectedBid = (_selectedBid > min) ? _selectedBid - 1 : min);
                     }),
                     Container(
@@ -95,13 +127,13 @@ class _BiddingOverlayState extends ConsumerState<BiddingOverlay> {
                     ),
                     _buildBidControl(Icons.add, () {
                       gameAudio.playBiddingTick();
-                      final max = 13;
+                      const max = 13;
                       setState(() => _selectedBid = (_selectedBid < max) ? _selectedBid + 1 : max);
                     }),
                   ],
                 ),
-              
-              const SizedBox(height: 24),
+
+              const SizedBox(height: 16),
               
               // Trump Selector (Only if isTrumpSelection)
               if (widget.isTrumpSelection) ...[
@@ -140,7 +172,8 @@ class _BiddingOverlayState extends ConsumerState<BiddingOverlay> {
                             // Actions
               Row(
                 children: [
-                  if (!widget.isTrumpSelection)
+                  // PASS button: only shown in Round 1 (not Round 2, not trump selection)
+                  if (!widget.isTrumpSelection && !widget.isRoundTwo)
                     Expanded(
                       child: TextButton(
                         onPressed: widget.onPass,
@@ -151,7 +184,7 @@ class _BiddingOverlayState extends ConsumerState<BiddingOverlay> {
                         child: const Text('PASS', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                       ),
                     ),
-                  if (!widget.isTrumpSelection)
+                  if (!widget.isTrumpSelection && !widget.isRoundTwo)
                     const SizedBox(width: 16),
                   Expanded(
                     flex: 2,
@@ -198,6 +231,26 @@ class _BiddingOverlayState extends ConsumerState<BiddingOverlay> {
       case Suit.hearts: return '♥️';
       case Suit.diamonds: return '♦️';
       case Suit.clubs: return '♣️';
+    }
+  }
+
+  String _getTrumpEmoji(String trumpCode) {
+    switch (trumpCode) {
+      case 'S': return '♠️';
+      case 'H': return '♥️';
+      case 'D': return '♦️';
+      case 'C': return '♣️';
+      default: return '♠️';
+    }
+  }
+
+  String _getTrumpName(String trumpCode) {
+    switch (trumpCode) {
+      case 'S': return 'Spades';
+      case 'H': return 'Hearts';
+      case 'D': return 'Diamonds';
+      case 'C': return 'Clubs';
+      default: return 'Spades';
     }
   }
 }

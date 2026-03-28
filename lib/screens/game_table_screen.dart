@@ -141,7 +141,9 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
                   if ((room.currentPhase == 'bidding' || room.currentPhase == 'bidding_2' || room.currentPhase == 'trump_selection') && 
                       ref.watch(isLocalPlayerTurnProvider(room.code)))
                     BiddingOverlay(
+                      isRoundTwo: room.currentPhase == 'bidding_2',
                       currentHighBid: room.highestBid,
+                      trumpSuit: room.trumpSuit ?? 'S', // Default Spades if none set
                       isTrumpSelection: room.currentPhase == 'trump_selection',
                       onBidSubmitted: (score) => ref.read(cardServiceProvider).placeBid(room.id, localPlayerId!, score),
                       onTrumpSelected: (suit) => ref.read(cardServiceProvider).selectTrump(room.id, localPlayerId!, suit.name.toUpperCase().substring(0, 1)),
