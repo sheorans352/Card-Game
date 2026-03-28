@@ -152,60 +152,77 @@ class SupabaseCardService extends CardService {
     final String status = room['status'];
     
     final updates = <String, dynamic>{};
-    
+
     if (bid == 0) {
+      // Player permanently passes this round — mark bid = -1
+      await _supabase.from('players').update({'bid': -1}).eq('id', playerId);
       updates['pass_count'] = passCount + 1;
     } else {
-      // Validation
+      // Validate
       if (status == 'bidding' && bid < 5 && currentHigh == 0) throw Exception('Min opening bid is 5');
       if (status == 'bidding_2' && bid < 2 && currentHigh == 0) throw Exception('Min bid is 2');
-      
-      if (bid <= currentHigh) {
-        throw Exception('Bid must be higher than current highest bid ($currentHigh)');
-      }
-      
+      if (bid <= currentHigh) throw Exception('Bid must be higher than $currentHigh');
+
       updates['highest_bid'] = bid;
       updates['highest_bidder_id'] = playerId;
-      updates['pass_count'] = 0; // Reset successive pass count on a bid
+      await _supabase.from('players').update({'bid': bid}).eq('id', playerId);
+      // NOTE: pass_count is NOT reset here — players already out stay out
     }
 
-    final nextTurnIndex = (room['turn_index'] + 1) % 4;
-    updates['turn_index'] = nextTurnIndex;
+    final int newPassCount = (updates['pass_count'] ?? passCount) as int;
 
-    // Termination logic
-    if ((updates['pass_count'] ?? passCount) >= 3 && (updates['highest_bid'] ?? currentHigh) > 0) {
-      // Bidding round winner found → trump selection
-      updates['status'] = 'trump_selection';
-      updates['current_phase'] = 'trump_selection';
-      
-      final String winnerId = updates['highest_bidder_id'] ?? room['highest_bidder_id'];
-      final players = await _supabase.from('players').select('id').eq('room_id', roomId).order('created_at');
-      updates['turn_index'] = players.indexWhere((p) => p['id'] == winnerId);
-    } else if ((updates['pass_count'] ?? passCount) >= 4 && (updates['highest_bid'] ?? currentHigh) == 0 && status == 'bidding') {
-      // EVERYONE PASSED in bidding_1 → deal round 2+3 silently, go to bidding_2
-      final players = await _supabase.from('players').select('id').eq('room_id', roomId).order('joined_at', ascending: true);
-      final pIds = players.map<String>((p) => p['id'] as String).toList();
-      
-      await _dealFourCardsRound(roomId, pIds, 20); // Round 2: 4 cards
-      await _dealFourCardsRound(roomId, pIds, 36); // Round 3: 4 cards
-      
-      updates['status'] = 'bidding_2';
-      updates['current_phase'] = 'bidding_2';
-      updates['pass_count'] = 0;
-      updates['highest_bid'] = 0;
-      updates['trump_suit'] = 'S'; // Default: Spades when all passed
-      updates['turn_index'] = (room['dealer_index'] + 1) % 4; // Cutter starts final bid
-    } else if (status == 'bidding_2' && (updates['pass_count'] ?? passCount) >= 3) {
-      // Final bid complete → start playing
-      updates['status'] = 'playing';
-      updates['current_phase'] = 'playing';
-      updates['turn_index'] = (room['dealer_index'] + 1) % 4; // Cutter leads first trick
+    // Fetch all players (with updated bids) to compute next active turn
+    final allPlayers = await _supabase
+        .from('players')
+        .select('id, bid')
+        .eq('room_id', roomId)
+        .order('joined_at', ascending: true);
+
+    final currentIndex = allPlayers.indexWhere((p) => p['id'] == playerId);
+
+    // --- Termination check ---
+    if (status == 'bidding') {
+      if (newPassCount >= 3 && currentHigh > 0) {
+        // 3 players have passed, 1 winner remains
+        updates['status'] = 'trump_selection';
+        updates['current_phase'] = 'trump_selection';
+        final String winnerId = updates['highest_bidder_id'] ?? room['highest_bidder_id'];
+        updates['turn_index'] = allPlayers.indexWhere((p) => p['id'] == winnerId);
+      } else if (newPassCount >= 4) {
+        // Everyone passed → deal rest, default trump Spades
+        final pIds = allPlayers.map<String>((p) => p['id'] as String).toList();
+        await _dealFourCardsRound(roomId, pIds, 20);
+        await _dealFourCardsRound(roomId, pIds, 36);
+        updates['status'] = 'bidding_2';
+        updates['current_phase'] = 'bidding_2';
+        updates['pass_count'] = 0;
+        updates['highest_bid'] = 0;
+        updates['trump_suit'] = 'S'; // Spades default
+        updates['turn_index'] = (room['dealer_index'] + 1) % 4;
+        // Reset all player bids for the new bidding round
+        await _supabase.from('players').update({'bid': null}).eq('room_id', roomId);
+      } else {
+        // Advance to next player who hasn't passed (bid != -1)
+        int next = (currentIndex + 1) % 4;
+        for (int i = 0; i < 4; i++) {
+          if ((allPlayers[next]['bid'] as int?) != -1) break;
+          next = (next + 1) % 4;
+        }
+        updates['turn_index'] = next;
+      }
+    } else if (status == 'bidding_2') {
+      if (newPassCount >= 3) {
+        // Final bid complete → start playing
+        updates['status'] = 'playing';
+        updates['current_phase'] = 'playing';
+        updates['turn_index'] = (room['dealer_index'] + 1) % 4;
+      } else {
+        // Advance turn normally (no elimination in bidding_2)
+        updates['turn_index'] = (room['turn_index'] + 1) % 4;
+      }
     }
 
     await _supabase.from('rooms').update(updates).eq('id', roomId);
-    if (bid > 0) {
-      await _supabase.from('players').update({'bid': bid}).eq('id', playerId);
-    }
   }
 
   @override
