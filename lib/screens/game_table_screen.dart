@@ -58,16 +58,13 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
         
         if (!isDealer) return;
 
-        print('DEBUG: Dealer detecting state change: ${room.status}');
-
         try {
           if (room.status == 'shuffling') {
             gameAudio.playShuffle();
             ref.read(cardServiceProvider).shuffleDeck(room.id);
-          } else if (room.status == 'dealing') {
-             print('DEBUG: Dealer triggering initial deal for room: ${room.id}');
-             ref.read(cardServiceProvider).dealInitialFive(room.id, players.map((p) => p.id).toList());
           }
+          // NOTE: 'dealing' is handled directly inside cutDeck → dealInitialFive.
+          // Do NOT call dealInitialFive here to avoid double-dealing.
         } catch (e) {
           print('DEBUG: Error in dealer automation: $e');
         }
