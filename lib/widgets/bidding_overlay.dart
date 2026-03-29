@@ -9,7 +9,8 @@ class BiddingOverlay extends ConsumerStatefulWidget {
   final int? lockedBid;
   final int currentHighBid;
   final bool isTrumpSelection;
-  final String? trumpSuit; // Shown in bidding_2
+  final bool isScenarioB; // bidding_2 where all passed Phase 1 (trump override at 9+)
+  final String? trumpSuit;
   final Function(int bid) onBidSubmitted;
   final Function(Suit suit) onTrumpSelected;
   final VoidCallback onPass;
@@ -20,6 +21,7 @@ class BiddingOverlay extends ConsumerStatefulWidget {
     this.lockedBid,
     this.currentHighBid = 0,
     this.isTrumpSelection = false,
+    this.isScenarioB = false,
     this.trumpSuit,
     required this.onBidSubmitted, 
     required this.onTrumpSelected,
@@ -38,8 +40,8 @@ class _BiddingOverlayState extends ConsumerState<BiddingOverlay> {
   void initState() {
     super.initState();
     if (widget.isRoundTwo) {
-      // Round 2: minimum bid is 2, no pass allowed
-      _selectedBid = widget.currentHighBid == 0 ? 2 : widget.currentHighBid + 1;
+      // Round 2 declarations start at 1 (min trick count is 1)
+      _selectedBid = 1;
     } else {
       _selectedBid = widget.lockedBid ?? (widget.currentHighBid == 0 ? 5 : widget.currentHighBid + 1);
     }
@@ -76,11 +78,13 @@ class _BiddingOverlayState extends ConsumerState<BiddingOverlay> {
               const SizedBox(height: 24),
               // Title
               Text(
-                widget.isRoundTwo ? 'FINAL BID' : 'PLACE YOUR BID',
+                widget.isRoundTwo
+                  ? (widget.isScenarioB ? 'FINAL CALL' : 'YOUR CALL')
+                  : 'PLACE YOUR BID',
                 style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.amber, letterSpacing: 2),
               ),
 
-              // Trump badge — shown only in Round 2
+              // Trump badge — shown in Round 2
               if (widget.isRoundTwo && widget.trumpSuit != null) ...[
                 const SizedBox(height: 8),
                 Container(
@@ -103,6 +107,13 @@ class _BiddingOverlayState extends ConsumerState<BiddingOverlay> {
                   ),
                 ),
               ],
+
+              // Scenario B hint: bid 9+ to change trump
+              if (widget.isRoundTwo && widget.isScenarioB) ...[
+                const SizedBox(height: 6),
+                Text('Bid 9+ to override Trump suit',
+                  style: TextStyle(color: Colors.white.withOpacity(0.45), fontSize: 11, fontStyle: FontStyle.italic)),
+              ],
               const SizedBox(height: 16),
               
               // Bid Selector (Hide if just selecting trump)
@@ -112,7 +123,8 @@ class _BiddingOverlayState extends ConsumerState<BiddingOverlay> {
                   children: [
                     _buildBidControl(Icons.remove, () {
                       gameAudio.playBiddingTick();
-                      final min = widget.isRoundTwo ? 2 : (widget.currentHighBid == 0 ? 5 : widget.currentHighBid + 1);
+                      // Round 2: min 1 (trick declarations). Round 1: min 5 or currentHigh+1
+                      final min = widget.isRoundTwo ? 1 : (widget.currentHighBid == 0 ? 5 : widget.currentHighBid + 1);
                       setState(() => _selectedBid = (_selectedBid > min) ? _selectedBid - 1 : min);
                     }),
                     Container(

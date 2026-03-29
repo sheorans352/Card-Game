@@ -212,6 +212,10 @@ final isLocalPlayerTurnProvider = Provider.family<bool, String>((ref, code) {
     return players[cutterIndex].id == localId;
   }
   if (room.status == 'bidding' || room.status == 'bidding_2' || room.status == 'playing' || room.status == 'trump_selection') {
+    // Scenario A: trump setter doesn't declare in bidding_2 (their Phase 1 bid is committed)
+    if (room.status == 'bidding_2' && room.highestBidderId != null && localId == room.highestBidderId) {
+      return false;
+    }
     final currentPlayer = players[room.turnIndex % players.length];
     return currentPlayer.id == localId;
   }

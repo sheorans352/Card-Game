@@ -140,30 +140,47 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
                   ),
 
                   // FULL SCREEN OVERLAYS (Must be last for Z-index)
-                  
-                  // Bidding & Trump Selection
+
+                  // Bidding & Trump Selection overlay (active turn)
                   if ((room.currentPhase == 'bidding' || room.currentPhase == 'bidding_2' || room.currentPhase == 'trump_selection') && 
                       ref.watch(isLocalPlayerTurnProvider(room.code)))
                     BiddingOverlay(
                       isRoundTwo: room.currentPhase == 'bidding_2',
                       currentHighBid: room.highestBid,
-                      trumpSuit: room.trumpSuit ?? 'S', // Default Spades if none set
+                      trumpSuit: room.trumpSuit ?? 'S',
                       isTrumpSelection: room.currentPhase == 'trump_selection',
+                      isScenarioB: room.currentPhase == 'bidding_2' && room.highestBidderId == null,
                       onBidSubmitted: (score) => ref.read(cardServiceProvider).placeBid(room.id, localPlayerId!, score),
                       onTrumpSelected: (suit) => ref.read(cardServiceProvider).selectTrump(room.id, localPlayerId!, suit.name.toUpperCase().substring(0, 1)),
                       onPass: () => ref.read(cardServiceProvider).placeBid(room.id, localPlayerId!, 0),
                     ),
-                  
-                  if ((room.currentPhase == 'bidding' || room.currentPhase == 'bidding_2' || room.currentPhase == 'trump_selection') && 
-                      !ref.watch(isLocalPlayerTurnProvider(room.code)))
-                   const Align(
+
+                  // Scenario A waiting screen: trump setter sees who they're waiting on
+                  if (room.currentPhase == 'bidding_2' && room.highestBidderId == localPlayerId)
+                    _buildTrumpSetterWaitingScreen(players, room),
+
+                  // Generic waiting text for non-active players
+                  if ((room.currentPhase == 'bidding' || room.currentPhase == 'trump_selection') && 
+                      !ref.watch(isLocalPlayerTurnProvider(room.code)) &&
+                      room.highestBidderId != localPlayerId)
+                   Align(
                      alignment: Alignment.bottomCenter,
                      child: Padding(
-                       padding: EdgeInsets.only(bottom: 100),
-                       child: Text('Waiting for other players to bid...', 
-                         style: TextStyle(color: Colors.white54, fontStyle: FontStyle.italic)),
+                       padding: const EdgeInsets.only(bottom: 100),
+                       child: Text(
+                         room.currentPhase == 'trump_selection'
+                           ? 'Waiting for winner to set trump...'
+                           : 'Waiting for others to bid...',
+                         style: const TextStyle(color: Colors.white54, fontStyle: FontStyle.italic)),
                      ),
                    ),
+
+                  // bidding_2 waiting (non-trump-setter, non-active)
+                  if (room.currentPhase == 'bidding_2' &&
+                      room.highestBidderId != localPlayerId &&
+                      !ref.watch(isLocalPlayerTurnProvider(room.code)))
+                    _buildBidding2WaitingText(players, room),
+
                   
                   if (room.currentPhase == 'cutting')
                     const DeckCutOverlay(),
@@ -297,6 +314,45 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
       case 'C': return 'Clubs';
       default: return '';
     }
+  }
+
+  /// Full waiting screen shown to the trump setter (Scenario A) during bidding_2
+  Widget _buildTrumpSetterWaitingScreen(List<Player> players, Room room) {
+    final currentPlayer = players.isNotEmpty ? players[room.turnIndex % players.length] : null;
+    final waitingFor = currentPlayer?.name.split(' ').first ?? 'other players';
+    return Positioned.fill(
+      child: Container(
+        color: Colors.black.withOpacity(0.82),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Text('YOUR BID IS LOCKED', style: TextStyle(color: accentGold, fontSize: 13, letterSpacing: 3, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 16),
+            const Icon(Icons.lock_outline_rounded, color: accentGold, size: 48),
+            const SizedBox(height: 24),
+            Text('Waiting for', style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 14)),
+            const SizedBox(height: 8),
+            Text(waitingFor, style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w900)),
+            const SizedBox(height: 6),
+            Text('to make their Call...', style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 14)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Bottom hint for non-active, non-trump-setter players in bidding_2
+  Widget _buildBidding2WaitingText(List<Player> players, Room room) {
+    final currentPlayer = players.isNotEmpty ? players[room.turnIndex % players.length] : null;
+    final waitingFor = currentPlayer?.name.split(' ').first ?? 'other players';
+    return Align(
+      alignment: Alignment.bottomCenter,
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 100),
+        child: Text('Waiting for $waitingFor to make their Call...',
+          style: const TextStyle(color: Colors.white54, fontStyle: FontStyle.italic)),
+      ),
+    );
   }
 
   Widget _buildBottomTricksHUD(List<Player> players, int localIndex, Room room) {

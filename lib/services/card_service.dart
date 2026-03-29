@@ -215,14 +215,65 @@ class SupabaseCardService extends CardService {
         updates['turn_index'] = next;
       }
     } else if (status == 'bidding_2') {
-      if (newPassCount >= 3) {
-        // Final bid complete → start playing
-        updates['status'] = 'playing';
-        updates['current_phase'] = 'playing';
-        updates['turn_index'] = (room['dealer_index'] + 3) % 4; // Cutter leads first trick
+      // === PHASE 2: Final trick-count declarations (no passing) ===
+      final phase1WinnerId = room['highest_bidder_id'] as String?;
+      final isScenarioA = phase1WinnerId != null;
+
+      if (bid < 1) throw Exception('Must declare at least 1 trick');
+
+      // Record declaration (bid field = committed trick count)
+      await _supabase.from('players').update({'bid': bid}).eq('id', playerId);
+
+      final declarationCount = passCount + 1;
+      updates['pass_count'] = declarationCount;
+
+      // Scenario A needs 3 declarations (trump settler already committed)
+      // Scenario B needs all 4
+      final needed = isScenarioA ? 3 : 4;
+
+      if (declarationCount >= needed) {
+        if (!isScenarioA) {
+          // Scenario B: check if any player bid 9+ to override trump
+          final latestPlayers = await _supabase
+              .from('players').select('id, bid')
+              .eq('room_id', roomId)
+              .order('joined_at', ascending: true);
+
+          int maxBid = 0;
+          String? overriderId;
+          for (var p in latestPlayers) {
+            final pBid = p['bid'] as int? ?? 0;
+            if (pBid >= 9 && pBid > maxBid) { maxBid = pBid; overriderId = p['id'] as String; }
+          }
+
+          if (overriderId != null) {
+            // Highest 9+ bid wins → trump selection (52 cards already dealt)
+            updates['status'] = 'trump_selection';
+            updates['current_phase'] = 'trump_selection';
+            updates['highest_bidder_id'] = overriderId;
+            updates['turn_index'] = latestPlayers.indexWhere((p) => p['id'] == overriderId);
+          } else {
+            // No 9+ bid → Spades confirmed, cutter leads
+            updates['status'] = 'playing';
+            updates['current_phase'] = 'playing';
+            updates['trump_suit'] = 'S';
+            updates['turn_index'] = (room['dealer_index'] + 3) % 4;
+            updates['highest_bidder_id'] = null;
+          }
+        } else {
+          // Scenario A: Phase 1 winner leads first
+          updates['status'] = 'playing';
+          updates['current_phase'] = 'playing';
+          updates['turn_index'] = allPlayers.indexWhere((p) => p['id'] == phase1WinnerId);
+          updates['highest_bidder_id'] = null; // Clear for playing phase
+        }
       } else {
-        // Advance turn normally (no elimination in bidding_2)
-        updates['turn_index'] = (room['turn_index'] + 1) % 4;
+        // Advance turn — skip the trump setter in Scenario A
+        int next = (currentIndex + 1) % 4;
+        if (isScenarioA && allPlayers[next]['id'] == phase1WinnerId) {
+          next = (next + 1) % 4;
+        }
+        updates['turn_index'] = next;
       }
     }
 
@@ -234,29 +285,49 @@ class SupabaseCardService extends CardService {
     final room = await _supabase.from('rooms').select().eq('id', roomId).single();
     if (room['highest_bidder_id'] != playerId) throw Exception('Only the winner can select trump');
 
-    await _supabase.from('rooms').update({
-      'trump_suit': suit,
-    }).eq('id', roomId);
+    // Set trump suit first
+    await _supabase.from('rooms').update({'trump_suit': suit}).eq('id', roomId);
 
-    final players = await _supabase.from('players').select('id').eq('room_id', roomId).order('created_at');
+    final players = await _supabase
+        .from('players')
+        .select('id')
+        .eq('room_id', roomId)
+        .order('joined_at', ascending: true);
     final pIds = players.map<String>((p) => p['id'] as String).toList();
 
-    if (room['status'] == 'trump_selection') {
-       // Deal Round 2: 4 cards each (deck[20..35]) — silent, no bidding
-       await _dealFourCardsRound(roomId, pIds, 20);
-       
-       // Deal Round 3: 4 cards each (deck[36..51]) — still silent
-       await _dealFourCardsRound(roomId, pIds, 36);
+    // Check how many cards are already dealt to distinguish Phase 1 vs Scenario B override
+    final handsResponse = await _supabase.from('hands').select('id').eq('room_id', roomId);
+    final handsDealt = (handsResponse as List).length;
 
-       // Now all 13 cards dealt (5+4+4). Move to final bidding round.
-       await _supabase.from('rooms').update({
-         'status': 'bidding_2',
-         'current_phase': 'bidding_2',
-         'turn_index': (room['dealer_index'] + 3) % 4, // Cutter starts final bid
-         'pass_count': 0,
-         'highest_bid': 0,
-         'highest_bidder_id': null,
-       }).eq('id', roomId);
+    if (handsDealt < 52) {
+      // === Phase 1 trump selection: deal 4+4 remaining cards ===
+      await _dealFourCardsRound(roomId, pIds, 20); // Round 2
+      await _dealFourCardsRound(roomId, pIds, 36); // Round 3
+
+      // Reset trump_bid_passed for all players (bidding_2 is a fresh declaration round)
+      await _supabase.from('players')
+          .update({'trump_bid_passed': false})
+          .eq('room_id', roomId);
+
+      // Move to final bid — KEEP highest_bidder_id (identifies Scenario A Phase 1 winner)
+      await _supabase.from('rooms').update({
+        'status': 'bidding_2',
+        'current_phase': 'bidding_2',
+        'turn_index': (room['dealer_index'] + 3) % 4, // Cutter starts declaring
+        'pass_count': 0,   // Used as declaration counter in bidding_2
+        'highest_bid': 0,  // Reset (highest_bidder_id is kept for Scenario A)
+        // highest_bidder_id intentionally NOT cleared — Scenario A identity
+      }).eq('id', roomId);
+    } else {
+      // === Scenario B: 52 cards already dealt, this is a 9+ trump override ===
+      // Trump setter leads first (Phase 5, Scenario 1)
+      final trumpSetterIndex = pIds.indexOf(playerId);
+      await _supabase.from('rooms').update({
+        'status': 'playing',
+        'current_phase': 'playing',
+        'turn_index': trumpSetterIndex,
+        'highest_bidder_id': null, // Clear for playing phase
+      }).eq('id', roomId);
     }
   }
 
@@ -421,19 +492,79 @@ class SupabaseCardService extends CardService {
   }
 
   @override
-  Future<bool> validateMove(String roomId, String playerId, String cardValue, List<Map<String, dynamic>> currentTrick, List<String> playerHand, String? trumpSuit) async {
+  Future<bool> validateMove(
+    String roomId,
+    String playerId,
+    String cardValue,
+    List<Map<String, dynamic>> currentTrick,
+    List<String> playerHand,
+    String? trumpSuit,
+  ) async {
+    // Leading the trick — any card is valid
     if (currentTrick.isEmpty) return true;
 
-    final leadCardId = currentTrick.first['card_value'] as String;
-    final leadSuit = CardModel.fromId(leadCardId).suit;
+    final leadCard = CardModel.fromId(currentTrick.first['card_value'] as String);
+    final leadSuit = leadCard.suit;
     final playedCard = CardModel.fromId(cardValue);
+    final trumpSuitEnum = _parseSuit(trumpSuit);
+    final handCards = playerHand.map((c) => CardModel.fromId(c)).toList();
 
-    // If player follows suit, it's always valid
-    if (playedCard.suit == leadSuit) return true;
+    final hasSameSuit = handCards.any((c) => c.suit == leadSuit);
 
-    // If player doesn't follow suit, they must not have any cards of the lead suit
-    final hasLeadSuit = playerHand.any((cid) => CardModel.fromId(cid).suit == leadSuit);
-    
-    return !hasLeadSuit;
+    if (hasSameSuit) {
+      // Rule 1: Must follow lead suit
+      if (playedCard.suit != leadSuit) return false;
+
+      // Must-beat rule: find current best card of lead suit on table
+      CardModel? currentBest;
+      for (var t in currentTrick) {
+        final tc = CardModel.fromId(t['card_value'] as String);
+        if (tc.suit == leadSuit) {
+          if (currentBest == null || tc.rank > currentBest.rank) currentBest = tc;
+        }
+      }
+      // If player can beat the best, they MUST
+      if (currentBest != null) {
+        final canBeat = handCards.any((c) => c.suit == leadSuit && c.rank > currentBest!.rank);
+        if (canBeat && playedCard.rank <= currentBest.rank) return false;
+      }
+      return true;
+    }
+
+    // No lead-suit cards in hand
+    final hasTrump = trumpSuitEnum != null && handCards.any((c) => c.suit == trumpSuitEnum);
+
+    if (hasTrump) {
+      // Rule 2: Must play trump
+      if (playedCard.suit != trumpSuitEnum) return false;
+
+      // Find current best trump on table
+      CardModel? bestTrump;
+      for (var t in currentTrick) {
+        final tc = CardModel.fromId(t['card_value'] as String);
+        if (tc.suit == trumpSuitEnum) {
+          if (bestTrump == null || tc.rank > bestTrump.rank) bestTrump = tc;
+        }
+      }
+      // If trump already played, must play higher trump if possible
+      if (bestTrump != null) {
+        final canBeatTrump = handCards.any((c) => c.suit == trumpSuitEnum && c.rank > bestTrump!.rank);
+        if (canBeatTrump && playedCard.rank <= bestTrump.rank) return false;
+      }
+      return true;
+    }
+
+    // Rule 3: No lead suit and no trump — any card is valid (throwaway)
+    return true;
+  }
+
+  Suit? _parseSuit(String? code) {
+    switch (code) {
+      case 'S': return Suit.spades;
+      case 'H': return Suit.hearts;
+      case 'D': return Suit.diamonds;
+      case 'C': return Suit.clubs;
+      default: return null;
+    }
   }
 }
