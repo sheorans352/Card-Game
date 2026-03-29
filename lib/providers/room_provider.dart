@@ -211,7 +211,7 @@ final isLocalPlayerTurnProvider = Provider.family<bool, String>((ref, code) {
     final cutterIndex = (room.dealerIndex + 3) % players.length;
     return players[cutterIndex].id == localId;
   }
-  if (room.status == 'bidding' || room.status == 'bidding_2' || room.status == 'playing') {
+  if (room.status == 'bidding' || room.status == 'bidding_2' || room.status == 'playing' || room.status == 'trump_selection') {
     final currentPlayer = players[room.turnIndex % players.length];
     return currentPlayer.id == localId;
   }

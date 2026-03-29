@@ -318,7 +318,7 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
                 RichText(text: TextSpan(
                   children: [
                     TextSpan(text: '${p.tricksWon}', style: TextStyle(color: isLocal ? accentGold : Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
-                    TextSpan(text: ' / ${p.bid ?? "?"}', style: const TextStyle(color: Colors.white38, fontSize: 14)),
+                    TextSpan(text: ' / ${(p.bid != null && p.bid! > 0) ? p.bid : "?"}', style: const TextStyle(color: Colors.white38, fontSize: 14)),
                   ]
                 )),
                 const Text('tricks', style: TextStyle(color: Colors.white24, fontSize: 9)),
