@@ -59,12 +59,16 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
         if (!isDealer) return;
 
         try {
-          if (room.status == 'shuffling') {
+          final prevRoom = previous?.value;
+          final justEnteredShuffling = room.status == 'shuffling' && prevRoom?.status != 'shuffling';
+          
+          // Only shuffle when entering 'shuffling' state fresh.
+          // Never re-shuffle if deck has already been cut this round.
+          if (justEnteredShuffling && room.deckCutValue == null) {
             gameAudio.playShuffle();
             ref.read(cardServiceProvider).shuffleDeck(room.id);
           }
           // NOTE: 'dealing' is handled directly inside cutDeck → dealInitialFive.
-          // Do NOT call dealInitialFive here to avoid double-dealing.
         } catch (e) {
           print('DEBUG: Error in dealer automation: $e');
         }

@@ -405,11 +405,15 @@ class SupabaseCardService extends CardService {
     // Set to shuffling for next round
     await _supabase.from('rooms').update({
       'status': 'shuffling',
-      'current_phase': 'lobby', // Actually back to lobby phase briefly before auto-dealing
+      'current_phase': 'lobby',
       'current_round': roundNum + 1,
       'dealer_index': lowestScorerIndex,
       'trump_suit': null,
       'trump_locked': false,
+      'deck_cut_value': null, // Reset so next round can be freshly shuffled
+      'pass_count': 0,
+      'highest_bid': 0,
+      'highest_bidder_id': null,
     }).eq('id', roomId);
     
     // Clear played cards
