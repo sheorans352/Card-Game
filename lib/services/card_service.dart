@@ -532,12 +532,9 @@ class SupabaseCardService extends CardService {
     }
 
     // No lead-suit cards in hand
-    final hasTrump = trumpSuitEnum != null && handCards.any((c) => c.suit == trumpSuitEnum);
-
-    if (hasTrump) {
-      // Rule 2: Must play trump
-      if (playedCard.suit != trumpSuitEnum) return false;
-
+    
+    // If the player chooses to play a trump card
+    if (trumpSuitEnum != null && playedCard.suit == trumpSuitEnum) {
       // Find current best trump on table
       CardModel? bestTrump;
       for (var t in currentTrick) {
@@ -554,7 +551,7 @@ class SupabaseCardService extends CardService {
       return true;
     }
 
-    // Rule 3: No lead suit and no trump — any card is valid (throwaway)
+    // Rule 3: No lead suit cards in hand, and player chose to play a non-trump card (Throwaway) — always valid
     return true;
   }
 
