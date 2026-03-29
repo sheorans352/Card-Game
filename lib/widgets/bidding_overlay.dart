@@ -40,8 +40,8 @@ class _BiddingOverlayState extends ConsumerState<BiddingOverlay> {
   void initState() {
     super.initState();
     if (widget.isRoundTwo) {
-      // Round 2 declarations start at 1 (min trick count is 1)
-      _selectedBid = 1;
+      // Round 2 declarations start at 2 (min trick count is 2)
+      _selectedBid = 2;
     } else {
       _selectedBid = widget.lockedBid ?? (widget.currentHighBid == 0 ? 5 : widget.currentHighBid + 1);
     }
@@ -123,8 +123,8 @@ class _BiddingOverlayState extends ConsumerState<BiddingOverlay> {
                   children: [
                     _buildBidControl(Icons.remove, () {
                       gameAudio.playBiddingTick();
-                      // Round 2: min 1 (trick declarations). Round 1: min 5 or currentHigh+1
-                      final min = widget.isRoundTwo ? 1 : (widget.currentHighBid == 0 ? 5 : widget.currentHighBid + 1);
+                      // Round 2: min 2 (trick declarations). Round 1: min 5 or currentHigh+1
+                      final min = widget.isRoundTwo ? 2 : (widget.currentHighBid == 0 ? 5 : widget.currentHighBid + 1);
                       setState(() => _selectedBid = (_selectedBid > min) ? _selectedBid - 1 : min);
                     }),
                     Container(

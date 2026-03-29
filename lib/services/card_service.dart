@@ -81,8 +81,8 @@ class SupabaseCardService extends CardService {
     final room = roomResponse.first;
     final List<dynamic> deck = room['shuffled_deck'];
     final int dealerIndex = room['dealer_index'] ?? 0;
-    // Cutter is to the LEFT of dealer — matches isCutterProvider: (dealerIndex + 3) % 4
-    final int cutterIndex = (dealerIndex + 3) % 4;
+    // Cutter is to the LEFT of dealer (clockwise next): (dealerIndex + 1) % 4
+    final int cutterIndex = (dealerIndex + 1) % 4;
     
     // Clear all old hands for these players
     for (final pid in playerIds) {
@@ -123,7 +123,7 @@ class SupabaseCardService extends CardService {
     final room = roomResponse.first;
     final List<dynamic> deck = room['shuffled_deck'];
     final int dealerIndex = room['dealer_index'] ?? 0;
-    final int cutterIndex = (dealerIndex + 3) % 4; // Matches isCutterProvider
+    final int cutterIndex = (dealerIndex + 1) % 4; // Matches isCutterProvider
 
     final List<String> orderedPlayers = List.generate(4, (i) => playerIds[(cutterIndex + i) % 4]);
 
@@ -161,14 +161,18 @@ class SupabaseCardService extends CardService {
       updates['pass_count'] = passCount + 1;
     } else {
       // Validate
-      if (status == 'bidding' && bid < 5 && currentHigh == 0) throw Exception('Min opening bid is 5');
-      if (status == 'bidding_2' && bid < 2 && currentHigh == 0) throw Exception('Min bid is 2');
-      if (bid <= currentHigh) throw Exception('Bid must be higher than $currentHigh');
-
-      updates['highest_bid'] = bid;
-      updates['highest_bidder_id'] = playerId;
+      if (status == 'bidding') {
+        if (bid < 5 && currentHigh == 0) throw Exception('Min opening bid is 5');
+        if (bid <= currentHigh) throw Exception('Bid must be higher than $currentHigh');
+        updates['highest_bid'] = bid;
+        updates['highest_bidder_id'] = playerId;
+      } else if (status == 'bidding_2') {
+        if (bid < 2) throw Exception('Min bid is 2');
+        // No currentHigh limitation; can be same or less than other players' bids
+      }
+      
       await _supabase.from('players').update({'bid': bid}).eq('id', playerId);
-      // NOTE: pass_count is NOT reset — players who passed stay out
+      // NOTE: pass_count is NOT reset for bidding_1 — players who passed stay out
     }
 
     final int newPassCount = (updates['pass_count'] ?? passCount) as int;
@@ -200,7 +204,13 @@ class SupabaseCardService extends CardService {
         updates['pass_count'] = 0;
         updates['highest_bid'] = 0;
         updates['trump_suit'] = 'S'; // Spades default
-        updates['turn_index'] = (room['dealer_index'] + 3) % 4;
+        updates['turn_index'] = (room['dealer_index'] + 1) % 4;
+        
+        // Optimistic lock to prevent duplicate deals on rapid clicking
+        final updated = await _supabase.from('rooms').update({'status': 'dealing_2'})
+            .match({'id': roomId, 'status': 'bidding'}).select();
+        if (updated.isEmpty) return;
+
         // Reset trump_bid_passed and bid for final bidding round
         await _supabase.from('players')
             .update({'bid': null, 'trump_bid_passed': false})
@@ -257,7 +267,7 @@ class SupabaseCardService extends CardService {
             updates['status'] = 'playing';
             updates['current_phase'] = 'playing';
             updates['trump_suit'] = 'S';
-            updates['turn_index'] = (room['dealer_index'] + 3) % 4;
+            updates['turn_index'] = (room['dealer_index'] + 1) % 4;
             updates['highest_bidder_id'] = null;
           }
         } else {
@@ -300,6 +310,11 @@ class SupabaseCardService extends CardService {
     final handsDealt = (handsResponse as List).length;
 
     if (handsDealt < 52) {
+      // Optimistic lock to prevent duplicate deals on rapid clicking
+      final updated = await _supabase.from('rooms').update({'status': 'dealing_2'})
+          .match({'id': roomId, 'status': 'trump_selection'}).select();
+      if (updated.isEmpty) return;
+
       // === Phase 1 trump selection: deal 4+4 remaining cards ===
       await _dealFourCardsRound(roomId, pIds, 20); // Round 2
       await _dealFourCardsRound(roomId, pIds, 36); // Round 3
@@ -313,7 +328,7 @@ class SupabaseCardService extends CardService {
       await _supabase.from('rooms').update({
         'status': 'bidding_2',
         'current_phase': 'bidding_2',
-        'turn_index': (room['dealer_index'] + 3) % 4, // Cutter starts declaring
+        'turn_index': (room['dealer_index'] + 1) % 4, // Cutter starts declaring
         'pass_count': 0,   // Used as declaration counter in bidding_2
         'highest_bid': 0,  // Reset (highest_bidder_id is kept for Scenario A)
         // highest_bidder_id intentionally NOT cleared — Scenario A identity
