@@ -81,8 +81,8 @@ class SupabaseCardService extends CardService {
     final room = roomResponse.first;
     final List<dynamic> deck = room['shuffled_deck'];
     final int dealerIndex = room['dealer_index'] ?? 0;
-    // Cutter is the player after the dealer (clockwise)
-    final int cutterIndex = (dealerIndex + 1) % 4;
+    // Cutter is to the LEFT of dealer — matches isCutterProvider: (dealerIndex + 3) % 4
+    final int cutterIndex = (dealerIndex + 3) % 4;
     
     // Clear all old hands for these players
     for (final pid in playerIds) {
@@ -123,7 +123,7 @@ class SupabaseCardService extends CardService {
     final room = roomResponse.first;
     final List<dynamic> deck = room['shuffled_deck'];
     final int dealerIndex = room['dealer_index'] ?? 0;
-    final int cutterIndex = (dealerIndex + 1) % 4;
+    final int cutterIndex = (dealerIndex + 3) % 4; // Matches isCutterProvider
 
     final List<String> orderedPlayers = List.generate(4, (i) => playerIds[(cutterIndex + i) % 4]);
 
@@ -198,7 +198,7 @@ class SupabaseCardService extends CardService {
         updates['pass_count'] = 0;
         updates['highest_bid'] = 0;
         updates['trump_suit'] = 'S'; // Spades default
-        updates['turn_index'] = (room['dealer_index'] + 1) % 4;
+        updates['turn_index'] = (room['dealer_index'] + 3) % 4; // Cutter starts bidding_2
         // Reset all player bids for the new bidding round
         await _supabase.from('players').update({'bid': null}).eq('room_id', roomId);
       } else {
@@ -215,7 +215,7 @@ class SupabaseCardService extends CardService {
         // Final bid complete → start playing
         updates['status'] = 'playing';
         updates['current_phase'] = 'playing';
-        updates['turn_index'] = (room['dealer_index'] + 1) % 4;
+        updates['turn_index'] = (room['dealer_index'] + 3) % 4; // Cutter leads first trick
       } else {
         // Advance turn normally (no elimination in bidding_2)
         updates['turn_index'] = (room['turn_index'] + 1) % 4;
@@ -248,7 +248,7 @@ class SupabaseCardService extends CardService {
        await _supabase.from('rooms').update({
          'status': 'bidding_2',
          'current_phase': 'bidding_2',
-         'turn_index': (room['dealer_index'] + 1) % 4, // Cutter starts final bid
+         'turn_index': (room['dealer_index'] + 3) % 4, // Cutter starts final bid
          'pass_count': 0,
          'highest_bid': 0,
          'highest_bidder_id': null,
