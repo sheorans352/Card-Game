@@ -196,6 +196,13 @@ class SupabaseCardService extends CardService {
         updates['turn_index'] = allPlayers.indexWhere((p) => p['id'] == winnerId);
       } else if (newPassCount >= 4) {
         // Everyone passed → deal rest, default trump = Spades
+        
+        // Optimistic lock to prevent duplicate deals on rapid clicking
+        // Do this FIRST before long dealing animations
+        final updated = await _supabase.from('rooms').update({'status': 'dealing_2'})
+            .match({'id': roomId, 'status': 'bidding'}).select();
+        if (updated.isEmpty) return;
+
         final pIds = allPlayers.map<String>((p) => p['id'] as String).toList();
         await _dealFourCardsRound(roomId, pIds, 20);
         await _dealFourCardsRound(roomId, pIds, 36);
@@ -206,11 +213,6 @@ class SupabaseCardService extends CardService {
         updates['trump_suit'] = 'S'; // Spades default
         updates['turn_index'] = (room['dealer_index'] + 1) % 4;
         
-        // Optimistic lock to prevent duplicate deals on rapid clicking
-        final updated = await _supabase.from('rooms').update({'status': 'dealing_2'})
-            .match({'id': roomId, 'status': 'bidding'}).select();
-        if (updated.isEmpty) return;
-
         // Reset trump_bid_passed and bid for final bidding round
         await _supabase.from('players')
             .update({'bid': null, 'trump_bid_passed': false})
@@ -350,7 +352,7 @@ class SupabaseCardService extends CardService {
   Future<void> playCard(String roomId, String playerId, String cardValue) async {
     // 0. Validate move
     final room = await _supabase.from('rooms').select().eq('id', roomId).single();
-    final playedCards = await _supabase.from('played_cards').select().eq('room_id', roomId);
+    final playedCards = await _supabase.from('played_cards').select().eq('room_id', roomId).order('created_at', ascending: true);
     final hand = await _supabase.from('hands').select().eq('player_id', playerId);
     
     final currentTrick = playedCards.length % 4 == 0 ? <Map<String, dynamic>>[] : playedCards.sublist(playedCards.length - (playedCards.length % 4));
@@ -374,8 +376,8 @@ class SupabaseCardService extends CardService {
 
     // 3. Fetch state for evaluation
     final roomResponse = await _supabase.from('rooms').select().eq('id', roomId).single();
-    final allPlayedCards = await _supabase.from('played_cards').select().eq('room_id', roomId).order('played_at', ascending: true);
-    final players = await _supabase.from('players').select().eq('room_id', roomId);
+    final allPlayedCards = await _supabase.from('played_cards').select().eq('room_id', roomId).order('created_at', ascending: true);
+    final players = await _supabase.from('players').select().eq('room_id', roomId).order('created_at', ascending: true);
 
     final trickSize = allPlayedCards.length % 4;
     

@@ -118,7 +118,11 @@ final playedCardsProvider = StreamProvider.family<List<Map<String, dynamic>>, St
         .from('played_cards')
         .stream(primaryKey: ['id'])
         .eq('room_id', roomId)
-        .map((data) => data.map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e)).toList())
+        .map((data) {
+          final sorted = data.map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e)).toList();
+          sorted.sort((a, b) => (a['created_at'] as String).compareTo(b['created_at'] as String));
+          return sorted;
+        })
         .handleError((error) {
           debugPrint('Supabase Stream Error (PlayedCards): $error');
           throw error;
@@ -208,7 +212,7 @@ final isLocalPlayerTurnProvider = Provider.family<bool, String>((ref, code) {
   if (room == null || players == null || localId == null) return false;
   if (room.status == 'waiting') return false;
   if (room.status == 'cutting') {
-    final cutterIndex = (room.dealerIndex + 3) % players.length;
+    final cutterIndex = (room.dealerIndex + 1) % players.length;
     return players[cutterIndex].id == localId;
   }
   if (room.status == 'bidding' || room.status == 'bidding_2' || room.status == 'playing' || room.status == 'trump_selection') {
@@ -228,8 +232,8 @@ final isCutterProvider = Provider.family<bool, String>((ref, code) {
   final players = ref.watch(playersStreamProvider(room.id)).value;
   final localId = ref.watch(localPlayerIdProvider);
   if (players == null || localId == null) return false;
-  // Cutter is the player to the left of the dealer (index - 1, or +3 mod 4)
-  final cutterIndex = (room.dealerIndex + 3) % players.length;
+  // Cutter is the player to the left of the dealer (index + 1)
+  final cutterIndex = (room.dealerIndex + 1) % players.length;
   return players[cutterIndex].id == localId;
 });
 
@@ -331,7 +335,7 @@ class MockCardService extends CardService {
       status: 'bidding', 
       currentPhase: 'bidding', 
       trumpSuit: 'S',
-      turnIndex: (room.dealerIndex + 3) % 4, // Cutter starts
+      turnIndex: (room.dealerIndex + 1) % 4, // Cutter starts
     );
     LocalStorageSync.setData(LocalStorageSync.roomKey, nextRoom.toJson());
   }
@@ -365,7 +369,7 @@ class MockCardService extends CardService {
     final nextRoom = room.copyWith(
       status: 'bidding_2', 
       currentPhase: 'bidding_2', 
-      turnIndex: (room.dealerIndex + 3) % 4 // Cutter starts
+      turnIndex: (room.dealerIndex + 1) % 4 // Cutter starts
     );
     LocalStorageSync.setData(LocalStorageSync.roomKey, nextRoom.toJson());
   }
