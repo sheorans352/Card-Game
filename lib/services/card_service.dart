@@ -381,8 +381,6 @@ class SupabaseCardService extends CardService {
     }
   }
 
-  }
-
   Future<void> _recordRoundResults(String roomId) async {
     final room = await _supabase.from('rooms').select().eq('id', roomId).single();
     final players = await _supabase.from('players').select().eq('room_id', roomId);
