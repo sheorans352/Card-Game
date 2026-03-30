@@ -384,7 +384,8 @@ class MockCardService extends CardService {
     for (int i = 0; i < 4; i++) {
       final targetIdx = (cutterIndex + i) % 4;
       final pId = playerIds[targetIdx];
-      final cardsForPlayer = deck.skip(targetIdx * 5).take(5).map((c) => {'card_value': c}).toList();
+      // Give the top cards of the deck to the player whose turn it is in the logic (i)
+      final cardsForPlayer = deck.skip(i * 5).take(5).map((c) => {'card_value': c}).toList();
       hands[pId] = cardsForPlayer;
       LocalStorageSync.setData(LocalStorageSync.handsKey, hands);
       await Future.delayed(const Duration(milliseconds: 600)); 
@@ -411,7 +412,8 @@ class MockCardService extends CardService {
       final targetIdx = (cutterIndex + i) % 4;
       final pId = playerIds[targetIdx];
       final existing = (hands[pId] as List).cast<Map<String, dynamic>>();
-      final extra = deck.skip(20 + targetIdx * 4).take(4).map((c) => {'card_value': c}).toList();
+      // Round 2 start after 20 cards: skip(20 + i * 4)
+      final extra = deck.skip(20 + i * 4).take(4).map((c) => {'card_value': c}).toList();
       hands[pId] = [...existing, ...extra];
       LocalStorageSync.setData(LocalStorageSync.handsKey, hands);
       await Future.delayed(const Duration(milliseconds: 500)); 
@@ -433,7 +435,8 @@ class MockCardService extends CardService {
       final targetIdx = (cutterIndex + i) % 4;
       final pId = playerIds[targetIdx];
       final existing = (hands[pId] as List).cast<Map<String, dynamic>>();
-      final extra = deck.skip(36 + targetIdx * 4).take(4).map((c) => {'card_value': c}).toList();
+      // Round 3 starts after 20 + 16 = 36 cards: skip(36 + i * 4)
+      final extra = deck.skip(36 + i * 4).take(4).map((c) => {'card_value': c}).toList();
       hands[pId] = [...existing, ...extra];
       LocalStorageSync.setData(LocalStorageSync.handsKey, hands);
       await Future.delayed(const Duration(milliseconds: 500)); 
