@@ -29,12 +29,6 @@ final localPlayerIdProvider = StateProvider<String?>((ref) {
   }
   return null;
 });
-
-import '../services/card_service.dart';
-import '../config/env_config.dart';
-
-SupabaseClient get supabase => Supabase.instance.client;
-
 // Core Providers
 
 final roomMetadataByIdProvider = StreamProvider.family<Room?, String>((ref, roomId) {

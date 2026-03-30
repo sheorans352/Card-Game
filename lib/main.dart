@@ -23,15 +23,15 @@ class MyApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return const MaterialApp(
+    return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Minus Card Game',
       theme: ThemeData(
         brightness: Brightness.dark,
         primarySwatch: Colors.amber,
-        scaffoldBackgroundColor: Color(0xFF121212),
+        scaffoldBackgroundColor: const Color(0xFF121212),
       ),
-      home: HomeScreen(),
+      home: const HomeScreen(),
     );
   }
 }

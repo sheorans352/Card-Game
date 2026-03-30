@@ -381,10 +381,10 @@ class SupabaseCardService extends CardService {
       'card_value': cardValue,
     });
 
-    // 3. Fetch state for evaluation
+    // 3. Fetch state for evaluation (Reuse players from step 0)
     final roomResponse = await _supabase.from('rooms').select().eq('id', roomId).single();
     final allPlayedCards = await _supabase.from('played_cards').select().eq('room_id', roomId).order('created_at', ascending: true);
-    final players = await _supabase.from('players').select().eq('room_id', roomId).order('created_at', ascending: true);
+
 
     final trickSize = allPlayedCards.length % 4;
     
