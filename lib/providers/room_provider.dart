@@ -161,7 +161,12 @@ final playerHandProvider = StreamProvider.family<List<Map<String, dynamic>>, Str
 final playedCardsProvider = StreamProvider.family<List<Map<String, dynamic>>, String>((ref, roomId) {
   final config = ref.watch(appConfigProvider);
   if (config.useMock) {
-    return Stream.value([]);
+    return (() async* {
+      yield LocalStorageSync.getData<List<Map<String, dynamic>>>(LocalStorageSync.playedCardsKey, (j) => (j as List).cast<Map<String, dynamic>>()) ?? [];
+      yield* LocalStorageSync.updates
+          .where((key) => key == LocalStorageSync.playedCardsKey || key == 'reset')
+          .map((_) => LocalStorageSync.getData<List<Map<String, dynamic>>>(LocalStorageSync.playedCardsKey, (j) => (j as List).cast<Map<String, dynamic>>()) ?? []);
+    })();
   } else {
     return supabase
         .from('played_cards')
@@ -182,7 +187,12 @@ final playedCardsProvider = StreamProvider.family<List<Map<String, dynamic>>, St
 final roundResultsProvider = StreamProvider.family<List<Map<String, dynamic>>, String>((ref, roomId) {
   final config = ref.watch(appConfigProvider);
   if (config.useMock) {
-    return Stream.value([]);
+    return (() async* {
+      yield []; // Simple empty list for mock
+      yield* LocalStorageSync.updates
+          .where((key) => key == 'round_results' || key == 'reset')
+          .map((_) => []);
+    })();
   } else {
     return supabase
         .from('round_results')
@@ -496,26 +506,27 @@ class MockCardService extends CardService {
     final hand = allHands[playerId] as List;
     hand.removeWhere((c) => c['card_value'] == cardValue);
     LocalStorageSync.setData(LocalStorageSync.handsKey, allHands);
-    final playedCards = LocalStorageSync.getData<List<Map<String, dynamic>>>(LocalStorageSync.playedCardsKey, (j) => (j as List).cast<Map<String, dynamic>>());
+
+    final playedCards = LocalStorageSync.getData<List<Map<String, dynamic>>>(LocalStorageSync.playedCardsKey, (j) => (j as List).cast<Map<String, dynamic>>()) ?? [];
     playedCards.add({'player_id': playerId, 'card_value': cardValue});
     LocalStorageSync.setData(LocalStorageSync.playedCardsKey, playedCards);
+
     final room = LocalStorageSync.getData(LocalStorageSync.roomKey, (j) => Room.fromJson(j));
-    var nextRoom = room.copyWith(turnIndex: room.turnIndex + 1);
-    if (playedCards.length % 4 == 0) {
-      // Evaluate winner and scoring... (Phase 6)
-      if (playedCards.length == 52) { // Round Finished
-         final playersData = LocalStorageSync.getData<List<Player>>(LocalStorageSync.playersKey, (j) => (j as List).map<Player>((p) => Player.fromJson(p)).toList());
-         // Simple mock score calc:
-         for (int i = 0; i < playersData.length; i++) {
-           final p = playersData[i];
-           final scoreChange = (p.tricksWon >= (p.bid ?? 0)) ? (p.bid ?? 0) : -(p.bid ?? 0);
-           playersData[i] = p.copyWith(totalScore: p.totalScore + scoreChange, bid: null, tricksWon: 0);
-         }
-         LocalStorageSync.setData(LocalStorageSync.playersKey, playersData.map((p) => p.toJson()).toList());
-         nextRoom = nextRoom.copyWith(status: 'game_over', currentPhase: 'game_over');
-      }
-    }
+    var nextRoom = room.copyWith(turnIndex: (room.turnIndex + 1) % 4);
     LocalStorageSync.setData(LocalStorageSync.roomKey, nextRoom.toJson());
+
+    if (playedCards.length % 4 == 0) {
+      // Trick Finished: Simulate a delay to show the cards in the middle
+      await Future.delayed(const Duration(milliseconds: 1200));
+      
+      // Advance room status if round finished (13 tricks * 4 = 52 cards played)
+      // For now, just clear the table to start next trick
+      LocalStorageSync.setData(LocalStorageSync.playedCardsKey, []);
+      
+      // Optional: Logic to increment tricksWon for the winner (Phase 6)
+      // nextRoom = nextRoom.copyWith(turnIndex: winnerIdx);
+      // LocalStorageSync.setData(LocalStorageSync.roomKey, nextRoom.toJson());
+    }
   }
 
   @override
