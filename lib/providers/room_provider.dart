@@ -54,6 +54,18 @@ class LocalStorageSync {
   }
 }
 
+final roomMetadataByIdProvider = StreamProvider.family<Room?, String>((ref, roomId) {
+  return supabase
+      .from('rooms')
+      .stream(primaryKey: ['id'])
+      .eq('id', roomId)
+      .map<Room?>((data) => data.isEmpty ? null : Room.fromJson(Map<String, dynamic>.from(data.first)))
+      .handleError((error) {
+        debugPrint('Supabase Stream Error (RoomById): $error');
+        return null;
+      });
+});
+
 final roomMetadataProvider = StreamProvider.family<Room?, String>((ref, code) {
   final config = ref.watch(appConfigProvider);
   if (config.useMock) {
@@ -148,7 +160,7 @@ final roundResultsProvider = StreamProvider.family<List<Map<String, dynamic>>, S
 });
 
 final playableCardsProvider = Provider.family<Set<String>, String>((ref, roomId) {
-  final room = ref.watch(roomMetadataProvider(roomId)).value;
+  final room = ref.watch(roomMetadataByIdProvider(roomId)).value;
   final localId = ref.watch(localPlayerIdProvider);
   if (room == null || localId == null || room.status != 'playing') return {};
   
@@ -329,8 +341,16 @@ class MockCardService extends CardService {
     final room = LocalStorageSync.getData(LocalStorageSync.roomKey, (j) => Room.fromJson(j));
     final deck = room.shuffledDeck;
     final hands = <String, dynamic>{};
-    for (int i = 0; i < playerIds.length; i++) hands[playerIds[i]] = deck.skip(i * 5).take(5).map((c) => {'card_value': c}).toList();
-    LocalStorageSync.setData(LocalStorageSync.handsKey, hands);
+    
+    // Ordered Dealing: 5 to P1, then 5 to P2, etc. with deliberate delays
+    for (int i = 0; i < playerIds.length; i++) {
+      final pId = playerIds[i];
+      final cardsForPlayer = deck.skip(i * 5).take(5).map((c) => {'card_value': c}).toList();
+      hands[pId] = cardsForPlayer;
+      LocalStorageSync.setData(LocalStorageSync.handsKey, hands);
+      await Future.delayed(const Duration(milliseconds: 600)); // Deliberate pace
+    }
+
     final nextRoom = room.copyWith(
       status: 'bidding', 
       currentPhase: 'bidding', 
@@ -345,12 +365,17 @@ class MockCardService extends CardService {
     final room = LocalStorageSync.getData(LocalStorageSync.roomKey, (j) => Room.fromJson(j));
     final deck = room.shuffledDeck;
     final hands = LocalStorageSync.getData(LocalStorageSync.handsKey, (j) => j as Map<String, dynamic>);
+    
+    // Sequential Dealing: 4 to each, one by one
     for (int i = 0; i < playerIds.length; i++) {
-       final existing = (hands[playerIds[i]] as List).cast<Map<String, dynamic>>();
-       final extra = deck.skip(20 + i * 4).take(4).map((c) => {'card_value': c}).toList();
-       hands[playerIds[i]] = [...existing, ...extra];
+      final pId = playerIds[i];
+      final existing = (hands[pId] as List).cast<Map<String, dynamic>>();
+      final extra = deck.skip(20 + i * 4).take(4).map((c) => {'card_value': c}).toList();
+      hands[pId] = [...existing, ...extra];
+      LocalStorageSync.setData(LocalStorageSync.handsKey, hands);
+      await Future.delayed(const Duration(milliseconds: 500)); // Deliberate pace
     }
-    LocalStorageSync.setData(LocalStorageSync.handsKey, hands);
+
     final nextRoom = room.copyWith(status: 'dealing_2', currentPhase: 'dealing_2');
     LocalStorageSync.setData(LocalStorageSync.roomKey, nextRoom.toJson());
   }
@@ -360,12 +385,17 @@ class MockCardService extends CardService {
     final room = LocalStorageSync.getData(LocalStorageSync.roomKey, (j) => Room.fromJson(j));
     final deck = room.shuffledDeck;
     final hands = LocalStorageSync.getData(LocalStorageSync.handsKey, (j) => j as Map<String, dynamic>);
+    
+    // Sequential Dealing: Final 4 to each
     for (int i = 0; i < playerIds.length; i++) {
-       final existing = (hands[playerIds[i]] as List).cast<Map<String, dynamic>>();
-       final extra = deck.skip(36 + i * 4).take(4).map((c) => {'card_value': c}).toList();
-       hands[playerIds[i]] = [...existing, ...extra];
+      final pId = playerIds[i];
+      final existing = (hands[pId] as List).cast<Map<String, dynamic>>();
+      final extra = deck.skip(36 + i * 4).take(4).map((c) => {'card_value': c}).toList();
+      hands[pId] = [...existing, ...extra];
+      LocalStorageSync.setData(LocalStorageSync.handsKey, hands);
+      await Future.delayed(const Duration(milliseconds: 500)); // Deliberate pace
     }
-    LocalStorageSync.setData(LocalStorageSync.handsKey, hands);
+
     final nextRoom = room.copyWith(
       status: 'bidding_2', 
       currentPhase: 'bidding_2', 
