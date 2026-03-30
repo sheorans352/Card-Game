@@ -145,11 +145,18 @@ class SupabaseCardService extends CardService {
 
   @override
   Future<void> placeBid(String roomId, String playerId, int bid) async {
-    // 1. Fetch current state
+    // 1. Fetch current state and enforce turn
     final room = await _supabase.from('rooms').select().eq('id', roomId).single();
+    final players = await _supabase.from('players').select().eq('room_id', roomId).order('joined_at', ascending: true);
+    final currentPlayerIndex = room['turn_index'] % players.length;
+    if (players[currentPlayerIndex]['id'] != playerId) {
+      throw Exception('Not your turn to bid!');
+    }
+
     final int currentHigh = room['highest_bid'] ?? 0;
     final int passCount = room['pass_count'] ?? 0;
     final String status = room['status'];
+
     
     final updates = <String, dynamic>{};
 
