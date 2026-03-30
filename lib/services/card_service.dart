@@ -301,8 +301,16 @@ class SupabaseCardService extends CardService {
 
   @override
   Future<void> selectTrump(String roomId, String playerId, String suit) async {
+    // 1. Fetch current state and enforce winner
     final room = await _supabase.from('rooms').select().eq('id', roomId).single();
-    if (room['highest_bidder_id'] != playerId) throw Exception('Only the winner can select trump');
+    final players = await _supabase.from('players').select().eq('room_id', roomId).order('joined_at', ascending: true);
+    final winnerIndex = room['turn_index']; // Winner's index is stored in turn_index during trump_selection phase
+    
+    if (players[winnerIndex]['id'] != playerId) {
+      throw Exception('Only the winner can select trump!');
+    }
+
+
 
     // Set trump suit first
     await _supabase.from('rooms').update({'trump_suit': suit}).eq('id', roomId);
