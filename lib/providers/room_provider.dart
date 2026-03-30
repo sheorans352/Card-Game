@@ -123,7 +123,11 @@ final playableCardsProvider = Provider.family<Set<String>, String>((ref, roomId)
   if (room == null || localId == null || room.status != 'playing') return {};
   
   final players = ref.watch(playersStreamProvider(room.id)).value;
-  if (players == null) return {};
+  if (players == null || players.isEmpty) return {};
+
+  // === TURN CHECK ===
+  final isTurn = players[room.turnIndex % players.length].id == localId;
+  if (!isTurn) return {};
 
   final hand = ref.watch(playerHandProvider(localId)).value ?? [];
   final playedCards = ref.watch(playedCardsProvider(room.id)).value ?? [];
@@ -157,14 +161,11 @@ final playableCardsProvider = Provider.family<Set<String>, String>((ref, roomId)
     return cardsOfLeadSuit.toSet(); // Must follow suit
   }
   
-  // 3. No lead suit -> Can play Trump or anything
-  if (trumpSuit != null) {
-     final trumps = cardsInHand.where((c) => c.endsWith(trumpSuit)).toList();
-     if (trumps.isNotEmpty) return trumps.toSet(); // Forced to trump if possible
-  }
-
+  // 3. No lead suit -> Can play ANY card (Trump or discard)
   return cardsInHand.toSet();
 });
+
+
 
 int _getRankValue(String v) {
   if (v == 'A') return 14;

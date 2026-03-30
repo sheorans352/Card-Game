@@ -87,6 +87,12 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
               final localIndex = players.indexWhere((p) => p.id == localPlayerId);
               if (localIndex == -1) return const Center(child: Text('You are not in this room'));
 
+              // Get actual played cards count for HUDs
+              final playedCardsCount = ref.watch(playedCardsProvider(room.id)).maybeWhen(
+                data: (cards) => cards.length,
+                orElse: () => 0,
+              );
+
               // Rotate players so local is at bottom (index 0)
               final rotatedPlayers = List.generate(4, (i) {
                 return players[(localIndex + i) % players.length];
@@ -97,7 +103,7 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
                    const SpadeBackground(),
                   // The Table
                   // Top HUD: Scores & Status
-                  _buildTopHUD(players, room),
+                  _buildTopHUD(players, room, playedCardsCount),
 
                   // Player Avatars (Figma Style)
                   _buildPlayerAvatar(rotatedPlayers[0], 'bottom', room.turnIndex == localIndex, room.dealerIndex == localIndex, playerGreen),
@@ -119,7 +125,7 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
                   
                   // TRUMP HUD (Floating bottom left)
                   if (room.trumpSuit != null)
-                    _buildTrumpHUD(room.trumpSuit!, room),
+                    _buildTrumpHUD(room.trumpSuit!, room, playedCardsCount),
 
                   // Scoreboard Button (Top Right)
                   Positioned(
@@ -254,7 +260,7 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
     );
   }
 
-  Widget _buildTopHUD(List<Player> players, Room room) {
+  Widget _buildTopHUD(List<Player> players, Room room, int playedCardsCount) {
     return Positioned(
       top: 0, left: 0, right: 0,
       child: Container(
@@ -279,7 +285,7 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
               Text('Trump: ${_getSuitName(room.trumpSuit!)}', style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.bold)),
             ],
             const Spacer(),
-            Text('ROUND ${room.currentRound ?? 1} — TRICK ${(playedCardsCount(room) ~/ 4) + 1}', 
+            Text('ROUND ${room.currentRound ?? 1} — TRICK ${(playedCardsCount ~/ 4) + 1}', 
               style: const TextStyle(color: accentGold, fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 1.5)),
             const Spacer(),
             // Miniature Player Scores
@@ -299,12 +305,7 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
     );
   }
 
-  int playedCardsCount(Room room) {
-    // We can't easily access the stream provider results here synchronously 
-    // without a separate state, but we can assume from the turnIndex and deck status
-    // Or we just use a placeholder text as seen in Figma and refine later.
-    return 14; // Placeholder reflecting Figma's 'Trick 4' value (Trick 4 = 12+2 cards)
-  }
+  // playedCardsCount(room) removed as we watch the stream directly in build()
 
   String _getSuitName(String suit) {
     switch (suit) {
@@ -390,7 +391,8 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
     );
   }
 
-  Widget _buildTrumpHUD(String suit, Room room) {
+  Widget _buildTrumpHUD(String suit, Room room, int playedCardsCount) {
+    final trickNumber = (playedCardsCount ~/ 4) + 1;
     return Positioned(
       bottom: 90,
       left: 20,
@@ -402,7 +404,7 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
           const SizedBox(width: 8),
           const Text('•', style: TextStyle(color: Colors.white24)),
           const SizedBox(width: 8),
-          Text('Round ${room.currentRound}  •  Trick ${(room.turnIndex % 13) + 1} of 13', 
+          Text('Round ${room.currentRound}  •  Trick $trickNumber of 13', 
             style: const TextStyle(color: Colors.white38, fontSize: 11)),
         ],
       )

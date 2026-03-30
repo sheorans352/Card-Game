@@ -350,8 +350,14 @@ class SupabaseCardService extends CardService {
 
   @override
   Future<void> playCard(String roomId, String playerId, String cardValue) async {
-    // 0. Validate move
+    // 0. Validate turn order
     final room = await _supabase.from('rooms').select().eq('id', roomId).single();
+    final players = await _supabase.from('players').select().eq('room_id', roomId).order('joined_at', ascending: true);
+    final currentPlayerIndex = room['turn_index'] % players.length;
+    if (players[currentPlayerIndex]['id'] != playerId) {
+      throw Exception('Not your turn!');
+    }
+
     final playedCards = await _supabase.from('played_cards').select().eq('room_id', roomId).order('created_at', ascending: true);
     final hand = await _supabase.from('hands').select().eq('player_id', playerId);
     
@@ -360,6 +366,7 @@ class SupabaseCardService extends CardService {
     
     final isValid = await validateMove(roomId, playerId, cardValue, currentTrick, handValues, room['trump_suit']);
     if (!isValid) throw Exception('Invalid move: Must follow suit/win if possible');
+
 
     // 1. Play the card
     await _supabase.from('played_cards').insert({
