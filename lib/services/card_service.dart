@@ -361,104 +361,26 @@ class SupabaseCardService extends CardService {
 
   @override
   Future<void> playCard(String roomId, String playerId, String cardValue) async {
-    // 0. Validate turn order
-    final room = await _supabase.from('rooms').select().eq('id', roomId).single();
-    final players = await _supabase.from('players').select().eq('room_id', roomId).order('joined_at', ascending: true);
-    final currentPlayerIndex = room['turn_index'] % players.length;
-    if (players[currentPlayerIndex]['id'] != playerId) {
-      throw Exception('Not your turn!');
-    }
-
-    final playedCards = await _supabase.from('played_cards').select().eq('room_id', roomId).order('played_at', ascending: true);
-    final hand = await _supabase.from('hands').select().eq('player_id', playerId);
-    
-    final currentTrick = playedCards.length % 4 == 0 ? <Map<String, dynamic>>[] : playedCards.sublist(playedCards.length - (playedCards.length % 4));
-    final handValues = hand.map((h) => h['card_value'] as String).toList();
-    
-    final isValid = await validateMove(roomId, playerId, cardValue, currentTrick, handValues, room['trump_suit']);
-    if (!isValid) throw Exception('Invalid move: Must follow suit/win if possible');
-
-
-    // 1. Play the card
-    await _supabase.from('played_cards').insert({
-      'room_id': roomId,
-      'player_id': playerId,
-      'card_value': cardValue,
+    // 1. Call atomic RPC for turn check, card play, and winner evaluation
+    final response = await _supabase.rpc('play_card', params: {
+      'p_room_id': roomId,
+      'p_player_id': playerId,
+      'p_card_value': cardValue,
     });
 
-    // 2. Remove from hand
-    await _supabase.from('hands').delete().match({
-      'player_id': playerId,
-      'card_value': cardValue,
-    });
-
-    // 3. Fetch state for evaluation (Reuse players from step 0)
-    final roomResponse = await _supabase.from('rooms').select().eq('id', roomId).single();
-    final allPlayedCards = await _supabase.from('played_cards').select().eq('room_id', roomId).order('played_at', ascending: true);
-
-
-    final trickSize = allPlayedCards.length % 4;
-    
-    if (trickSize == 0 && allPlayedCards.isNotEmpty) {
-      // Trick finished! Evaluate winner.
-      final currentTrick = allPlayedCards.sublist(allPlayedCards.length - 4);
-      final trumpSuit = roomResponse['trump_suit'];
-      
-      String? winnerPlayerId;
-      CardModel? bestCard;
-      final leadSuit = CardModel.fromId(currentTrick.first['card_value']).suit;
-
-      for (var pCard in currentTrick) {
-        final card = CardModel.fromId(pCard['card_value']);
-        if (bestCard == null) {
-          bestCard = card;
-          winnerPlayerId = pCard['player_id'];
-          continue;
-        }
-
-        bool beats = false;
-        if (trumpSuit != null && card.suit.name.toUpperCase().startsWith(trumpSuit)) {
-          if (!bestCard.suit.name.toUpperCase().startsWith(trumpSuit)) {
-            beats = true;
-          } else if (card.rank > bestCard.rank) {
-            beats = true;
-          }
-        } else if (!bestCard.suit.name.toUpperCase().startsWith(trumpSuit ?? 'NONE') && card.suit == leadSuit) {
-          if (bestCard.suit != leadSuit || card.rank > bestCard.rank) {
-            beats = true;
-          }
-        }
-
-        if (beats) {
-          bestCard = card;
-          winnerPlayerId = pCard['player_id'];
-        }
-      }
-
-      if (winnerPlayerId != null) {
-        // Update tricks_won for winner
-        final winner = players.firstWhere((p) => p['id'] == winnerPlayerId);
-        await _supabase.from('players').update({
-          'tricks_won': (winner['tricks_won'] ?? 0) + 1,
-        }).eq('id', winnerPlayerId);
-
-        // Winner starts next trick
-        final winnerIndex = players.indexWhere((p) => p['id'] == winnerPlayerId);
-        await _supabase.from('rooms').update({
-          'turn_index': winnerIndex,
-        }).eq('id', roomId);
-      }
-
-      // 4. Check if Round is finished (13 tricks * 4 = 52 cards)
-      if (playedCards.length == 52) {
-        await _recordRoundResults(roomId);
-      }
-    } else {
-      // Move to next player
-      await _supabase.from('rooms').update({
-        'turn_index': (roomResponse['turn_index'] + 1) % 4,
-      }).eq('id', roomId);
+    final result = Map<String, dynamic>.from(response);
+    if (result['success'] != true) {
+      throw Exception(result['error'] ?? 'Failed to play card');
     }
+
+    // 2. Check if the round is finished (52 cards played)
+    // The RPC returns trick_finished and round_finished info
+    final playedCards = await _supabase.from('played_cards').select('id').eq('room_id', roomId);
+    if (playedCards.length == 52) {
+      await _recordRoundResults(roomId);
+    }
+  }
+
   }
 
   Future<void> _recordRoundResults(String roomId) async {

@@ -29,6 +29,9 @@ final localPlayerIdProvider = StateProvider<String?>((ref) {
   }
   return null;
 });
+// State tracking for optimistic UI updates
+final pendingCardPlayProvider = StateProvider<Set<String>>((ref) => {});
+
 // Core Providers
 
 final roomMetadataByIdProvider = StreamProvider.family<Room?, String>((ref, roomId) {

@@ -722,21 +722,35 @@ class CardsLayer extends ConsumerWidget {
   List<Widget> _buildPlayerHands(WidgetRef ref) {
     final localHandAsync = ref.watch(playerHandProvider(localPlayerId));
     final playableIds = ref.watch(playableCardsProvider(roomId));
+    final pendingPlays = ref.watch(pendingCardPlayProvider);
     List<Widget> handWidgets = [];
 
     localHandAsync.whenData((hand) {
-      for (var i = 0; i < hand.length; i++) {
-        final cardId = hand[i]['card_value'] as String;
-        final isPlayable = playableIds.contains(cardId);
+      // Filter out cards that are currently being played (Optimistic UI)
+      final visibleHand = hand.where((h) => !pendingPlays.contains(h['card_value'] as String)).toList();
+      
+      for (var i = 0; i < visibleHand.length; i++) {
+        final cardId = visibleHand[i]['card_value'] as String;
+        final isPlayable = playableIds.contains(cardId) && pendingPlays.isEmpty; // Global debounce
+        
         handWidgets.add(
           HandCardWidget(
             card: CardModel.fromId(cardId),
             index: i,
-            total: hand.length,
+            total: visibleHand.length,
             isPlayable: isPlayable,
-            onTap: isPlayable ? () {
+            onTap: isPlayable ? () async {
               gameAudio.playCardPlay();
-              ref.read(cardServiceProvider).playCard(roomId, localPlayerId, cardId);
+              // Optimistically hide from hand
+              ref.read(pendingCardPlayProvider.notifier).update((state) => {...state, cardId});
+              try {
+                await ref.read(cardServiceProvider).playCard(roomId, localPlayerId, cardId);
+              } catch (e) {
+                // If it fails, restore the card to hand
+                ref.read(pendingCardPlayProvider.notifier).update((state) => state.where((id) => id != cardId).toSet());
+                debugPrint('Play card failed: $e');
+              }
+              // Set will be cleared automatically when the hand stream updates from the DB delete
             } : () {
               gameAudio.playInvalidMove();
             },
@@ -755,9 +769,16 @@ class CardsLayer extends ConsumerWidget {
         }
       });
     }
-    // Listen for new cards in local hand for dealing SFX
+    // Listen for new cards in local hand for dealing SFX and to clear pending plays
     ref.listen(playerHandProvider(localPlayerId), (prev, next) {
       next.whenData((hand) {
+        // 1. Manage pending plays set: remove if the card is actually gone from the DB hand
+        final handIds = hand.map((h) => h['card_value'] as String).toSet();
+        ref.read(pendingCardPlayProvider.notifier).update((state) => 
+          state.where((id) => handIds.contains(id)).toSet()
+        );
+
+        // 2. Deal SFX
         final prevLen = prev?.value?.length ?? 0;
         final nextLen = hand.length;
         if (nextLen > prevLen) {
