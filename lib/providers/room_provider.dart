@@ -38,23 +38,41 @@ class LocalStorageSync {
   static const String playedCardsKey = 'minus_mock_played';
 
   static final Map<String, String> _storage = {};
+  static final _updateController = StreamController<String>.broadcast();
+  static Stream<String> get updates => _updateController.stream;
 
   static void reset() {
     _storage.clear();
+    _updateController.add('reset');
   }
 
   static T getData<T>(String key, T Function(dynamic) fromJson) {
     final data = _storage[key];
     if (data == null) return null as T;
-    return fromJson(jsonDecode(data));
+    try {
+      return fromJson(jsonDecode(data));
+    } catch (e) {
+      debugPrint('Error decoding $key: $e');
+      return null as T;
+    }
   }
 
   static void setData(String key, dynamic data) {
     _storage[key] = jsonEncode(data);
+    _updateController.add(key);
   }
 }
 
 final roomMetadataByIdProvider = StreamProvider.family<Room?, String>((ref, roomId) {
+  final config = ref.watch(appConfigProvider);
+  if (config.useMock) {
+    return (() async* {
+      yield LocalStorageSync.getData(LocalStorageSync.roomKey, (j) => Room.fromJson(j));
+      yield* LocalStorageSync.updates
+        .where((key) => key == LocalStorageSync.roomKey || key == 'reset')
+        .map((_) => LocalStorageSync.getData(LocalStorageSync.roomKey, (j) => Room.fromJson(j)));
+    })();
+  }
   return supabase
       .from('rooms')
       .stream(primaryKey: ['id'])
@@ -69,7 +87,12 @@ final roomMetadataByIdProvider = StreamProvider.family<Room?, String>((ref, room
 final roomMetadataProvider = StreamProvider.family<Room?, String>((ref, code) {
   final config = ref.watch(appConfigProvider);
   if (config.useMock) {
-    return Stream.value(null);
+    return (() async* {
+      yield LocalStorageSync.getData(LocalStorageSync.roomKey, (j) => Room.fromJson(j));
+      yield* LocalStorageSync.updates
+        .where((key) => key == LocalStorageSync.roomKey || key == 'reset')
+        .map((_) => LocalStorageSync.getData(LocalStorageSync.roomKey, (j) => Room.fromJson(j)));
+    })();
   } else {
     return supabase
         .from('rooms')
@@ -86,7 +109,12 @@ final roomMetadataProvider = StreamProvider.family<Room?, String>((ref, code) {
 final playersStreamProvider = StreamProvider.family<List<Player>, String>((ref, roomId) {
   final config = ref.watch(appConfigProvider);
   if (config.useMock) {
-    return Stream.value([]);
+    return (() async* {
+      yield LocalStorageSync.getData<List<Player>>(LocalStorageSync.playersKey, (j) => (j as List).map<Player>((p) => Player.fromJson(p)).toList()) ?? [];
+      yield* LocalStorageSync.updates
+        .where((key) => key == LocalStorageSync.playersKey || key == 'reset')
+        .map((_) => LocalStorageSync.getData<List<Player>>(LocalStorageSync.playersKey, (j) => (j as List).map<Player>((p) => Player.fromJson(p)).toList()) ?? []);
+    })();
   } else {
     return supabase
         .from('players')
@@ -94,7 +122,7 @@ final playersStreamProvider = StreamProvider.family<List<Player>, String>((ref, 
         .eq('room_id', roomId)
         .map((data) {
           final sorted = List<Map<String, dynamic>>.from(data);
-          sorted.sort((a, b) => (a['joined_at'] as String).compareTo(b['joined_at'] as String));
+          sorted.sort((a, b) => (a['joined_at']?.toString() ?? '').compareTo(b['joined_at']?.toString() ?? ''));
           return sorted.map<Player>((p) => Player.fromJson(p)).toList();
         })
         .handleError((error) {
@@ -107,7 +135,16 @@ final playersStreamProvider = StreamProvider.family<List<Player>, String>((ref, 
 final playerHandProvider = StreamProvider.family<List<Map<String, dynamic>>, String>((ref, playerId) {
   final config = ref.watch(appConfigProvider);
   if (config.useMock) {
-    return Stream.value([]);
+    return (() async* {
+      final hands = LocalStorageSync.getData<Map<String, dynamic>>(LocalStorageSync.handsKey, (j) => j as Map<String, dynamic>);
+      yield (hands?[playerId] as List?)?.cast<Map<String, dynamic>>() ?? [];
+      yield* LocalStorageSync.updates
+          .where((key) => key == LocalStorageSync.handsKey || key == 'reset')
+          .map((_) {
+            final hands = LocalStorageSync.getData<Map<String, dynamic>>(LocalStorageSync.handsKey, (j) => j as Map<String, dynamic>);
+            return (hands?[playerId] as List?)?.cast<Map<String, dynamic>>() ?? [];
+          });
+    })();
   } else {
     return supabase
         .from('hands')
@@ -342,13 +379,15 @@ class MockCardService extends CardService {
     final deck = room.shuffledDeck;
     final hands = <String, dynamic>{};
     
-    // Ordered Dealing: 5 to P1, then 5 to P2, etc. with deliberate delays
-    for (int i = 0; i < playerIds.length; i++) {
-      final pId = playerIds[i];
-      final cardsForPlayer = deck.skip(i * 5).take(5).map((c) => {'card_value': c}).toList();
+    // Ordered Dealing: 5 to each, starting from cutter (dealer + 1)
+    final cutterIndex = (room.dealerIndex + 1) % 4;
+    for (int i = 0; i < 4; i++) {
+      final targetIdx = (cutterIndex + i) % 4;
+      final pId = playerIds[targetIdx];
+      final cardsForPlayer = deck.skip(targetIdx * 5).take(5).map((c) => {'card_value': c}).toList();
       hands[pId] = cardsForPlayer;
       LocalStorageSync.setData(LocalStorageSync.handsKey, hands);
-      await Future.delayed(const Duration(milliseconds: 600)); // Deliberate pace
+      await Future.delayed(const Duration(milliseconds: 600)); 
     }
 
     final nextRoom = room.copyWith(
@@ -366,14 +405,16 @@ class MockCardService extends CardService {
     final deck = room.shuffledDeck;
     final hands = LocalStorageSync.getData(LocalStorageSync.handsKey, (j) => j as Map<String, dynamic>);
     
-    // Sequential Dealing: 4 to each, one by one
-    for (int i = 0; i < playerIds.length; i++) {
-      final pId = playerIds[i];
+    // Sequential Dealing: 4 to each, one by one starting from cutter
+    final cutterIndex = (room.dealerIndex + 1) % 4;
+    for (int i = 0; i < 4; i++) {
+      final targetIdx = (cutterIndex + i) % 4;
+      final pId = playerIds[targetIdx];
       final existing = (hands[pId] as List).cast<Map<String, dynamic>>();
-      final extra = deck.skip(20 + i * 4).take(4).map((c) => {'card_value': c}).toList();
+      final extra = deck.skip(20 + targetIdx * 4).take(4).map((c) => {'card_value': c}).toList();
       hands[pId] = [...existing, ...extra];
       LocalStorageSync.setData(LocalStorageSync.handsKey, hands);
-      await Future.delayed(const Duration(milliseconds: 500)); // Deliberate pace
+      await Future.delayed(const Duration(milliseconds: 500)); 
     }
 
     final nextRoom = room.copyWith(status: 'dealing_2', currentPhase: 'dealing_2');
@@ -386,14 +427,16 @@ class MockCardService extends CardService {
     final deck = room.shuffledDeck;
     final hands = LocalStorageSync.getData(LocalStorageSync.handsKey, (j) => j as Map<String, dynamic>);
     
-    // Sequential Dealing: Final 4 to each
-    for (int i = 0; i < playerIds.length; i++) {
-      final pId = playerIds[i];
+    // Sequential Dealing: Final 4 to each starting from cutter
+    final cutterIndex = (room.dealerIndex + 1) % 4;
+    for (int i = 0; i < 4; i++) {
+      final targetIdx = (cutterIndex + i) % 4;
+      final pId = playerIds[targetIdx];
       final existing = (hands[pId] as List).cast<Map<String, dynamic>>();
-      final extra = deck.skip(36 + i * 4).take(4).map((c) => {'card_value': c}).toList();
+      final extra = deck.skip(36 + targetIdx * 4).take(4).map((c) => {'card_value': c}).toList();
       hands[pId] = [...existing, ...extra];
       LocalStorageSync.setData(LocalStorageSync.handsKey, hands);
-      await Future.delayed(const Duration(milliseconds: 500)); // Deliberate pace
+      await Future.delayed(const Duration(milliseconds: 500)); 
     }
 
     final nextRoom = room.copyWith(
@@ -432,7 +475,13 @@ class MockCardService extends CardService {
       }
     } else if (room.status == 'bidding_2') {
       if (nextRoom.turnIndex % 4 == (room.dealerIndex + 1) % 4) {
-        nextRoom = nextRoom.copyWith(status: 'playing', currentPhase: 'playing', turnIndex: (room.dealerIndex + 1) % 4);
+        // Start turn goes to highest bidder if set, else cutter
+        var startTurnIndex = (room.dealerIndex + 1) % 4;
+        if (room.highestBidderId != null) {
+          final bidderIdx = players.indexWhere((p) => p.id == room.highestBidderId);
+          if (bidderIdx != -1) startTurnIndex = bidderIdx;
+        }
+        nextRoom = nextRoom.copyWith(status: 'playing', currentPhase: 'playing', turnIndex: startTurnIndex);
       }
     }
     LocalStorageSync.setData(LocalStorageSync.roomKey, nextRoom.toJson());
