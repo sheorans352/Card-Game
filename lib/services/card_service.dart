@@ -369,7 +369,7 @@ class SupabaseCardService extends CardService {
       throw Exception('Not your turn!');
     }
 
-    final playedCards = await _supabase.from('played_cards').select().eq('room_id', roomId).order('created_at', ascending: true);
+    final playedCards = await _supabase.from('played_cards').select().eq('room_id', roomId).order('played_at', ascending: true);
     final hand = await _supabase.from('hands').select().eq('player_id', playerId);
     
     final currentTrick = playedCards.length % 4 == 0 ? <Map<String, dynamic>>[] : playedCards.sublist(playedCards.length - (playedCards.length % 4));
@@ -394,7 +394,7 @@ class SupabaseCardService extends CardService {
 
     // 3. Fetch state for evaluation (Reuse players from step 0)
     final roomResponse = await _supabase.from('rooms').select().eq('id', roomId).single();
-    final allPlayedCards = await _supabase.from('played_cards').select().eq('room_id', roomId).order('created_at', ascending: true);
+    final allPlayedCards = await _supabase.from('played_cards').select().eq('room_id', roomId).order('played_at', ascending: true);
 
 
     final trickSize = allPlayedCards.length % 4;
@@ -495,7 +495,7 @@ class SupabaseCardService extends CardService {
     final updatedPlayers = await _supabase.from('players')
         .select()
         .eq('room_id', roomId)
-        .order('created_at'); // Consistent ordering
+        .order('joined_at'); // Consistent ordering
 
     var lowestScorerIndex = 0;
     var minScore = updatedPlayers[0]['total_score'] ?? 0;
