@@ -315,12 +315,8 @@ class SupabaseCardService extends CardService {
     // Set trump suit first
     await _supabase.from('rooms').update({'trump_suit': suit}).eq('id', roomId);
 
-    final players = await _supabase
-        .from('players')
-        .select('id')
-        .eq('room_id', roomId)
-        .order('joined_at', ascending: true);
     final pIds = players.map<String>((p) => p['id'] as String).toList();
+
 
     // Check how many cards are already dealt to distinguish Phase 1 vs Scenario B override
     final handsResponse = await _supabase.from('hands').select('id').eq('room_id', roomId);
