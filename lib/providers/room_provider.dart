@@ -129,28 +129,78 @@ final roundResultsProvider = StreamProvider.family<List<Map<String, dynamic>>, S
       });
 });
 
+// === UNIFIED PREDICTIVE TURN LOGIC ===
+// Determines whose turn it is based on BOTH server state and local optimistic plays.
+final predictiveTurnIdProvider = Provider.family<String?, String>((ref, roomId) {
+  final room = ref.watch(roomMetadataByIdProvider(roomId)).value;
+  if (room == null) return null;
+  final players = ref.watch(playersStreamProvider(roomId)).value ?? [];
+  if (players.isEmpty) return null;
+
+  final serverPlayedCards = ref.watch(playedCardsProvider(roomId)).value ?? [];
+  final localPlayed = ref.watch(localPlayedCardsProvider);
+  
+  // Combine server cards with local plays that haven't hit the server yet
+  final serverCardIds = serverPlayedCards.map((m) => m['card_value'] as String).toSet();
+  final localOnly = localPlayed.where((id) => !serverCardIds.contains(id)).toList();
+  
+  // Total cards played in this round (Server + Optimistic Local)
+  final totalPlayedCount = serverPlayedCards.length + localOnly.length;
+  
+  if (totalPlayedCount == 0) {
+    // Round just started, use the server's initial turn
+    if (room.turnIndex < 0) return null;
+    return players[room.turnIndex % players.length].id;
+  }
+
+  final trickSize = totalPlayedCount % players.length;
+  
+  if (trickSize == 0) {
+    // A trick just finished. The winner of that trick leads the next one.
+    final lastTrick = serverPlayedCards.length >= 4 
+        ? serverPlayedCards.sublist(serverPlayedCards.length - 4)
+        : serverPlayedCards; 
+    
+    if (lastTrick.length < 4) return players[room.turnIndex % players.length].id;
+
+    final winnerId = Player.evaluateTrickWinner(lastTrick, room.trumpSuit, players);
+    return winnerId;
+  } else {
+    // Trick is in progress. 
+    String? leaderId;
+    if (serverPlayedCards.length % players.length == 0) {
+      // Server hasn't seen the first card of the new trick yet, but we have localOnly.
+      final lastServerTrick = serverPlayedCards.sublist(serverPlayedCards.length - 4);
+      leaderId = Player.evaluateTrickWinner(lastServerTrick, room.trumpSuit, players);
+    } else {
+      // Server already has some cards for the current trick.
+      final currentTrickStart = (serverPlayedCards.length ~/ players.length) * players.length;
+      leaderId = serverPlayedCards[currentTrickStart]['player_id'];
+    }
+
+    if (leaderId == null) return players[room.turnIndex % players.length].id;
+    
+    final leaderIndex = players.indexWhere((p) => p.id == leaderId);
+    if (leaderIndex == -1) return players[room.turnIndex % players.length].id;
+    
+    return players[(leaderIndex + trickSize) % players.length].id;
+  }
+});
+
 final playableCardsProvider = Provider.family<Set<String>, String>((ref, roomId) {
   final room = ref.watch(roomMetadataByIdProvider(roomId)).value;
   final localId = ref.watch(localPlayerIdProvider);
   if (room == null || localId == null || room.status != 'playing') return {};
   
-  final players = ref.watch(playersStreamProvider(room.id)).value;
-  if (players == null || players.isEmpty) return {};
+  final players = ref.watch(playersStreamProvider(room.id)).value ?? [];
+  if (players.isEmpty) return {};
 
   final hand = ref.watch(playerHandProvider(localId)).value ?? [];
   final playedCards = ref.watch(playedCardsProvider(room.id)).value ?? [];
   
   // === TURN CHECK (Predictive) ===
-  bool isTurn = false;
-  if (playedCards.isNotEmpty && playedCards.length % 4 == 0) {
-    final lastTrick = playedCards.sublist(playedCards.length - 4);
-    final winnerId = Player.evaluateTrickWinner(lastTrick, room.trumpSuit, players);
-    isTurn = winnerId == localId;
-  } else {
-    isTurn = players[room.turnIndex % players.length].id == localId;
-  }
-  
-  if (!isTurn) return {};
+  final currentTurnId = ref.watch(predictiveTurnIdProvider(roomId));
+  if (currentTurnId != localId) return {};
   
   final cardsInHand = hand.map((c) => c['card_value'] as String).toList();
   
@@ -177,7 +227,7 @@ final playableCardsProvider = Provider.family<Set<String>, String>((ref, roomId)
       }
     }
     
-    final winners = cardsOfLeadSuit.where((c) => _getRankValue(c.substring(0, c.length - 1)) > highestRank).toList();
+    final winners = cardsOfLeadSuit.where((c) => Player._getRankValue(c) > highestRank).toList();
     if (winners.isNotEmpty) return winners.toSet(); // Forced to win if possible
     return cardsOfLeadSuit.toSet(); // Must follow suit
   }
@@ -188,38 +238,35 @@ final playableCardsProvider = Provider.family<Set<String>, String>((ref, roomId)
 
 
 
-int _getRankValue(String v) {
-  if (v == 'A') return 14;
-  if (v == 'K') return 13;
-  if (v == 'Q') return 12;
-  if (v == 'J') return 11;
-  return int.parse(v);
-}
+int _getRankValue(String v) => Player._getRankValue(v);
 
 final isLocalPlayerTurnProvider = Provider.family<bool, String>((ref, code) {
   final room = ref.watch(roomMetadataProvider(code)).value;
-  final players = ref.watch(playersStreamProvider(room?.id ?? "")).value;
+  if (room == null) return false;
   final localId = ref.watch(localPlayerIdProvider);
-  if (room == null || players == null || localId == null) return false;
+  if (localId == null) return false;
+
   if (room.status == 'waiting') return false;
   if (room.status == 'cutting') {
+    final players = ref.watch(playersStreamProvider(room.id)).value ?? [];
+    if (players.isEmpty) return false;
     final cutterIndex = (room.dealerIndex + 1) % players.length;
     return players[cutterIndex].id == localId;
   }
+  
   if (room.status == 'bidding' || room.status == 'bidding_2' || room.status == 'playing' || room.status == 'trump_selection') {
-    // Scenario A: trump setter doesn't declare in bidding_2 (their Phase 1 bid is committed)
+    // Scenario A: trump setter doesn't declare in bidding_2
     if (room.status == 'bidding_2' && room.highestBidderId != null && localId == room.highestBidderId) {
       return false;
     }
     
-    // PREDICTIVE TURN LOGIC: If a trick just finished (count % 4 == 0), calculate winner locally
-    final playedCards = ref.watch(playedCardsProvider(room.id)).value ?? [];
-    if (room.status == 'playing' && playedCards.isNotEmpty && playedCards.length % 4 == 0) {
-      final lastTrick = playedCards.sublist(playedCards.length - 4);
-      final winnerId = Player.evaluateTrickWinner(lastTrick, room.trumpSuit, players);
-      return winnerId == localId;
+    if (room.status == 'playing') {
+      final turnId = ref.watch(predictiveTurnIdProvider(room.id));
+      return turnId == localId;
     }
 
+    final players = ref.watch(playersStreamProvider(room.id)).value ?? [];
+    if (players.isEmpty) return false;
     final currentPlayer = players[room.turnIndex % players.length];
     return currentPlayer.id == localId;
   }

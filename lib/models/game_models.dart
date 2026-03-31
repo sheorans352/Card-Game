@@ -182,7 +182,7 @@ class Player {
   static String? evaluateTrickWinner(List<Map<String, dynamic>> playedCards, String? trumpSuit, List<Player> players) {
     if (playedCards.length < 4) return null;
     
-    // The lead card is the first chronologically (index 0)
+    // 1. Identify Lead Suit (from the first card played in this trick/batch of 4)
     final leadCard = playedCards.first['card_value'] as String;
     final leadSuit = leadCard.substring(leadCard.length - 1);
     final trump = (trumpSuit ?? 'S').toUpperCase();
@@ -191,6 +191,7 @@ class Player {
     int bestRank = _getRankValue(leadCard);
     String bestSuit = leadSuit;
 
+    // 2. Compare subsequent cards
     for (var i = 1; i < playedCards.length; i++) {
        final card = playedCards[i]['card_value'] as String;
        final playerId = playedCards[i]['player_id'] as String;
@@ -201,6 +202,9 @@ class Player {
        bool isBestTrump = bestSuit == trump;
        bool isLead = suit == leadSuit;
 
+       // Winning logic:
+       // - If new card is Trump: wins if current best is not Trump, or new rank is higher.
+       // - Else if new card is Lead Suit: wins if current best is not Trump AND new rank is higher.
        if (isTrump) {
          if (!isBestTrump || rank > bestRank) {
            winnerId = playerId;
@@ -218,8 +222,12 @@ class Player {
     return winnerId;
   }
 
-  static int _getRankValue(String card) {
-    final value = card.substring(0, card.length - 1);
+  static int _getRankValue(String cardOrRank) {
+    // Handle both "AS" and "A"
+    final value = cardOrRank.length > 1 && !RegExp(r'^\d+$').hasMatch(cardOrRank)
+        ? cardOrRank.substring(0, cardOrRank.length - 1)
+        : cardOrRank;
+    
     switch (value) {
       case 'A': return 14;
       case 'K': return 13;

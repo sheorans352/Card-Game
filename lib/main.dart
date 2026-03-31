@@ -29,7 +29,7 @@ class MyApp extends ConsumerWidget {
       theme: ThemeData(
         brightness: Brightness.dark,
         primarySwatch: Colors.amber,
-        scaffoldBackgroundColor: const Color(0xFF121212),
+        scaffoldBackgroundColor: const Color(0xFF062A14),
       ),
       home: const HomeScreen(),
     );

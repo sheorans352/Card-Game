@@ -96,13 +96,25 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
 
               return Stack(
                 children: [
+                   Container(
+                     decoration: const BoxDecoration(
+                       gradient: RadialGradient(
+                         center: Alignment.center,
+                         radius: 0.8,
+                         colors: [
+                           Color(0xFF0E4D2A), // Lighter center felt
+                           Color(0xFF062A14), // Darker edge felt
+                         ],
+                       ),
+                     ),
+                   ),
                    const SpadeBackground(),
                   _buildTopHUD(players, room, playedCardsCount),
 
-                  _buildPlayerAvatar(rotatedPlayers[0], 'bottom', room.turnIndex == localIndex, room.dealerIndex == localIndex, playerGreen),
-                  _buildPlayerAvatar(rotatedPlayers[1], 'left', room.turnIndex == (localIndex + 1) % 4, room.dealerIndex == (localIndex + 1) % 4, playerBlue),
-                  _buildPlayerAvatar(rotatedPlayers[2], 'top', room.turnIndex == (localIndex + 2) % 4, room.dealerIndex == (localIndex + 2) % 4, playerRed),
-                  _buildPlayerAvatar(rotatedPlayers[3], 'right', room.turnIndex == (localIndex + 3) % 4, room.dealerIndex == (localIndex + 3) % 4, playerGold),
+                  _buildPlayerAvatar(rotatedPlayers[0], 'bottom', ref.watch(predictiveTurnIdProvider(room.id)) == rotatedPlayers[0].id, room.dealerIndex == (players.indexOf(rotatedPlayers[0])), playerGreen),
+                  _buildPlayerAvatar(rotatedPlayers[1], 'left', ref.watch(predictiveTurnIdProvider(room.id)) == rotatedPlayers[1].id, room.dealerIndex == (players.indexOf(rotatedPlayers[1])), playerBlue),
+                  _buildPlayerAvatar(rotatedPlayers[2], 'top', ref.watch(predictiveTurnIdProvider(room.id)) == rotatedPlayers[2].id, room.dealerIndex == (players.indexOf(rotatedPlayers[2])), playerRed),
+                  _buildPlayerAvatar(rotatedPlayers[3], 'right', ref.watch(predictiveTurnIdProvider(room.id)) == rotatedPlayers[3].id, room.dealerIndex == (players.indexOf(rotatedPlayers[3])), playerGold),
 
                   CardsLayer(
                     roomId: room.id,
@@ -245,16 +257,20 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
   Widget _buildTopHUD(List<Player> players, Room room, int playedCardsCount) {
     return Positioned(
       top: 0, left: 0, right: 0,
-      child: Container(
-        height: 60,
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Colors.black.withOpacity(0.8), Colors.transparent],
-          ),
-        ),
+      child: ClipRRect(
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+          child: Container(
+            height: 60,
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Colors.black.withOpacity(0.7), Colors.black.withOpacity(0.3)],
+              ),
+              border: Border(bottom: BorderSide(color: Colors.white.withOpacity(0.05))),
+            ),
         child: Row(
           children: [
             if (room.trumpSuit != null) ...[
@@ -420,53 +436,88 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
             Stack(
               clipBehavior: Clip.none,
               children: [
-                // Avatar Circle
-                Container(
-                  width: 70, height: 70,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: color.withOpacity(0.2),
-                    border: Border.all(
-                      color: isTurn ? accentGold : Colors.white10,
-                      width: isTurn ? 3 : 1,
+                // Avatar Circle with Pulse
+                TweenAnimationBuilder<double>(
+                  tween: Tween(begin: 0.0, end: isTurn ? 1.0 : 0.0),
+                  duration: const Duration(milliseconds: 1500),
+                  builder: (context, value, child) {
+                    return Container(
+                      width: 70 + (value * 8), height: 70 + (value * 8),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          if (isTurn)
+                            BoxShadow(
+                              color: accentGold.withOpacity(0.3 * value),
+                              blurRadius: 20 * value,
+                              spreadRadius: 4 * value,
+                            ),
+                        ],
+                      ),
+                      child: child,
+                    );
+                  },
+                  child: Container(
+                    width: 70, height: 70,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [color.withOpacity(0.4), color.withOpacity(0.1)],
+                      ),
+                      border: Border.all(
+                        color: isTurn ? accentGold : Colors.white10,
+                        width: isTurn ? 3 : 1,
+                      ),
                     ),
-                    boxShadow: [
-                      if (isTurn) BoxShadow(color: accentGold.withOpacity(0.4), blurRadius: 15, spreadRadius: 2),
-                    ],
-                  ),
-                  child: Center(
-                    child: Text(
-                      player.name.substring(0, 2).toUpperCase(),
-                      style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900),
+                    child: Center(
+                      child: Text(
+                        player.name.substring(0, 1).toUpperCase(),
+                        style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w900),
+                      ),
                     ),
                   ),
                 ),
 
-                // Dealer Badge (Matches Figma top right of avatar)
+                // Dealer Badge
                 if (isDealer)
                   Positioned(
-                    right: 0,
-                    top: 0,
+                    right: -2, top: -2,
                     child: Container(
-                      width: 22, height: 22,
-                      decoration: BoxDecoration(color: Color(0xFFE5B84B), shape: BoxShape.circle, border: Border.all(color: Colors.black, width: 1.5)),
+                      width: 24, height: 24,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE5B84B), 
+                        shape: BoxShape.circle, 
+                        border: Border.all(color: Colors.black, width: 2),
+                        boxShadow: const [BoxShadow(color: Colors.black45, blurRadius: 4)],
+                      ),
                       child: const Center(child: Text('D', style: TextStyle(color: Colors.black, fontSize: 11, fontWeight: FontWeight.w900))),
                     ),
                   ),
-                
-                if (isTurn)
-                  Positioned.fill(
-                    child: CustomPaint(painter: _TurnTimerPainter(angle: 0.8)), // Placeholder
-                  ),
               ],
             ),
-            const SizedBox(height: 10),
-            Text(player.name, style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
-            if (player.bid != null && position != 'bottom') 
-               Container(
-                 margin: const EdgeInsets.only(top: 4),
-                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                 decoration: BoxDecoration(color: Colors.black45, borderRadius: BorderRadius.circular(10)),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.4),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.white.withOpacity(0.05)),
+              ),
+              child: Text(
+                player.name.split(' ').first,
+                style: TextStyle(
+                  color: isTurn ? accentGold : Colors.white70,
+                  fontSize: 10,
+                  fontWeight: isTurn ? FontWeight.bold : FontWeight.normal,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ),
+            if (player.bid != null && position != 'bottom' && player.bid! > 0) 
+               Padding(
+                 padding: const EdgeInsets.only(top: 4),
                  child: Text('${player.tricksWon}/${player.bid}', style: const TextStyle(color: accentGold, fontSize: 10, fontWeight: FontWeight.w900)),
                ),
           ],
@@ -718,11 +769,11 @@ class _CardsLayerState extends ConsumerState<CardsLayer> {
 
     // Watch for TURN change to the winner to clear the board early if they play fast
     if (room != null) {
-      ref.listen<int?>(
-        roomMetadataProvider(roomCode!).select((data) => data.value?.turnIndex),
+      ref.listen<AsyncValue<List<Map<String, dynamic>>>>(
+        playedCardsProvider(widget.roomId),
         (prev, next) {
-           final playedCards = ref.read(playedCardsProvider(widget.roomId)).value ?? [];
-           if (playedCards.length % 4 == 0 && playedCards.isNotEmpty) {
+           final played = next.value ?? [];
+           if (played.length % 4 == 0 && played.isNotEmpty) {
               if (mounted) setState(() => _forceHideTrick = false);
            }
         }
@@ -751,8 +802,26 @@ class _CardsLayerState extends ConsumerState<CardsLayer> {
       );
     }
 
+    // --- Optimistic Merge for Table Display ---
+    final localPlayed = ref.watch(localPlayedCardsProvider);
+    
     return playedCardsAsync.when(
-      data: (playedMaps) {
+      data: (serverPlayed) {
+        // Optimistic Merge: show cards that we played locally but haven't hit the server yet
+        final serverCardIds = serverPlayed.map((m) => m['card_value'] as String).toSet();
+        List<Map<String, dynamic>> playedMaps = List.from(serverPlayed);
+        
+        for (var cardId in localPlayed) {
+          if (!serverCardIds.contains(cardId)) {
+            // Add local play to the end of the list for rendering
+            playedMaps.add({
+              'player_id': widget.localPlayerId,
+              'card_value': cardId,
+              'is_optimistic': true
+            });
+          }
+        }
+
         final trickSize = playedMaps.length % 4;
         final isTrickFinished = trickSize == 0 && playedMaps.isNotEmpty;
         final trickStartIndex = playedMaps.length - (isTrickFinished ? 4 : trickSize);
@@ -766,16 +835,18 @@ class _CardsLayerState extends ConsumerState<CardsLayer> {
         // Winner Position Logic
         String? winnerPos;
         if (isTrickFinished && room != null) {
-           final winnerIndex = room.turnIndex;
-           final localIndex = widget.players.indexWhere((p) => p.id == widget.localPlayerId); // Corrected
-           // Wait, players passed to CardsLayer is already rotated? 
-           // In build(): rotatedPlayers[0] is local.
-           // So if winnerIndex is the absolute index of the winner:
-           final playersList = ref.watch(playersStreamProvider(widget.roomId)).value ?? [];
-           if (playersList.isNotEmpty) {
+           // USE PREDICTIVE WINNER for the animation so it's instant!
+           final playersList = ref.read(playersStreamProvider(room.id)).value ?? [];
+           final winnerId = Player.evaluateTrickWinner(currentTrick, room.trumpSuit, playersList);
+           
+           if (winnerId != null && playersList.isNotEmpty) {
+              final winnerIdxInList = playersList.indexWhere((p) => p.id == winnerId);
               final localPlayerIdxInList = playersList.indexWhere((p) => p.id == widget.localPlayerId);
-              final winnerIdxInRotated = (winnerIndex - localPlayerIdxInList + 4) % 4;
-              winnerPos = _getPositionFromIndex(winnerIdxInRotated);
+              
+              if (winnerIdxInList != -1 && localPlayerIdxInList != -1) {
+                final winnerIdxInRotated = (winnerIdxInList - localPlayerIdxInList + 4) % 4;
+                winnerPos = _getPositionFromIndex(winnerIdxInRotated);
+              }
            }
         }
 
@@ -1100,7 +1171,19 @@ class PlayedCardWidget extends StatelessWidget {
                   angle: rotation + (order * 0.1),
                   child: Opacity(
                     opacity: 1.0 - (winValue * 0.8), // Fades out slightly as it reaches winner
-                    child: PlayingCard(card: card, isFaceUp: true),
+                    child: Container(
+                       decoration: BoxDecoration(
+                         boxShadow: [
+                           BoxShadow(
+                             color: Colors.black.withOpacity(0.4 * (1.0 - winValue)),
+                             blurRadius: 15,
+                             spreadRadius: 2,
+                             offset: Offset(5 * (1.0 - value), 10 * (1.0 - value)),
+                           ),
+                         ],
+                       ),
+                       child: PlayingCard(card: card, isFaceUp: true),
+                    ),
                   ),
                 ),
               );

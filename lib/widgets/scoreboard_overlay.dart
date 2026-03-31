@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'dart:ui';
 import '../providers/room_provider.dart';
 
 class ScoreboardOverlay extends ConsumerWidget {
@@ -23,215 +24,187 @@ class ScoreboardOverlay extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final resultsAsync = ref.watch(roundResultsProvider(roomId));
     final roomAsync = ref.watch(roomMetadataByIdProvider(roomId));
-
     final currentRound = roomAsync.value?.currentRound ?? 1;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: primaryBg.withOpacity(0.98),
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
-        border: Border.all(color: accentGold.withOpacity(0.2), width: 1.5),
-      ),
-      child: Column(
-        children: [
-          const SizedBox(height: 30),
-          const Text(
-            'Scoreboard',
-            style: TextStyle(color: accentGold, fontSize: 32, fontWeight: FontWeight.w900, letterSpacing: 1),
-          ),
-          const SizedBox(height: 4),
-          const Text(
-            'Race to 31',
-            style: TextStyle(color: Colors.white38, fontSize: 13),
-          ),
-          const SizedBox(height: 30),
-
-          // Table Header (Avatars)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Row(
+    return BackdropFilter(
+      filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.black.withOpacity(0.82),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(40)),
+          border: Border.all(color: Colors.white10),
+          boxShadow: [
+            BoxShadow(color: Colors.black.withOpacity(0.5), blurRadius: 40, offset: const Offset(0, -10)),
+          ],
+        ),
+        child: Column(
+          children: [
+            const SizedBox(height: 12),
+            // Pull Handle
+            Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white12, borderRadius: BorderRadius.circular(2))),
+            const SizedBox(height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const SizedBox(width: 80, child: Text('ROUND', style: TextStyle(color: Colors.white24, fontSize: 10, fontWeight: FontWeight.bold))),
-                ...players.map((p) => Expanded(
-                  child: Center(
-                    child: Container(
-                       width: 40, height: 40,
-                       decoration: const BoxDecoration(color: Colors.white10, shape: BoxShape.circle),
-                       child: Center(child: Text(p.name.substring(0, 2).toUpperCase(), style: const TextStyle(color: Color(0xFF2E7D32), fontSize: 12, fontWeight: FontWeight.bold))),
-                    ),
-                  ),
-                )),
+                const Icon(Icons.stars_rounded, color: accentGold, size: 28),
+                const SizedBox(width: 12),
+                const Text(
+                  'HALL OF FAME',
+                  style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900, letterSpacing: 3),
+                ),
               ],
             ),
-          ),
+            const Text('Race through 31 points to victory', style: TextStyle(color: Colors.white38, fontSize: 11)),
+            const SizedBox(height: 32),
 
-          // Results List
-          Expanded(
-            child: resultsAsync.when(
-              data: (results) {
-                if (results.isEmpty) {
-                  return const Center(child: Text('No rounds completed yet', style: TextStyle(color: Colors.white30)));
-                }
-
-                // Logic: Show rows from currentRound down to 1
-                return ListView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: currentRound + 1, // +1 for TOTAL row
-                  itemBuilder: (context, index) {
-                    if (index == currentRound) {
-                       return _buildTotalRow(players);
-                    }
-
-                    final rdNum = currentRound - index;
-                    final isCurrentRound = rdNum == currentRound;
-                    
-                    // Group results by round_number for historical rows
-                    final historicalResults = results.where((r) => r['round_number'] == rdNum).toList();
-
-                    return Container(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      child: Row(
-                        children: [
-                          SizedBox(
-                            width: 80, 
-                            child: Row(
-                              children: [
-                                Text('R$rdNum', style: TextStyle(
-                                  color: isCurrentRound ? accentGold : Colors.white24, 
-                                  fontSize: 14,
-                                  fontWeight: isCurrentRound ? FontWeight.bold : FontWeight.normal,
-                                )),
-                                if (isCurrentRound) const Icon(Icons.play_arrow_rounded, color: accentGold, size: 20),
-                              ],
-                            ),
-                          ),
-                          ...players.map((p) {
-                            if (isCurrentRound) {
-                               // ACTIVE ROUND stats: tricks / bid
-                               return Expanded(
-                                 child: Container(
-                                   margin: const EdgeInsets.all(4),
-                                   padding: const EdgeInsets.symmetric(vertical: 8),
-                                   decoration: BoxDecoration(
-                                     color: accentGold.withOpacity(0.05),
-                                     borderRadius: BorderRadius.circular(8),
-                                     border: Border.all(color: accentGold.withOpacity(0.2)),
-                                   ),
-                                   child: Column(
-                                     children: [
-                                       Text(
-                                         '${p.tricksWon}/${p.bid ?? "?"}',
-                                         style: const TextStyle(color: accentGold, fontWeight: FontWeight.w900, fontSize: 18),
-                                       ),
-                                       const Text('CURRENT', style: TextStyle(color: accentGold, fontSize: 8, fontWeight: FontWeight.bold)),
-                                     ],
-                                   ),
-                                 ),
-                               );
-                            } else {
-                                // HISTORICAL ROUND points
-                                final res = historicalResults.where((r) => r['player_id'] == p.id).firstOrNull;
-                                if (res == null) return const Expanded(child: SizedBox());
-                                
-                                final points = res['points_earned'] ?? 0;
-                                final isNegative = points < 0;
-
-                                return Expanded(
-                                  child: Container(
-                                    margin: const EdgeInsets.all(4),
-                                    padding: const EdgeInsets.symmetric(vertical: 8),
-                                    decoration: BoxDecoration(
-                                      color: isNegative ? boxRed.withOpacity(0.15) : Colors.white.withOpacity(0.05),
-                                      borderRadius: BorderRadius.circular(8),
-                                      border: Border.all(color: isNegative ? boxRed.withOpacity(0.3) : Colors.white10),
-                                    ),
-                                    child: Column(
-                                      children: [
-                                        Text(
-                                          '$points',
-                                          style: TextStyle(
-                                            color: isNegative ? boxRed : Colors.lightGreenAccent,
-                                            fontWeight: FontWeight.w900,
-                                            fontSize: 18,
-                                          ),
-                                        ),
-                                        Text('${res['tricks_won']}/${res['bid']}', style: TextStyle(color: Colors.white38, fontSize: 9)),
-                                      ],
-                                    ),
-                                  ),
-                                );
-                            }
-                          }),
-                        ],
-                      ),
-                    );
-                  },
-                );
-              },
-              loading: () => const Center(child: CircularProgressIndicator(color: Color(0xFFC7A14C))),
-              error: (e, _) => Center(child: Text('Error loading scores: $e', style: const TextStyle(color: Colors.redAccent))),
-            ),
-          ),
-
-                  // Race to 31 Progress Bars
-          _buildRaceTo31Indicators(players),
-          
-          const Spacer(),
-
-          // Legend Footer
-          _buildLegend(),
-
-          // Back Button
-          Padding(
-            padding: const EdgeInsets.all(24),
-            child: ElevatedButton(
-              onPressed: onClose,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: accentGold,
-                foregroundColor: Colors.black,
-                minimumSize: const Size(double.infinity, 56),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-              ),
-              child: const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+            // Table Header (Avatars)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              child: Row(
                 children: [
-                  Text('Back to Game Table', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
-                  SizedBox(width: 8),
-                  Icon(Icons.arrow_forward, size: 20),
+                  const SizedBox(width: 70, child: Text('ROUND', style: TextStyle(color: Colors.white24, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1))),
+                  ...players.map((p) => Expanded(
+                    child: Center(
+                      child: Container(
+                        width: 42, height: 42,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(colors: [accentGold.withOpacity(0.3), Colors.white10]),
+                          shape: BoxShape.circle,
+                          border: Border.all(color: accentGold.withOpacity(0.4), width: 1.5),
+                        ),
+                        child: Center(child: Text(p.name.substring(0, 1).toUpperCase(), style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w900))),
+                      ),
+                    ),
+                  )),
                 ],
               ),
             ),
-          ),
-        ],
+
+            // Results List
+            Expanded(
+              child: resultsAsync.when(
+                data: (results) {
+                  if (results.isEmpty) {
+                    return const Center(child: Text('Scores will appear after the first round', style: TextStyle(color: Colors.white24, fontSize: 13)));
+                  }
+
+                  return ListView.builder(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    physics: const BouncingScrollPhysics(),
+                    itemCount: currentRound + 1,
+                    itemBuilder: (context, index) {
+                      if (index == currentRound) return _buildTotalRow(players);
+
+                      final rdNum = currentRound - index;
+                      final isCurrentRound = rdNum == currentRound;
+                      final historicalResults = results.where((r) => r['round_number'] == rdNum).toList();
+
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                          decoration: BoxDecoration(
+                            color: isCurrentRound ? accentGold.withOpacity(0.08) : Colors.white.withOpacity(0.03),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: isCurrentRound ? accentGold.withOpacity(0.3) : Colors.white10),
+                          ),
+                          child: Row(
+                            children: [
+                              SizedBox(width: 70, child: Text('R$rdNum', style: TextStyle(
+                                  color: isCurrentRound ? accentGold : Colors.white24, fontSize: 14, fontWeight: FontWeight.w900))),
+                              ...players.map((p) {
+                                if (isCurrentRound) {
+                                   return Expanded(
+                                     child: Column(
+                                       children: [
+                                         Text('${p.tricksWon}/${p.bid ?? "?"}', style: const TextStyle(color: accentGold, fontWeight: FontWeight.w900, fontSize: 18)),
+                                         const Text('LIVE', style: TextStyle(color: accentGold, fontSize: 8, fontWeight: FontWeight.bold)),
+                                       ],
+                                     ),
+                                   );
+                                } else {
+                                    final res = historicalResults.where((r) => r['player_id'] == p.id).firstOrNull;
+                                    if (res == null) return const Expanded(child: SizedBox());
+                                    final points = res['points_earned'] ?? 0;
+                                    final isNegative = points < 0;
+
+                                    return Expanded(
+                                      child: Column(
+                                        children: [
+                                          Text('$points', style: TextStyle(
+                                            color: isNegative ? boxRed : Colors.lightGreenAccent,
+                                            fontWeight: FontWeight.w900, fontSize: 17,
+                                          )),
+                                          Text('${res['tricks_won']}/${res['bid']}', style: const TextStyle(color: Colors.white24, fontSize: 9)),
+                                        ],
+                                      ),
+                                    );
+                                }
+                              }),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  );
+                },
+                loading: () => const Center(child: CircularProgressIndicator(color: accentGold)),
+                error: (e, _) => Center(child: Text('Error: $e', style: const TextStyle(color: boxRed))),
+              ),
+            ),
+
+            // Race to 31 Progress
+            _buildRaceTo31Indicators(players),
+            
+            const SizedBox(height: 20),
+            _buildLegend(),
+            const SizedBox(height: 12),
+
+            // Back Button
+            Padding(
+              padding: const EdgeInsets.all(24),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(20),
+                child: BackdropFilter(
+                   filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+                   child: ElevatedButton(
+                    onPressed: onClose,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: accentGold.withOpacity(0.8),
+                      foregroundColor: Colors.black,
+                      minimumSize: const Size(double.infinity, 64),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                      elevation: 0,
+                    ),
+                    child: const Text('RESUME GAME', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, letterSpacing: 2)),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildTotalRow(List<dynamic> players) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12),
+    return Container(
+      margin: const EdgeInsets.only(top: 16, bottom: 24),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(colors: [Colors.white.withOpacity(0.05), Colors.transparent]),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: accentGold.withOpacity(0.2)),
+      ),
       child: Row(
         children: [
-          const SizedBox(width: 80, child: Text('TOTAL', style: TextStyle(color: accentGold, fontWeight: FontWeight.w900, fontSize: 14))),
+          const SizedBox(width: 70, child: Text('SCORE', style: TextStyle(color: accentGold, fontWeight: FontWeight.bold, fontSize: 12))),
           ...players.map((p) => Expanded(
-            child: Container(
-              margin: const EdgeInsets.symmetric(horizontal: 4),
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.05),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: accentGold.withOpacity(0.3)),
-              ),
-              child: Center(
-                child: Text(
-                  '${p.totalScore}', 
-                  style: TextStyle(
-                    color: p.totalScore < 0 ? boxRed : Colors.white,
-                    fontSize: 24, 
-                    fontWeight: FontWeight.w900
-                  )
-                ),
-              ),
+            child: Center(
+              child: Text('${p.totalScore}', style: TextStyle(
+                  color: p.totalScore < 0 ? boxRed : Colors.white, fontSize: 26, fontWeight: FontWeight.w900,
+                  shadows: [if (p.totalScore >= 20) Shadow(color: accentGold.withOpacity(0.5), blurRadius: 10)]
+              )),
             ),
           )),
         ],
@@ -240,32 +213,40 @@ class ScoreboardOverlay extends ConsumerWidget {
   }
 
   Widget _buildRaceTo31Indicators(List<dynamic> players) {
-    return Padding(
-      padding: const EdgeInsets.all(20),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('RACE TO 31', style: TextStyle(color: Colors.white24, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1)),
-          const SizedBox(height: 12),
+          const Text('CHAMPIONSHIP PROGRESS', style: TextStyle(color: Colors.white24, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 2)),
+          const SizedBox(height: 16),
           Row(
             children: players.map((p) {
-               final double progress = (p.totalScore as int).clamp(0, 31) / 31.0;
+               final score = (p.totalScore as int).clamp(0, 31);
+               final double progress = score / 31.0;
+               final isNearWin = score >= 25;
+               
                return Expanded(
                  child: Padding(
-                   padding: const EdgeInsets.symmetric(horizontal: 4),
+                   padding: const EdgeInsets.symmetric(horizontal: 5),
                    child: Column(
                      children: [
-                       ClipRRect(
-                         borderRadius: BorderRadius.circular(2),
-                         child: LinearProgressIndicator(
-                           value: progress,
-                           minHeight: 4,
-                           backgroundColor: Colors.white10,
-                           color: accentGold,
-                         ),
+                       Stack(
+                         children: [
+                           Container(height: 6, decoration: BoxDecoration(color: Colors.white10, borderRadius: BorderRadius.circular(3))),
+                           AnimatedContainer(
+                             duration: const Duration(seconds: 1),
+                             height: 6, width: progress * 100, // Approximation for flex
+                             decoration: BoxDecoration(
+                               gradient: LinearGradient(colors: isNearWin ? [Colors.orange, accentGold] : [accentGold, accentGold.withOpacity(0.4)]),
+                               borderRadius: BorderRadius.circular(3),
+                               boxShadow: [if (isNearWin) BoxShadow(color: accentGold.withOpacity(0.5), blurRadius: 8, spreadRadius: 1)],
+                             ),
+                           ),
+                         ],
                        ),
-                       const SizedBox(height: 4),
-                       Text('${p.totalScore}/31', style: const TextStyle(color: Colors.white24, fontSize: 9)),
+                       const SizedBox(height: 6),
+                       Text('${p.totalScore}/31', style: TextStyle(color: isNearWin ? accentGold : Colors.white24, fontSize: 10, fontWeight: FontWeight.bold)),
                      ],
                    ),
                  ),
@@ -278,24 +259,22 @@ class ScoreboardOverlay extends ConsumerWidget {
   }
 
   Widget _buildLegend() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          _legendItem('POINTS', 'Bid met (Green)', Colors.lightGreenAccent),
-          _legendItem('PENALTY', 'Bid missed (Red/-)', boxRed),
-          _legendItem('STATS', 'Tricks / Bid', Colors.white38),
-        ],
-      ),
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      children: [
+        _legendItem('WINS', Colors.lightGreenAccent),
+        _legendItem('PENALTY', boxRed),
+        _legendItem('STATS', Colors.white24),
+      ],
     );
   }
 
-  Widget _legendItem(String val, String label, Color color) {
-    return Column(
+  Widget _legendItem(String label, Color color) {
+    return Row(
       children: [
-        Text(val, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 14)),
-        Text(label, style: const TextStyle(color: Colors.white24, fontSize: 8)),
+        Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+        const SizedBox(width: 8),
+        Text(label, style: const TextStyle(color: Colors.white24, fontSize: 10, fontWeight: FontWeight.bold)),
       ],
     );
   }
