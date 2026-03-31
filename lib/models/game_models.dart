@@ -1,3 +1,5 @@
+import 'card_model.dart';
+
 class Room {
   final String id;
   final String code;
