@@ -14,6 +14,14 @@ import '../widgets/scoreboard_overlay.dart';
 import '../widgets/spade_background.dart';
 import '../services/audio_service.dart';
 
+const Color primaryBg = Color(0xFF062A14); // Deeper green
+const Color accentGold = Color(0xFFC7A14C);
+const Color cardDark = Color(0xFF141414);
+const Color playerGreen = Color(0xFF2E7D32);
+const Color playerBlue = Color(0xFF1565C0);
+const Color playerRed = Color(0xFFC62828);
+const Color playerGold = Color(0xFFBF8F00);
+
 class GameTableScreen extends ConsumerStatefulWidget {
   const GameTableScreen({super.key});
 
@@ -22,14 +30,6 @@ class GameTableScreen extends ConsumerStatefulWidget {
 }
 
 class _GameTableScreenState extends ConsumerState<GameTableScreen> {
-  static const Color primaryBg = Color(0xFF062A14); // Deeper green
-  static const Color accentGold = Color(0xFFC7A14C);
-  static const Color cardDark = Color(0xFF141414);
-  static const Color playerGreen = Color(0xFF2E7D32);
-  static const Color playerBlue = Color(0xFF1565C0);
-  static const Color playerRed = Color(0xFFC62828);
-  static const Color playerGold = Color(0xFFBF8F00);
-
   final Map<String, GlobalKey> _playerKeys = {
     'bottom': GlobalKey(),
     'left': GlobalKey(),

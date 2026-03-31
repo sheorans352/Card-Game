@@ -162,7 +162,7 @@ class ScoreboardOverlay extends ConsumerWidget {
                                     ],
                                   ),
                                   Column(
-                                    crossAxisAlignment: Alignment.end,
+                                    crossAxisAlignment: CrossAxisAlignment.end,
                                     children: [
                                       Text(
                                         '$totalScore',
