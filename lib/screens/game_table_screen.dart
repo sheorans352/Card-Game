@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/room_provider.dart';
@@ -62,15 +63,12 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
           final prevRoom = previous?.value;
           final justEnteredShuffling = room.status == 'shuffling' && prevRoom?.status != 'shuffling';
           
-          // Only shuffle when entering 'shuffling' state fresh.
-          // Never re-shuffle if deck has already been cut this round.
           if (justEnteredShuffling && room.deckCutValue == null) {
             gameAudio.playShuffle();
             ref.read(cardServiceProvider).shuffleDeck(room.id);
           }
-          // NOTE: 'dealing' is handled directly inside cutDeck → dealInitialFive.
         } catch (e) {
-          print('DEBUG: Error in dealer automation: $e');
+          debugPrint('DEBUG: Error in dealer automation: $e');
         }
       });
     });
@@ -87,13 +85,11 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
               final localIndex = players.indexWhere((p) => p.id == localPlayerId);
               if (localIndex == -1) return const Center(child: Text('You are not in this room'));
 
-              // Get actual played cards count for HUDs
               final playedCardsCount = ref.watch(playedCardsProvider(room.id)).maybeWhen(
                 data: (cards) => cards.length,
                 orElse: () => 0,
               );
 
-              // Rotate players so local is at bottom (index 0)
               final rotatedPlayers = List.generate(4, (i) {
                 return players[(localIndex + i) % players.length];
               });
@@ -101,17 +97,13 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
               return Stack(
                 children: [
                    const SpadeBackground(),
-                  // The Table
-                  // Top HUD: Scores & Status
                   _buildTopHUD(players, room, playedCardsCount),
 
-                  // Player Avatars (Figma Style)
                   _buildPlayerAvatar(rotatedPlayers[0], 'bottom', room.turnIndex == localIndex, room.dealerIndex == localIndex, playerGreen),
                   _buildPlayerAvatar(rotatedPlayers[1], 'left', room.turnIndex == (localIndex + 1) % 4, room.dealerIndex == (localIndex + 1) % 4, playerBlue),
                   _buildPlayerAvatar(rotatedPlayers[2], 'top', room.turnIndex == (localIndex + 2) % 4, room.dealerIndex == (localIndex + 2) % 4, playerRed),
                   _buildPlayerAvatar(rotatedPlayers[3], 'right', room.turnIndex == (localIndex + 3) % 4, room.dealerIndex == (localIndex + 3) % 4, playerGold),
 
-                  // Cards Layer
                   CardsLayer(
                     roomId: room.id,
                     players: rotatedPlayers,
@@ -120,34 +112,29 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
                     playerPositions: _playerKeys,
                   ),
 
-                  // Fixed Bottom Tricks HUD (Moved up in Stack)
                   _buildBottomTricksHUD(players, localIndex, room),
                   
-                  // TRUMP HUD (Floating bottom left)
                   if (room.trumpSuit != null)
                     _buildTrumpHUD(room.trumpSuit!, room, playedCardsCount),
 
                   // Scoreboard Button (Top Right)
-                        // Scoreboard Button
-                        Container(
-                          decoration: BoxDecoration(
-                            color: Colors.black38,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: accentGold.withOpacity(0.5)),
-                          ),
-                          child: IconButton(
-                            onPressed: () => setState(() => _showScoreboard = true),
-                            icon: const Icon(Icons.leaderboard_rounded, color: accentGold, size: 28),
-                            tooltip: 'Scoreboard',
-                          ),
-                        ),
-                      ],
+                  Positioned(
+                    top: MediaQuery.of(context).padding.top + 10,
+                    right: 20,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.black38,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: accentGold.withOpacity(0.5)),
+                      ),
+                      child: IconButton(
+                        onPressed: () => setState(() => _showScoreboard = true),
+                        icon: const Icon(Icons.leaderboard_rounded, color: accentGold, size: 28),
+                        tooltip: 'Scoreboard',
+                      ),
                     ),
                   ),
 
-                  // FULL SCREEN OVERLAYS (Must be last for Z-index)
-
-                  // Bidding & Trump Selection overlay (active turn)
                   if ((room.currentPhase == 'bidding' || room.currentPhase == 'bidding_2' || room.currentPhase == 'trump_selection') && 
                       ref.watch(isLocalPlayerTurnProvider(room.code)))
                     BiddingOverlay(
@@ -156,16 +143,14 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
                       trumpSuit: room.trumpSuit ?? 'S',
                       isTrumpSelection: room.currentPhase == 'trump_selection',
                       isScenarioB: room.currentPhase == 'bidding_2' && room.highestBidderId == null,
-                      onBidSubmitted: (score) => ref.read(cardServiceProvider).placeBid(room.id, localPlayerId!, score),
-                      onTrumpSelected: (suit) => ref.read(cardServiceProvider).selectTrump(room.id, localPlayerId!, suit.name.toUpperCase().substring(0, 1)),
-                      onPass: () => ref.read(cardServiceProvider).placeBid(room.id, localPlayerId!, 0),
+                      onBidSubmitted: (score) => ref.read(cardServiceProvider).placeBid(room.id, localPlayerId, score),
+                      onTrumpSelected: (suit) => ref.read(cardServiceProvider).selectTrump(room.id, localPlayerId, suit.name.toUpperCase().substring(0, 1)),
+                      onPass: () => ref.read(cardServiceProvider).placeBid(room.id, localPlayerId, 0),
                     ),
 
-                  // Scenario A waiting screen: trump setter sees who they're waiting on
                   if (room.currentPhase == 'bidding_2' && room.highestBidderId == localPlayerId)
                     _buildTrumpSetterWaitingScreen(players, room),
 
-                  // Generic waiting text for non-active players
                   if ((room.currentPhase == 'bidding' || room.currentPhase == 'trump_selection') && 
                       !ref.watch(isLocalPlayerTurnProvider(room.code)) &&
                       room.highestBidderId != localPlayerId)
@@ -181,17 +166,14 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
                      ),
                    ),
 
-                  // bidding_2 waiting (non-trump-setter, non-active)
                   if (room.currentPhase == 'bidding_2' &&
                       room.highestBidderId != localPlayerId &&
                       !ref.watch(isLocalPlayerTurnProvider(room.code)))
                     _buildBidding2WaitingText(players, room),
 
-                  
                   if (room.currentPhase == 'cutting')
                     const DeckCutOverlay(),
 
-                  // Scoreboard Overlay
                   if (_showScoreboard)
                     Positioned.fill(
                       child: GestureDetector(
