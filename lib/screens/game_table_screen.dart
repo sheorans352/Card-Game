@@ -716,6 +716,19 @@ class _CardsLayerState extends ConsumerState<CardsLayer> {
       },
     );
 
+    // Watch for TURN change to the winner to clear the board early if they play fast
+    if (room != null) {
+      ref.listen<int?>(
+        roomMetadataProvider(roomCode!).select((data) => data.value?.turnIndex),
+        (prev, next) {
+           final playedCards = ref.read(playedCardsProvider(widget.roomId)).value ?? [];
+           if (playedCards.length % 4 == 0 && playedCards.isNotEmpty) {
+              if (mounted) setState(() => _forceHideTrick = false);
+           }
+        }
+      );
+    }
+
     // Watch for round changes to reset local state
     if (room != null) {
       ref.listen<int?>(

@@ -39,6 +39,21 @@ class _BiddingOverlayState extends ConsumerState<BiddingOverlay> {
   @override
   void initState() {
     super.initState();
+    _initializeBid();
+  }
+
+  @override
+  void didUpdateWidget(covariant BiddingOverlay oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // If we transition into Round 2 or Scenario B changes, or Trump Selection ends
+    if (widget.isRoundTwo != oldWidget.isRoundTwo || 
+        widget.isScenarioB != oldWidget.isScenarioB ||
+        widget.isTrumpSelection != oldWidget.isTrumpSelection) {
+      _initializeBid();
+    }
+  }
+
+  void _initializeBid() {
     if (widget.isRoundTwo) {
       // Round 2 declarations start at 2 (min trick count is 2)
       _selectedBid = 2;
