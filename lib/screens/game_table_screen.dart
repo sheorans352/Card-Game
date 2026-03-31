@@ -660,7 +660,7 @@ String _getSuitEmojiStatic(String code) {
   }
 }
 
-class CardsLayer extends ConsumerWidget {
+class CardsLayer extends ConsumerStatefulWidget {
   final String roomId;
   final List<Player> players;
   final String localPlayerId;
@@ -677,35 +677,85 @@ class CardsLayer extends ConsumerWidget {
   });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final playedCardsAsync = ref.watch(playedCardsProvider(roomId));
+  ConsumerState<CardsLayer> createState() => _CardsLayerState();
+}
+
+class _CardsLayerState extends ConsumerState<CardsLayer> {
+  bool _forceHideTrick = false;
+  int _lastTrickCount = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    final playedCardsAsync = ref.watch(playedCardsProvider(widget.roomId));
+    
+    // We need the room code to get the turnIndex (winner)
+    final roomCode = ref.watch(currentRoomCodeProvider);
+    final room = roomCode != null ? ref.watch(roomMetadataProvider(roomCode)).value : null;
 
     return playedCardsAsync.when(
       data: (playedMaps) {
         final trickSize = playedMaps.length % 4;
-        final trickStartIndex = playedMaps.length - (trickSize == 0 && playedMaps.isNotEmpty ? 4 : trickSize);
-        if (trickStartIndex < 0) return const SizedBox();
+        final isTrickFinished = trickSize == 0 && playedMaps.isNotEmpty;
+        
+        // Auto-clear logic: Reset hide flag when a NEW trick starts or trick disappears
+        if (playedMaps.length != _lastTrickCount) {
+          if (trickSize == 1) {
+             _forceHideTrick = false;
+          }
+           _lastTrickCount = playedMaps.length;
+           
+           if (isTrickFinished) {
+              Future.delayed(const Duration(milliseconds: 1500), () {
+                if (mounted) setState(() => _forceHideTrick = true);
+              });
+           }
+        }
+
+        final trickStartIndex = playedMaps.length - (isTrickFinished ? 4 : trickSize);
+        if (trickStartIndex < 0 || _forceHideTrick) {
+           return Stack(children: _buildPlayerHands(ref));
+        }
+        
         final currentTrick = playedMaps.sublist(trickStartIndex);
+        
+        // Winner Position Logic
+        String? winnerPos;
+        if (isTrickFinished && room != null) {
+           final winnerIndex = room.turnIndex;
+           final localIndex = widget.players.indexWhere((p) => p.id == widget.localPlayerId); // Corrected
+           // Wait, players passed to CardsLayer is already rotated? 
+           // In build(): rotatedPlayers[0] is local.
+           // So if winnerIndex is the absolute index of the winner:
+           final playersList = ref.watch(playersStreamProvider(widget.roomId)).value ?? [];
+           if (playersList.isNotEmpty) {
+              final localPlayerIdxInList = playersList.indexWhere((p) => p.id == widget.localPlayerId);
+              final winnerIdxInRotated = (winnerIndex - localPlayerIdxInList + 4) % 4;
+              winnerPos = _getPositionFromIndex(winnerIdxInRotated);
+           }
+        }
 
         return Stack(
           children: [
             ..._buildPlayerHands(ref),
             ...currentTrick.map((m) {
-              final player = players.cast<Player?>().firstWhere((p) => p?.id == m['player_id'], orElse: () => null);
+              final player = widget.players.cast<Player?>().firstWhere((p) => p?.id == m['player_id'], orElse: () => null);
               if (player == null) return const SizedBox();
-              final playerIdxInRotated = players.indexOf(player);
+              final playerIdxInRotated = widget.players.indexOf(player);
               final pos = _getPositionFromIndex(playerIdxInRotated);
               return PlayedCardWidget(
+                key: ValueKey('played_${m['card_value']}'),
                 card: CardModel.fromId(m['card_value']),
                 position: pos,
                 order: currentTrick.indexOf(m),
+                isTrickFinished: isTrickFinished,
+                winnerPosition: winnerPos,
               );
             }),
           ],
         );
       },
-      loading: () => const SizedBox(),
-      error: (e, s) => const SizedBox(),
+      loading: () => Stack(children: _buildPlayerHands(ref)),
+      error: (e, s) => Stack(children: _buildPlayerHands(ref)),
     );
   }
 
@@ -720,6 +770,9 @@ class CardsLayer extends ConsumerWidget {
   }
 
   List<Widget> _buildPlayerHands(WidgetRef ref) {
+    final roomId = widget.roomId;
+    final players = widget.players;
+    final localPlayerId = widget.localPlayerId;
     final localHandAsync = ref.watch(playerHandProvider(localPlayerId));
     final playableIds = ref.watch(playableCardsProvider(roomId));
     final pendingPlays = ref.watch(pendingCardPlayProvider);
@@ -735,6 +788,7 @@ class CardsLayer extends ConsumerWidget {
         
         handWidgets.add(
           HandCardWidget(
+            key: ValueKey('hand_$cardId'),
             card: CardModel.fromId(cardId),
             index: i,
             total: visibleHand.length,
@@ -765,7 +819,13 @@ class CardsLayer extends ConsumerWidget {
       final pHandAsync = ref.watch(playerHandProvider(p.id));
       pHandAsync.whenData((hand) {
         for (var j = 0; j < hand.length; j++) {
-          handWidgets.add(OpponentCardWidget(position: pos, index: j, total: hand.length));
+          final cardId = hand[j]['id'];
+          handWidgets.add(OpponentCardWidget(
+            key: ValueKey('opp_${pos}_$cardId'),
+            position: pos, 
+            index: j, 
+            total: hand.length
+          ));
         }
       });
     }
@@ -927,12 +987,16 @@ class PlayedCardWidget extends StatelessWidget {
   final CardModel card;
   final String position;
   final int order;
+  final bool isTrickFinished;
+  final String? winnerPosition;
 
   const PlayedCardWidget({
     super.key,
     required this.card,
     required this.position,
     required this.order,
+    this.isTrickFinished = false,
+    this.winnerPosition,
   });
 
   @override
@@ -948,17 +1012,42 @@ class PlayedCardWidget extends StatelessWidget {
       case 'right': offsetX = 60; rotation = -math.pi / 2; break;
     }
 
+    double winOffsetX = 0;
+    double winOffsetY = 0;
+    if (isTrickFinished && winnerPosition != null) {
+      switch (winnerPosition) {
+        case 'bottom': winOffsetY = 240; break;
+        case 'left': winOffsetX = -180; break;
+        case 'top': winOffsetY = -240; break;
+        case 'right': winOffsetX = 180; break;
+      }
+    }
+
     return Center(
       child: TweenAnimationBuilder<double>(
-        tween: Tween(begin: 0.0, end: 1.0),
-        duration: const Duration(milliseconds: 300),
+        tween: Tween(begin: 1.0, end: 0.0),
+        duration: const Duration(milliseconds: 350),
+        curve: Curves.easeOutCubic,
         builder: (context, value, child) {
-          return Transform.translate(
-            offset: Offset(offsetX * value, offsetY * value),
-            child: Transform.rotate(
-              angle: rotation + (order * 0.1),
-              child: PlayingCard(card: card, isFaceUp: true),
-            ),
+          return TweenAnimationBuilder<double>(
+            tween: isTrickFinished ? Tween(begin: 0.0, end: 1.0) : Tween(begin: 0.0, end: 0.0),
+            duration: const Duration(milliseconds: 500),
+            curve: Curves.easeInQuint,
+            builder: (context, winValue, child) {
+              return Transform.translate(
+                offset: Offset(
+                  (offsetX * value) + (winOffsetX * winValue), 
+                  (offsetY * value) + (winOffsetY * winValue),
+                ),
+                child: Transform.rotate(
+                  angle: rotation + (order * 0.1),
+                  child: Opacity(
+                    opacity: 1.0 - (winValue * 0.8), // Fades out slightly as it reaches winner
+                    child: PlayingCard(card: card, isFaceUp: true),
+                  ),
+                ),
+              );
+            },
           );
         },
       ),
