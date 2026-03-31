@@ -824,11 +824,14 @@ class _CardsLayerState extends ConsumerState<CardsLayer> {
     final localPlayed = ref.watch(localPlayedCardsProvider);
     List<Widget> handWidgets = [];
 
+    final playedCards = ref.watch(playedCardsProvider(roomId)).value ?? [];
+    final myPlayedIds = playedCards.where((m) => m['player_id'] == localPlayerId).map((m) => m['card_value'] as String).toSet();
+
     localHandAsync.whenData((hand) {
-      // Filter out cards already played in this round (Optimistic UI)
+      // Filter out cards already played (Optimisic + Ground Truth from Table)
       final visibleHand = hand.where((h) {
         final val = h['card_value'] as String;
-        return !pendingPlays.contains(val) && !localPlayed.contains(val);
+        return !pendingPlays.contains(val) && !localPlayed.contains(val) && !myPlayedIds.contains(val);
       }).toList();
       
       for (var i = 0; i < visibleHand.length; i++) {
@@ -870,13 +873,15 @@ class _CardsLayerState extends ConsumerState<CardsLayer> {
       final pos = _getPositionFromIndex(i);
       final pHandAsync = ref.watch(playerHandProvider(p.id));
       pHandAsync.whenData((hand) {
-        for (var j = 0; j < hand.length; j++) {
-          final cardId = hand[j]['id'];
+        final cardsPlayedByOpponent = playedCards.where((m) => m['player_id'] == p.id).length;
+        final actualHandSize = (hand.length - cardsPlayedByOpponent).clamp(0, 52);
+        
+        for (var j = 0; j < actualHandSize; j++) {
           handWidgets.add(OpponentCardWidget(
-            key: ValueKey('opp_${pos}_$cardId'),
+            key: ValueKey('opp_${pos}_${p.id}_$j'),
             position: pos, 
             index: j, 
-            total: hand.length
+            total: actualHandSize
           ));
         }
       });
