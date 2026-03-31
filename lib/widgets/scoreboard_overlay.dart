@@ -15,15 +15,14 @@ class ScoreboardOverlay extends ConsumerWidget {
     required this.onClose,
   });
 
-  static const Color primaryBg = Color(0xFF062A14);
-  static const Color accentGold = Color(0xFFFFD700); 
-  static const Color dangerRed = Color(0xFFFF4D4D);
-  static const Color glassWhite = Colors.white10;
+  static const Color accentGold = Color(0xFFFFD700);
+  static const Color boxRed = Color(0xFFFF4D4D);
+  static const Color boxGreen = Color(0xFF00E676);
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final resultsAsync = ref.watch(roundResultsProvider(roomId));
-    
+
     return BackdropFilter(
       filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
       child: Container(
@@ -32,222 +31,92 @@ class ScoreboardOverlay extends ConsumerWidget {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              Colors.black.withOpacity(0.9),
+              Colors.black.withOpacity(0.85),
               Colors.black.withOpacity(0.95),
             ],
           ),
           borderRadius: const BorderRadius.vertical(top: Radius.circular(44)),
-          border: Border.all(color: Colors.white.withOpacity(0.1), width: 0.5),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.8),
-              blurRadius: 60,
-              offset: const Offset(0, -15),
-            ),
-          ],
+          border: Border.all(color: Colors.white10),
         ),
         child: Column(
           children: [
             const SizedBox(height: 14),
-            // Pull Handle
-            Container(
-              width: 50, height: 4,
-              decoration: BoxDecoration(
-                color: Colors.white24,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
+            Container(width: 50, height: 4, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2))),
             const SizedBox(height: 28),
             
-            // Header Section
-            Column(
-              children: [
-                ShaderMask(
-                  shaderCallback: (Rect bounds) {
-                    return const LinearGradient(
-                      colors: [accentGold, Color(0xFFFFFACD), accentGold],
-                    ).createShader(bounds);
-                  },
-                  child: const Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.emoji_events_rounded, color: Colors.white, size: 36),
-                      SizedBox(width: 16),
-                      Text(
-                        'HALL OF FAME',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 32,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 6,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'RACE TO 31 • MINUS CHAMPIONSHIP',
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.3),
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 2,
-                  ),
-                ),
-              ],
+            // Title
+            const Text(
+              'RACE TO 31',
+              style: TextStyle(color: accentGold, fontSize: 28, fontWeight: FontWeight.w900, letterSpacing: 4),
             ),
-            const SizedBox(height: 48),
+            const SizedBox(height: 4),
+            const Text(
+              'ROUND PERFORMANCE SUMMARY',
+              style: TextStyle(color: Colors.white38, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 2),
+            ),
+            const SizedBox(height: 32),
 
-            // Main Score List
+            // Table Content
             Expanded(
               child: resultsAsync.when(
                 data: (results) {
-                  return ListView(
-                    padding: const EdgeInsets.symmetric(horizontal: 28),
+                  final rounds = _groupResultsByRound(results);
+                  
+                  return SingleChildScrollView(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
                     physics: const BouncingScrollPhysics(),
-                    children: [
-                      ...players.map((p) {
-                        final totalScore = _calculateTotalScore(p.id, results);
-                        final isDanger = totalScore >= 25;
-                        final progress = (totalScore / 31).clamp(0.0, 1.0);
-                        
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 40),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Row(
-                                    children: [
-                                      _buildAvatar(p.name, isDanger),
-                                      const SizedBox(width: 20),
-                                      Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            p.name.toUpperCase(),
-                                            style: TextStyle(
-                                              color: isDanger ? dangerRed : Colors.white,
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.w900,
-                                              letterSpacing: 1.2,
-                                              shadows: [
-                                                if (isDanger) Shadow(color: dangerRed.withOpacity(0.5), blurRadius: 10),
-                                              ],
-                                            ),
-                                          ),
-                                          const SizedBox(height: 4),
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                            decoration: BoxDecoration(
-                                              color: isDanger ? dangerRed.withOpacity(0.1) : Colors.white.withOpacity(0.05),
-                                              borderRadius: BorderRadius.circular(4),
-                                              border: Border.all(color: isDanger ? dangerRed.withOpacity(0.2) : Colors.white12),
-                                            ),
-                                            child: Text(
-                                              isDanger ? 'DANGER ZONE' : 'SAFE ZONE',
-                                              style: TextStyle(
-                                                color: isDanger ? dangerRed : Colors.white24,
-                                                fontSize: 9,
-                                                fontWeight: FontWeight.w900,
-                                                letterSpacing: 1,
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                  Column(
-                                    crossAxisAlignment: CrossAxisAlignment.end,
-                                    children: [
-                                      Text(
-                                        '$totalScore',
-                                        style: TextStyle(
-                                          color: isDanger ? dangerRed : Colors.white,
-                                          fontSize: 38,
-                                          height: 1,
-                                          fontWeight: FontWeight.w900,
-                                          letterSpacing: -1,
-                                          fontFeatures: const [FontFeature.tabularFigures()],
-                                        ),
-                                      ),
-                                      Text(
-                                        'POINTS',
-                                        style: TextStyle(
-                                          color: isDanger ? dangerRed.withOpacity(0.4) : Colors.white10,
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 16),
-                              _buildProgressBar(context, progress, isDanger),
-                            ],
-                          ),
-                        );
-                      }),
-                      const SizedBox(height: 30),
-                    ],
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.03),
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(color: Colors.white10),
+                      ),
+                      clipBehavior: Clip.antiAlias,
+                      child: Table(
+                        columnWidths: const {
+                          0: FixedColumnWidth(60), // Round #
+                        },
+                        border: TableBorder.symmetric(
+                          inside: const BorderSide(color: Colors.white10, width: 0.5),
+                        ),
+                        defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+                        children: [
+                          // Header Row (Names)
+                          _buildHeaderRow(),
+                          // Round Rows
+                          ...rounds.entries.map((e) => _buildRoundRow(e.key, e.value)),
+                          // Total Row
+                          _buildTotalRow(results),
+                        ],
+                      ),
+                    ),
                   );
                 },
                 loading: () => const Center(child: CircularProgressIndicator(color: accentGold)),
-                error: (e, s) => Center(child: Text('Score sync in progress...', style: TextStyle(color: Colors.white.withOpacity(0.1)))),
+                error: (e, s) => const Center(child: Text('Syncing results...', style: TextStyle(color: Colors.white24))),
               ),
             ),
 
-            // Footer Section
+            // Footer Button
             Padding(
-              padding: const EdgeInsets.fromLTRB(28, 0, 28, 48),
-              child: Column(
-                children: [
-                  const Text(
-                    'LAST MAN STANDING WINS',
-                    style: TextStyle(color: Colors.white12, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 2),
-                  ),
-                  const SizedBox(height: 24),
-                  Container(
-                    width: double.infinity,
-                    height: 64,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(24),
-                      gradient: const LinearGradient(
-                        colors: [accentGold, Color(0xFFDAA520)],
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: accentGold.withOpacity(0.3),
-                          blurRadius: 20,
-                          offset: const Offset(0, 8),
-                        ),
-                      ],
-                    ),
-                    child: Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        onTap: onClose,
-                        borderRadius: BorderRadius.circular(24),
-                        child: const Center(
-                          child: Text(
-                            'RESUME ACTION',
-                            style: TextStyle(
-                              color: Colors.black,
-                              fontSize: 18,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 2,
-                            ),
-                          ),
-                        ),
-                      ),
+              padding: const EdgeInsets.all(28),
+              child: Container(
+                width: double.infinity,
+                height: 56,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(20),
+                  gradient: const LinearGradient(colors: [accentGold, Color(0xFFDAA520)]),
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: onClose,
+                    borderRadius: BorderRadius.circular(20),
+                    child: const Center(
+                      child: Text('BACK TO TABLE', style: TextStyle(color: Colors.black, fontSize: 16, fontWeight: FontWeight.w900, letterSpacing: 1.5)),
                     ),
                   ),
-                ],
+                ),
               ),
             ),
           ],
@@ -256,82 +125,108 @@ class ScoreboardOverlay extends ConsumerWidget {
     );
   }
 
-  Widget _buildAvatar(String name, bool isDanger) {
-    return Container(
-      width: 56, height: 56,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: isDanger 
-            ? [dangerRed.withOpacity(0.6), dangerRed.withOpacity(0.2)]
-            : [accentGold.withOpacity(0.6), accentGold.withOpacity(0.2)],
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: (isDanger ? dangerRed : accentGold).withOpacity(0.2),
-            blurRadius: 15,
-            spreadRadius: 2,
-          ),
-        ],
-        border: Border.all(
-          color: (isDanger ? dangerRed : accentGold).withOpacity(0.4),
-          width: 2,
-        ),
-      ),
-      child: Center(
-        child: Text(
-          name.substring(0, 1).toUpperCase(),
-          style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildProgressBar(BuildContext context, double progress, bool isDanger) {
-    return Stack(
+  TableRow _buildHeaderRow() {
+    return TableRow(
+      decoration: BoxDecoration(color: Colors.white.withOpacity(0.05)),
       children: [
-        Container(
-          height: 12,
-          width: double.infinity,
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.05),
-            borderRadius: BorderRadius.circular(6),
-          ),
-        ),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            return AnimatedContainer(
-              duration: const Duration(milliseconds: 1200),
-              curve: Curves.elasticOut,
-              height: 12,
-              width: constraints.maxWidth * progress,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: isDanger 
-                    ? [dangerRed.withOpacity(0.8), dangerRed]
-                    : [const Color(0xFFFFF700), accentGold],
-                ),
-                borderRadius: BorderRadius.circular(6),
-                boxShadow: [
-                  BoxShadow(
-                    color: (isDanger ? dangerRed : accentGold).withOpacity(0.5),
-                    blurRadius: 12,
-                    spreadRadius: 1,
-                  ),
-                ],
-              ),
-            );
-          }
-        ),
+        const _Cell(text: 'RD', isHeader: true),
+        ...players.map((p) => _Cell(text: p.name.toUpperCase(), isHeader: true)),
       ],
     );
   }
 
-  int _calculateTotalScore(String playerId, List<Map<String, dynamic>> results) {
-    return results
-      .where((r) => r['player_id'] == playerId)
-      .fold(0, (sum, item) => sum + (item['score'] as int));
+  TableRow _buildRoundRow(int roundNum, List<Map<String, dynamic>> roundResults) {
+    return TableRow(
+      children: [
+        _Cell(text: '#$roundNum', isLabel: true),
+        ...players.map((p) {
+          final result = roundResults.firstWhere((r) => r['player_id'] == p.id, orElse: () => {});
+          if (result.isEmpty) return const _Cell(text: '-');
+
+          final bid = result['bid'] ?? 0;
+          final tricks = result['tricks_taken'] ?? 0;
+          final score = result['score'] ?? 0;
+          final isSuccess = score > 0;
+
+          return _Cell(
+            text: isSuccess ? '$tricks/$bid' : '$score',
+            color: isSuccess ? boxGreen : boxRed,
+            subText: isSuccess ? '+5' : null,
+          );
+        }),
+      ],
+    );
+  }
+
+  TableRow _buildTotalRow(List<Map<String, dynamic>> allResults) {
+    return TableRow(
+      decoration: BoxDecoration(color: accentGold.withOpacity(0.05)),
+      children: [
+        const _Cell(text: 'TOTAL', isLabel: true, color: accentGold),
+        ...players.map((p) {
+          final total = allResults
+              .where((r) => r['player_id'] == p.id)
+              .fold(0, (sum, item) => sum + (item['score'] as int));
+          
+          return _Cell(
+            text: '$total', 
+            isHeader: true, 
+            color: total < 0 ? boxRed : (total >= 25 ? Colors.orange : Colors.white)
+          );
+        }),
+      ],
+    );
+  }
+
+  Map<int, List<Map<String, dynamic>>> _groupResultsByRound(List<Map<String, dynamic>> results) {
+    final Map<int, List<Map<String, dynamic>>> rounds = {};
+    for (var r in results) {
+      final roundNum = r['round_number'] as int;
+      rounds.putIfAbsent(roundNum, () => []).add(r);
+    }
+    return rounds;
+  }
+}
+
+class _Cell extends StatelessWidget {
+  final String text;
+  final String? subText;
+  final bool isHeader;
+  final bool isLabel;
+  final Color? color;
+
+  const _Cell({
+    required this.text,
+    this.subText,
+    this.isHeader = false,
+    this.isLabel = false,
+    this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 4),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            text,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: color ?? (isHeader ? Colors.white : (isLabel ? Colors.white60 : Colors.white70)),
+              fontSize: isHeader ? 14 : 13,
+              fontWeight: isHeader ? FontWeight.w900 : (isLabel ? FontWeight.bold : FontWeight.normal),
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
+          ),
+          if (subText != null)
+            Text(
+              subText!,
+              style: TextStyle(color: color?.withOpacity(0.5) ?? Colors.white24, fontSize: 9, fontWeight: FontWeight.bold),
+            ),
+        ],
+      ),
+    );
   }
 }
