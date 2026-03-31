@@ -249,7 +249,19 @@ final playableCardsProvider = Provider.family<Set<String>, String>((ref, roomId)
   final cardsOfLeadSuit = cardsInHand.where((c) => c.endsWith(leadSuit)).toList();
   
   if (cardsOfLeadSuit.isNotEmpty) {
-    // 2. MUST WIN RULE: Find highest card currently in trick of the lead suit
+    // 2. MUST WIN RULE (Contextual)
+    // If a trick is already "cut" by a TRUMP (that is not the lead suit), 
+    // we don't force windows of lead suit because they can't win anyway.
+    final trump = trumpSuit ?? 'S';
+    final isTrickTrumped = currentTrick.any((m) => (m['card_value'] as String).endsWith(trump));
+    final leadIsTrump = leadSuit == trump;
+
+    if (isTrickTrumped && !leadIsTrump) {
+      // Trick is trumped, lead suit CANNOT win. Allow any card of lead suit.
+      return cardsOfLeadSuit.toSet();
+    }
+
+    // Standard "Must Win" logic: Find highest card of the lead suit currently in trick
     int highestRank = 0;
     for (var m in currentTrick) {
       final cVal = m['card_value'] as String;
