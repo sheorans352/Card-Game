@@ -793,6 +793,8 @@ class _CardsLayerState extends ConsumerState<CardsLayer> {
              _hideTimer?.cancel();
              _hideTimer = Timer(const Duration(milliseconds: 1000), () {
                if (mounted) setState(() => _forceHideTrick = true);
+               // Clean up local tracking after trick ends
+               ref.read(localPlayedCardsProvider.notifier).state = {};
              });
            }
            
@@ -909,7 +911,7 @@ class _CardsLayerState extends ConsumerState<CardsLayer> {
       
       for (var i = 0; i < visibleHand.length; i++) {
         final cardId = visibleHand[i]['card_value'] as String;
-        final isPlayable = playableIds.contains(cardId) && pendingPlays.isEmpty; // Global debounce
+        final isPlayable = playableIds.contains(cardId); // Global lock removed for trick transition
         
         handWidgets.add(
           HandCardWidget(

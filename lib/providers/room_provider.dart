@@ -169,9 +169,10 @@ final predictivePlayedCardsProvider = Provider.family<List<Map<String, dynamic>>
   final total = [...serverPlayed];
   for (var cardId in localOnly) {
      total.add({
+       'card_id': 'opt_$cardId', // Unique local ID
        'card_value': cardId,
        'player_id': localId,
-       'is_optimistic': true, // Meta-tag for UI if needed
+       'is_optimistic': true,
      });
   }
   return total;
