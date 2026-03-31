@@ -130,7 +130,7 @@ class ScoreboardOverlay extends ConsumerWidget {
                                );
                             } else {
                                 // HISTORICAL ROUND points
-                                final res = historicalResults.firstWhere((r) => r['player_id'] == p.id, orElse: () => null);
+                                final res = historicalResults.where((r) => r['player_id'] == p.id).firstOrNull;
                                 if (res == null) return const Expanded(child: SizedBox());
                                 
                                 final points = res['points_earned'] ?? 0;
