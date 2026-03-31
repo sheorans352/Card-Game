@@ -753,13 +753,12 @@ class CardsLayer extends ConsumerStatefulWidget {
 }
 
 class _CardsLayerState extends ConsumerState<CardsLayer> {
-  bool _forceHideTrick = false;
   int _lastTrickCount = 0;
-  Timer? _hideTimer;
+  Timer? _sweepTimer;
 
   @override
   void dispose() {
-    _hideTimer?.cancel();
+    _sweepTimer?.cancel();
     super.dispose();
   }
 
@@ -772,74 +771,50 @@ class _CardsLayerState extends ConsumerState<CardsLayer> {
     final roomCode = ref.watch(currentRoomCodeProvider);
     final room = roomCode != null ? ref.watch(roomMetadataProvider(roomCode)).value : null;
 
-    // Side-effect: Handle Trick Sweeping using the predictive state
+    // Side-effect: Clear local tracking after a trick finishes (delay is for sweep animation)
     ref.listen<List<Map<String, dynamic>>>(
       predictivePlayedCardsProvider(widget.roomId),
       (prev, next) {
-        final trickSize = next.length % 4;
-        final isTrickFinished = trickSize == 0 && next.isNotEmpty;
-        
-        if (next.length != _lastTrickCount) {
+        if (next.length % 4 == 0 && next.isNotEmpty && next.length != _lastTrickCount) {
            _lastTrickCount = next.length;
-           
-           // Reset sweep when a NEW trick starts (card 1 of 4)
-           if (trickSize == 1) {
-             if (mounted) setState(() => _forceHideTrick = false);
-             _hideTimer?.cancel();
-           }
-           
-           // Start 1-second sweep timer when trick finishes
-           if (isTrickFinished) {
-             _hideTimer?.cancel();
-             _hideTimer = Timer(const Duration(milliseconds: 1000), () {
-               if (mounted) setState(() => _forceHideTrick = true);
-               // Clean up local tracking after trick ends
+           _sweepTimer?.cancel();
+           _sweepTimer = Timer(const Duration(milliseconds: 1500), () {
+             if (mounted) {
                ref.read(localPlayedCardsProvider.notifier).state = {};
-             });
-           }
-           
-           // Handle round end / clear
-           if (next.isEmpty) {
-              _hideTimer?.cancel();
-              if (mounted) setState(() => _forceHideTrick = false);
-           }
+               // We don't hide here; the UI will update naturally when next.length changes via the server or new plays
+             }
+           });
+        } else if (next.length != _lastTrickCount) {
+          _lastTrickCount = next.length;
         }
       },
     );
 
-
-    // Watch for round changes to reset local state
+    // Watch for round changes or lobby resets to reset local state
     if (room != null) {
       ref.listen<int?>(
         roomMetadataProvider(roomCode!).select((data) => data.value?.currentRound),
         (prev, next) {
-          if (prev != next) {
-            ref.read(localPlayedCardsProvider.notifier).state = {};
-          }
+          if (prev != next) ref.read(localPlayedCardsProvider.notifier).state = {};
         },
       );
-      
-      // Also reset if we move back to shuffling/lobby (End of game/round)
       ref.listen<String?>(
         roomMetadataProvider(roomCode).select((data) => data.value?.status),
         (prev, next) {
-          if (next == 'shuffling' || next == 'waiting') {
-            ref.read(localPlayedCardsProvider.notifier).state = {};
-          }
+          if (next == 'shuffling' || next == 'waiting') ref.read(localPlayedCardsProvider.notifier).state = {};
         },
       );
     }
 
     // --- Table Rendering Logic ---
-    final trickSize = playedMaps.length % 4;
-    final isTrickFinished = trickSize == 0 && playedMaps.isNotEmpty;
-    final trickStartIndex = playedMaps.length - (isTrickFinished ? 4 : trickSize);
+    if (playedMaps.isEmpty) return Stack(children: _buildPlayerHands(ref));
 
-    if (trickStartIndex < 0 || _forceHideTrick) {
-       return Stack(children: _buildPlayerHands(ref));
-    }
+    final trickSize = playedMaps.length % 4;
+    final isTrickFinished = trickSize == 0;
     
-    final currentTrick = playedMaps.sublist(trickStartIndex);
+    // Always show the "current" trick (the last 4 if finished, or the current n if in progress)
+    final trickStartIndex = playedMaps.length - (isTrickFinished ? 4 : trickSize);
+    final currentTrick = playedMaps.sublist(trickStartIndex < 0 ? 0 : trickStartIndex);
     
     // Winner Position Logic for Sweep Animation
     String? winnerPos;

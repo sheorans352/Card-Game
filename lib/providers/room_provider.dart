@@ -278,10 +278,10 @@ final playableCardsProvider = Provider.family<Set<String>, String>((ref, roomId)
   
   // 3. No lead suit -> Choice: Trump or Throw
   // Rule: If playing a trump, it must be higher than any trump already in the trick (if possible).
-  final trump = trumpSuit ?? 'S';
+  final trump = (trumpSuit ?? 'S').toUpperCase().trim();
   int highestTrumpInTrick = 0;
   for (var m in currentTrick) {
-    final cVal = m['card_value'] as String;
+    final cVal = (m['card_value'] as String).trim();
     if (cVal.endsWith(trump)) {
       final r = Player.getRankValue(cVal);
       if (r > highestTrumpInTrick) highestTrumpInTrick = r;
@@ -294,13 +294,17 @@ final playableCardsProvider = Provider.family<Set<String>, String>((ref, roomId)
   // Identify trumps that can overtrump the current highest trump
   final overTrumps = playerTrumps.where((c) => Player.getRankValue(c) > highestTrumpInTrick).toList();
   
-  if (overTrumps.isNotEmpty) {
-    // Player can overtrump. They must play an overtrump OR a discard.
-    // They are NOT allowed to play a lower trump if they have a higher one.
-    return {...overTrumps, ...playerDiscards}.toSet();
+  if (playerTrumps.isNotEmpty) {
+     if (overTrumps.isNotEmpty) {
+        // Must play winning trump OR a discard (can't undertrump if you can overtrump)
+        return {...overTrumps, ...playerDiscards}.toSet();
+     } else {
+        // Cannot overtrump, but MUST play a card (can undertrump or discard)
+        return cardsInHand.toSet();
+     }
   }
   
-  // If they can't overtrump, they can play any of their cards (undertrump or discard).
+  // No trumps at all -> can play any card (all are discards)
   return cardsInHand.toSet();
 });
 
