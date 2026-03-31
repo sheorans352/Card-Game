@@ -338,13 +338,18 @@ class SupabaseCardService extends CardService {
           .eq('room_id', roomId);
 
       // Move to final bid — KEEP highest_bidder_id (identifies Scenario A Phase 1 winner)
+      int nextTurn = (room['dealer_index'] + 1) % 4;
+      final String? phase1WinnerId = room['highest_bidder_id'] as String?;
+      if (phase1WinnerId != null && players[nextTurn]['id'] == phase1WinnerId) {
+        nextTurn = (nextTurn + 1) % 4; // Skip the trump setter who already committed
+      }
+
       await _supabase.from('rooms').update({
         'status': 'bidding_2',
         'current_phase': 'bidding_2',
-        'turn_index': (room['dealer_index'] + 1) % 4, // Cutter starts declaring
+        'turn_index': nextTurn,
         'pass_count': 0,   // Used as declaration counter in bidding_2
         'highest_bid': 0,  // Reset (highest_bidder_id is kept for Scenario A)
-        // highest_bidder_id intentionally NOT cleared — Scenario A identity
       }).eq('id', roomId);
     } else {
       // === Scenario B: 52 cards already dealt, this is a 9+ trump override ===
