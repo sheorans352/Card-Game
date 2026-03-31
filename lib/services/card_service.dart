@@ -361,7 +361,7 @@ class SupabaseCardService extends CardService {
 
   @override
   Future<void> playCard(String roomId, String playerId, String cardValue) async {
-    // 1. Call atomic RPC for turn check, card play, and winner evaluation
+    // 1. Call atomic RPC for turn check, card play, and winner/round evaluation
     final response = await _supabase.rpc('play_card', params: {
       'p_room_id': roomId,
       'p_player_id': playerId,
@@ -371,13 +371,6 @@ class SupabaseCardService extends CardService {
     final result = Map<String, dynamic>.from(response);
     if (result['success'] != true) {
       throw Exception(result['error'] ?? 'Failed to play card');
-    }
-
-    // 2. Check if the round is finished (52 cards played)
-    // The RPC returns trick_finished and round_finished info
-    final playedCards = await _supabase.from('played_cards').select('id').eq('room_id', roomId);
-    if (playedCards.length == 52) {
-      await _recordRoundResults(roomId);
     }
   }
 

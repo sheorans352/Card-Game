@@ -128,38 +128,6 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
                     _buildTrumpHUD(room.trumpSuit!, room, playedCardsCount),
 
                   // Scoreboard Button (Top Right)
-                  // Top-Right Utility Buttons
-                  Positioned(
-                    top: MediaQuery.of(context).padding.top + 10,
-                    right: 20,
-                    child: Row(
-                      children: [
-                        // Sync Button
-                        Container(
-                          margin: const EdgeInsets.only(right: 12),
-                          decoration: BoxDecoration(
-                            color: Colors.black38,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white12),
-                          ),
-                          child: IconButton(
-                            onPressed: () {
-                              final roomCode = ref.read(currentRoomCodeProvider);
-                              if (roomCode != null) {
-                                final room = ref.read(roomMetadataProvider(roomCode)).value;
-                                if (room != null) {
-                                  ref.invalidate(roomMetadataProvider(roomCode));
-                                  ref.invalidate(playedCardsProvider(room.id));
-                                  ref.invalidate(playersStreamProvider(room.id));
-                                  ref.invalidate(playerHandProvider(localPlayerId!));
-                                  ref.read(pendingCardPlayProvider.notifier).state = {};
-                                }
-                              }
-                            },
-                            icon: const Icon(Icons.sync_rounded, color: Colors.white54, size: 24),
-                            tooltip: 'Force Sync',
-                          ),
-                        ),
                         // Scoreboard Button
                         Container(
                           decoration: BoxDecoration(
@@ -715,6 +683,13 @@ class CardsLayer extends ConsumerStatefulWidget {
 class _CardsLayerState extends ConsumerState<CardsLayer> {
   bool _forceHideTrick = false;
   int _lastTrickCount = 0;
+  Timer? _hideTimer;
+
+  @override
+  void dispose() {
+    _hideTimer?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -724,26 +699,69 @@ class _CardsLayerState extends ConsumerState<CardsLayer> {
     final roomCode = ref.watch(currentRoomCodeProvider);
     final room = roomCode != null ? ref.watch(roomMetadataProvider(roomCode)).value : null;
 
+    // Use ref.listen to handle the side effect (Timer) outside of build()
+    ref.listen<AsyncValue<List<Map<String, dynamic>>>>(
+      playedCardsProvider(widget.roomId),
+      (prev, next) {
+        next.whenData((playedMaps) {
+          final trickSize = playedMaps.length % 4;
+          final isTrickFinished = trickSize == 0 && playedMaps.isNotEmpty;
+          
+          if (playedMaps.length != _lastTrickCount) {
+             _lastTrickCount = playedMaps.length;
+             
+             // Reset hide flag when a NEW trick starts (card 1 of 4)
+             if (trickSize == 1) {
+               setState(() => _forceHideTrick = false);
+               _hideTimer?.cancel();
+             }
+             
+             // Start timer to hide when trick finishes
+             if (isTrickFinished) {
+               _hideTimer?.cancel();
+               _hideTimer = Timer(const Duration(milliseconds: 1000), () {
+                 if (mounted) setState(() => _forceHideTrick = true);
+               });
+             }
+             
+             // Handle case where played_cards is cleared from DB (e.g. round end)
+             if (playedMaps.isEmpty) {
+                _hideTimer?.cancel();
+                if (mounted) setState(() => _forceHideTrick = false);
+             }
+          }
+        });
+      },
+    );
+
+    // Watch for round changes to reset local state
+    if (room != null) {
+      ref.listen<int?>(
+        roomMetadataProvider(roomCode!).select((data) => data.value?.currentRound),
+        (prev, next) {
+          if (prev != next) {
+            ref.read(localPlayedCardsProvider.notifier).state = {};
+          }
+        },
+      );
+      
+      // Also reset if we move back to shuffling/lobby (End of game/round)
+      ref.listen<String?>(
+        roomMetadataProvider(roomCode).select((data) => data.value?.status),
+        (prev, next) {
+          if (next == 'shuffling' || next == 'waiting') {
+            ref.read(localPlayedCardsProvider.notifier).state = {};
+          }
+        },
+      );
+    }
+
     return playedCardsAsync.when(
       data: (playedMaps) {
         final trickSize = playedMaps.length % 4;
         final isTrickFinished = trickSize == 0 && playedMaps.isNotEmpty;
-        
-        // Auto-clear logic: Reset hide flag when a NEW trick starts or trick disappears
-        if (playedMaps.length != _lastTrickCount) {
-          if (trickSize == 1) {
-             _forceHideTrick = false;
-          }
-           _lastTrickCount = playedMaps.length;
-           
-           if (isTrickFinished) {
-              Future.delayed(const Duration(milliseconds: 800), () {
-                if (mounted) setState(() => _forceHideTrick = true);
-              });
-           }
-        }
-
         final trickStartIndex = playedMaps.length - (isTrickFinished ? 4 : trickSize);
+
         if (trickStartIndex < 0 || _forceHideTrick) {
            return Stack(children: _buildPlayerHands(ref));
         }
@@ -808,11 +826,15 @@ class _CardsLayerState extends ConsumerState<CardsLayer> {
     final localHandAsync = ref.watch(playerHandProvider(localPlayerId));
     final playableIds = ref.watch(playableCardsProvider(roomId));
     final pendingPlays = ref.watch(pendingCardPlayProvider);
+    final localPlayed = ref.watch(localPlayedCardsProvider);
     List<Widget> handWidgets = [];
 
     localHandAsync.whenData((hand) {
-      // Filter out cards that are currently being played (Optimistic UI)
-      final visibleHand = hand.where((h) => !pendingPlays.contains(h['card_value'] as String)).toList();
+      // Filter out cards already played in this round (Optimistic UI)
+      final visibleHand = hand.where((h) {
+        final val = h['card_value'] as String;
+        return !pendingPlays.contains(val) && !localPlayed.contains(val);
+      }).toList();
       
       for (var i = 0; i < visibleHand.length; i++) {
         final cardId = visibleHand[i]['card_value'] as String;
@@ -829,22 +851,17 @@ class _CardsLayerState extends ConsumerState<CardsLayer> {
               gameAudio.playCardPlay();
               // Optimistically hide from hand
               ref.read(pendingCardPlayProvider.notifier).update((state) => {...state, cardId});
+              ref.read(localPlayedCardsProvider.notifier).update((state) => {...state, cardId});
               
-              // === ANTI-LOCK TIMEOUT (8s) ===
-              Future.delayed(const Duration(seconds: 8), () {
-                if (mounted) {
-                  ref.read(pendingCardPlayProvider.notifier).update((s) => s.where((id) => id != cardId).toSet());
-                }
-              });
-
               try {
                 await ref.read(cardServiceProvider).playCard(roomId, localPlayerId, cardId);
               } catch (e) {
                 // If it fails, restore the card to hand
                 ref.read(pendingCardPlayProvider.notifier).update((state) => state.where((id) => id != cardId).toSet());
+                ref.read(localPlayedCardsProvider.notifier).update((state) => state.where((id) => id != cardId).toSet());
                 debugPrint('Play card failed: $e');
               }
-              // Set will be cleared automatically when the hand stream updates from the DB delete
+              // pendingCardPlayProvider will be cleared by ref.listen below
             } : () {
               gameAudio.playInvalidMove();
             },

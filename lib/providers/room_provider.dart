@@ -13,6 +13,9 @@ import '../config/env_config.dart';
 
 SupabaseClient get supabase => Supabase.instance.client;
 
+// Track cards locally played in the current round to bypass Realtime lag.
+final localPlayedCardsProvider = StateProvider<Set<String>>((ref) => {});
+
 // Mock Providers for Verification
 final currentRoomCodeProvider = StateProvider<String?>((ref) {
   if (kIsWeb) {
