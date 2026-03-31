@@ -88,7 +88,28 @@ final playerHandProvider = StreamProvider.family<List<Map<String, dynamic>>, Str
       .from('hands')
       .stream(primaryKey: ['id'])
       .eq('player_id', playerId)
-      .map((data) => data.map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e)).toList())
+      .map((data) {
+        final hand = data.map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e)).toList();
+        
+        // Arrange cards in descending order by grouping them by suits
+        const suitOrder = {'S': 0, 'H': 1, 'D': 2, 'C': 3};
+        
+        hand.sort((a, b) {
+          final valA = a['card_value'] as String;
+          final valB = b['card_value'] as String;
+          final suitA = valA.substring(valA.length - 1).toUpperCase();
+          final suitB = valB.substring(valB.length - 1).toUpperCase();
+          
+          if (suitA != suitB) {
+            return (suitOrder[suitA] ?? 99).compareTo(suitOrder[suitB] ?? 99);
+          }
+          
+          // Same suit: Descending rank (Ace first)
+          return Player.getRankValue(valB).compareTo(Player.getRankValue(valA));
+        });
+        
+        return hand;
+      })
       .handleError((error) {
         debugPrint('Supabase Stream Error (Hand): $error');
         throw error;
