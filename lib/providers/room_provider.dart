@@ -150,6 +150,33 @@ final roundResultsProvider = StreamProvider.family<List<Map<String, dynamic>>, S
       });
 });
 
+// === UNIFIED PREDICTIVE CARD STATE ===
+// Combines server-side cards with local optimistic plays to provide a seamless state.
+final predictivePlayedCardsProvider = Provider.family<List<Map<String, dynamic>>, String>((ref, roomId) {
+  final serverPlayed = ref.watch(playedCardsProvider(roomId)).value ?? [];
+  final localPlayed = ref.watch(localPlayedCardsProvider);
+  final localId = ref.watch(localPlayerIdProvider);
+
+  if (localPlayed.isEmpty) return serverPlayed;
+
+  // Filter local cards that haven't hitting the server yet
+  final serverCardIds = serverPlayed.map((m) => m['card_value'] as String).toSet();
+  final localOnly = localPlayed.where((id) => !serverCardIds.contains(id)).toList();
+  
+  if (localOnly.isEmpty) return serverPlayed;
+
+  // Merge: Server cards come first, then local ones (approximating true play order)
+  final total = [...serverPlayed];
+  for (var cardId in localOnly) {
+     total.add({
+       'card_value': cardId,
+       'player_id': localId,
+       'is_optimistic': true, // Meta-tag for UI if needed
+     });
+  }
+  return total;
+});
+
 // === UNIFIED PREDICTIVE TURN LOGIC ===
 // Determines whose turn it is based on BOTH server state and local optimistic plays.
 final predictiveTurnIdProvider = Provider.family<String?, String>((ref, roomId) {
@@ -158,52 +185,33 @@ final predictiveTurnIdProvider = Provider.family<String?, String>((ref, roomId) 
   final players = ref.watch(playersStreamProvider(roomId)).value ?? [];
   if (players.isEmpty) return null;
 
-  final serverPlayedCards = ref.watch(playedCardsProvider(roomId)).value ?? [];
-  final localPlayed = ref.watch(localPlayedCardsProvider);
+  final cards = ref.watch(predictivePlayedCardsProvider(roomId));
+  final totalCount = cards.length;
   
-  // Combine server cards with local plays that haven't hit the server yet
-  final serverCardIds = serverPlayedCards.map((m) => m['card_value'] as String).toSet();
-  final localOnly = localPlayed.where((id) => !serverCardIds.contains(id)).toList();
-  
-  // Total cards played in this round (Server + Optimistic Local)
-  final totalPlayedCount = serverPlayedCards.length + localOnly.length;
-  
-  if (totalPlayedCount == 0) {
-    // Round just started, use the server's initial turn
+  if (totalCount == 0) {
     if (room.turnIndex < 0) return null;
     return players[room.turnIndex % players.length].id;
   }
 
-  final trickSize = totalPlayedCount % players.length;
+  final trickSize = totalCount % 4;
   
   if (trickSize == 0) {
-    // A trick just finished. The winner of that trick leads the next one.
-    final lastTrick = serverPlayedCards.length >= 4 
-        ? serverPlayedCards.sublist(serverPlayedCards.length - 4)
-        : serverPlayedCards; 
-    
-    if (lastTrick.length < 4) return players[room.turnIndex % players.length].id;
-
+    // Current trick is complete! The winner of the LAST trick leads the NEW trick.
+    final lastTrick = cards.sublist(totalCount - 4);
     final winnerId = Player.evaluateTrickWinner(lastTrick, room.trumpSuit, players);
     return winnerId;
   } else {
-    // Trick is in progress. 
-    String? leaderId;
-    if (serverPlayedCards.length % players.length == 0) {
-      // Server hasn't seen the first card of the new trick yet, but we have localOnly.
-      final lastServerTrick = serverPlayedCards.sublist(serverPlayedCards.length - 4);
-      leaderId = Player.evaluateTrickWinner(lastServerTrick, room.trumpSuit, players);
-    } else {
-      // Server already has some cards for the current trick.
-      final currentTrickStart = (serverPlayedCards.length ~/ players.length) * players.length;
-      leaderId = serverPlayedCards[currentTrickStart]['player_id'];
-    }
-
+    // A trick is currently in progress. 
+    // We find the leader of the CURRENT trick (the card at index `totalCount - trickSize`).
+    final currentTrickStartIdx = (totalCount ~/ 4) * 4;
+    final leaderId = cards[currentTrickStartIdx]['player_id'];
+    
     if (leaderId == null) return players[room.turnIndex % players.length].id;
     
     final leaderIndex = players.indexWhere((p) => p.id == leaderId);
     if (leaderIndex == -1) return players[room.turnIndex % players.length].id;
     
+    // The current turn is (leaderIndex + trickSize) % 4
     return players[(leaderIndex + trickSize) % players.length].id;
   }
 });
@@ -217,7 +225,7 @@ final playableCardsProvider = Provider.family<Set<String>, String>((ref, roomId)
   if (players.isEmpty) return {};
 
   final hand = ref.watch(playerHandProvider(localId)).value ?? [];
-  final playedCards = ref.watch(playedCardsProvider(room.id)).value ?? [];
+  final cards = ref.watch(predictivePlayedCardsProvider(roomId));
   
   // === TURN CHECK (Predictive) ===
   final currentTurnId = ref.watch(predictiveTurnIdProvider(roomId));
@@ -226,10 +234,12 @@ final playableCardsProvider = Provider.family<Set<String>, String>((ref, roomId)
   final cardsInHand = hand.map((c) => c['card_value'] as String).toList();
   
   // Trick Logic
-  final trickSize = playedCards.length % 4;
-  if (trickSize == 0) return cardsInHand.toSet(); // Lead any card
+  final trickSize = cards.length % 4;
   
-  final currentTrick = playedCards.sublist(playedCards.length - trickSize);
+  // If no cards in the current trick, we are the leader! Can play ANY card.
+  if (trickSize == 0) return cardsInHand.toSet(); 
+  
+  final currentTrick = cards.sublist(cards.length - trickSize);
   final leadCard = currentTrick.first['card_value'] as String;
   final leadSuit = leadCard.substring(leadCard.length - 1);
   final trumpSuit = room.trumpSuit;
@@ -243,7 +253,7 @@ final playableCardsProvider = Provider.family<Set<String>, String>((ref, roomId)
     for (var m in currentTrick) {
       final cVal = m['card_value'] as String;
       if (cVal.endsWith(leadSuit)) {
-        final r = Player.getRankValue(cVal.substring(0, cVal.length - 1));
+        final r = Player.getRankValue(cVal);
         if (r > highestRank) highestRank = r;
       }
     }

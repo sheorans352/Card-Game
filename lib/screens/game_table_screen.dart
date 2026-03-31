@@ -729,59 +729,46 @@ class _CardsLayerState extends ConsumerState<CardsLayer> {
 
   @override
   Widget build(BuildContext context) {
-    final playedCardsAsync = ref.watch(playedCardsProvider(widget.roomId));
+    // === USE PREDICTIVE STATE FOR UI RENDERING ===
+    final playedMaps = ref.watch(predictivePlayedCardsProvider(widget.roomId));
     
     // We need the room code to get the turnIndex (winner)
     final roomCode = ref.watch(currentRoomCodeProvider);
     final room = roomCode != null ? ref.watch(roomMetadataProvider(roomCode)).value : null;
 
-    // Use ref.listen to handle the side effect (Timer) outside of build()
-    ref.listen<AsyncValue<List<Map<String, dynamic>>>>(
-      playedCardsProvider(widget.roomId),
+    // Side-effect: Handle Trick Sweeping using the predictive state
+    ref.listen<List<Map<String, dynamic>>>(
+      predictivePlayedCardsProvider(widget.roomId),
       (prev, next) {
-        next.whenData((playedMaps) {
-          final trickSize = playedMaps.length % 4;
-          final isTrickFinished = trickSize == 0 && playedMaps.isNotEmpty;
-          
-          if (playedMaps.length != _lastTrickCount) {
-             _lastTrickCount = playedMaps.length;
-             
-             // Reset hide flag when a NEW trick starts (card 1 of 4)
-             if (trickSize == 1) {
-               setState(() => _forceHideTrick = false);
-               _hideTimer?.cancel();
-             }
-             
-             // Start timer to hide when trick finishes
-             if (isTrickFinished) {
-               _hideTimer?.cancel();
-               _hideTimer = Timer(const Duration(milliseconds: 1000), () {
-                 if (mounted) setState(() => _forceHideTrick = true);
-               });
-             }
-             
-             // Handle case where played_cards is cleared from DB (e.g. round end)
-             if (playedMaps.isEmpty) {
-                _hideTimer?.cancel();
-                if (mounted) setState(() => _forceHideTrick = false);
-             }
-          }
-        });
-      },
-    );
-
-    // Watch for TURN change to the winner to clear the board early if they play fast
-    if (room != null) {
-      ref.listen<AsyncValue<List<Map<String, dynamic>>>>(
-        playedCardsProvider(widget.roomId),
-        (prev, next) {
-           final played = next.value ?? [];
-           if (played.length % 4 == 0 && played.isNotEmpty) {
+        final trickSize = next.length % 4;
+        final isTrickFinished = trickSize == 0 && next.isNotEmpty;
+        
+        if (next.length != _lastTrickCount) {
+           _lastTrickCount = next.length;
+           
+           // Reset sweep when a NEW trick starts (card 1 of 4)
+           if (trickSize == 1) {
+             if (mounted) setState(() => _forceHideTrick = false);
+             _hideTimer?.cancel();
+           }
+           
+           // Start 1-second sweep timer when trick finishes
+           if (isTrickFinished) {
+             _hideTimer?.cancel();
+             _hideTimer = Timer(const Duration(milliseconds: 1000), () {
+               if (mounted) setState(() => _forceHideTrick = true);
+             });
+           }
+           
+           // Handle round end / clear
+           if (next.isEmpty) {
+              _hideTimer?.cancel();
               if (mounted) setState(() => _forceHideTrick = false);
            }
         }
-      );
-    }
+      },
+    );
+
 
     // Watch for round changes to reset local state
     if (room != null) {
@@ -805,76 +792,52 @@ class _CardsLayerState extends ConsumerState<CardsLayer> {
       );
     }
 
-    // --- Optimistic Merge for Table Display ---
-    final localPlayed = ref.watch(localPlayedCardsProvider);
+    // --- Table Rendering Logic ---
+    final trickSize = playedMaps.length % 4;
+    final isTrickFinished = trickSize == 0 && playedMaps.isNotEmpty;
+    final trickStartIndex = playedMaps.length - (isTrickFinished ? 4 : trickSize);
+
+    if (trickStartIndex < 0 || _forceHideTrick) {
+       return Stack(children: _buildPlayerHands(ref));
+    }
     
-    return playedCardsAsync.when(
-      data: (serverPlayed) {
-        // Optimistic Merge: show cards that we played locally but haven't hit the server yet
-        final serverCardIds = serverPlayed.map((m) => m['card_value'] as String).toSet();
-        List<Map<String, dynamic>> playedMaps = List.from(serverPlayed);
-        
-        for (var cardId in localPlayed) {
-          if (!serverCardIds.contains(cardId)) {
-            // Add local play to the end of the list for rendering
-            playedMaps.add({
-              'player_id': widget.localPlayerId,
-              'card_value': cardId,
-              'is_optimistic': true
-            });
+    final currentTrick = playedMaps.sublist(trickStartIndex);
+    
+    // Winner Position Logic for Sweep Animation
+    String? winnerPos;
+    if (isTrickFinished && room != null) {
+       final playersList = ref.read(playersStreamProvider(room.id)).value ?? [];
+       final winnerId = Player.evaluateTrickWinner(currentTrick, room.trumpSuit, playersList);
+       
+       if (winnerId != null && playersList.isNotEmpty) {
+          final winnerIdxInList = playersList.indexWhere((p) => p.id == winnerId);
+          final localPlayerIdxInList = playersList.indexWhere((p) => p.id == widget.localPlayerId);
+          
+          if (winnerIdxInList != -1 && localPlayerIdxInList != -1) {
+            final winnerIdxInRotated = (winnerIdxInList - localPlayerIdxInList + 4) % 4;
+            winnerPos = _getPositionFromIndex(winnerIdxInRotated);
           }
-        }
+       }
+    }
 
-        final trickSize = playedMaps.length % 4;
-        final isTrickFinished = trickSize == 0 && playedMaps.isNotEmpty;
-        final trickStartIndex = playedMaps.length - (isTrickFinished ? 4 : trickSize);
-
-        if (trickStartIndex < 0 || _forceHideTrick) {
-           return Stack(children: _buildPlayerHands(ref));
-        }
-        
-        final currentTrick = playedMaps.sublist(trickStartIndex);
-        
-        // Winner Position Logic
-        String? winnerPos;
-        if (isTrickFinished && room != null) {
-           // USE PREDICTIVE WINNER for the animation so it's instant!
-           final playersList = ref.read(playersStreamProvider(room.id)).value ?? [];
-           final winnerId = Player.evaluateTrickWinner(currentTrick, room.trumpSuit, playersList);
-           
-           if (winnerId != null && playersList.isNotEmpty) {
-              final winnerIdxInList = playersList.indexWhere((p) => p.id == winnerId);
-              final localPlayerIdxInList = playersList.indexWhere((p) => p.id == widget.localPlayerId);
-              
-              if (winnerIdxInList != -1 && localPlayerIdxInList != -1) {
-                final winnerIdxInRotated = (winnerIdxInList - localPlayerIdxInList + 4) % 4;
-                winnerPos = _getPositionFromIndex(winnerIdxInRotated);
-              }
-           }
-        }
-
-        return Stack(
-          children: [
-            ..._buildPlayerHands(ref),
-            ...currentTrick.map((m) {
-              final player = widget.players.cast<Player?>().firstWhere((p) => p?.id == m['player_id'], orElse: () => null);
-              if (player == null) return const SizedBox();
-              final playerIdxInRotated = widget.players.indexOf(player);
-              final pos = _getPositionFromIndex(playerIdxInRotated);
-              return PlayedCardWidget(
-                key: ValueKey('played_${m['card_value']}'),
-                card: CardModel.fromId(m['card_value']),
-                position: pos,
-                order: currentTrick.indexOf(m),
-                isTrickFinished: isTrickFinished,
-                winnerPosition: winnerPos,
-              );
-            }),
-          ],
-        );
-      },
-      loading: () => Stack(children: _buildPlayerHands(ref)),
-      error: (e, s) => Stack(children: _buildPlayerHands(ref)),
+    return Stack(
+      children: [
+        ..._buildPlayerHands(ref),
+        ...currentTrick.map((m) {
+          final player = widget.players.cast<Player?>().firstWhere((p) => p?.id == m['player_id'], orElse: () => null);
+          if (player == null) return const SizedBox();
+          final playerIdxInRotated = widget.players.indexOf(player);
+          final pos = _getPositionFromIndex(playerIdxInRotated);
+          return PlayedCardWidget(
+            key: ValueKey('played_${m['card_value']}'),
+            card: CardModel.fromId(m['card_value']),
+            position: pos,
+            order: currentTrick.indexOf(m),
+            isTrickFinished: isTrickFinished,
+            winnerPosition: winnerPos,
+          );
+        }),
+      ],
     );
   }
 
