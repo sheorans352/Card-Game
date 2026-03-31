@@ -16,169 +16,238 @@ class ScoreboardOverlay extends ConsumerWidget {
   });
 
   static const Color primaryBg = Color(0xFF062A14);
-  static const Color accentGold = Color(0xFFC7A14C);
-  static const Color boxGreen = Color(0xFF1B5E20);
-  static const Color boxRed = Color(0xFFC62828);
+  static const Color accentGold = Color(0xFFFFD700); 
+  static const Color dangerRed = Color(0xFFFF4D4D);
+  static const Color glassWhite = Colors.white10;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final resultsAsync = ref.watch(roundResultsProvider(roomId));
-    final roomAsync = ref.watch(roomMetadataByIdProvider(roomId));
-    final currentRound = roomAsync.value?.currentRound ?? 1;
-
+    
     return BackdropFilter(
-      filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+      filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.black.withOpacity(0.82),
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(40)),
-          border: Border.all(color: Colors.white10),
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Colors.black.withOpacity(0.9),
+              Colors.black.withOpacity(0.95),
+            ],
+          ),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(44)),
+          border: Border.all(color: Colors.white.withOpacity(0.1), width: 0.5),
           boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(0.5), blurRadius: 40, offset: const Offset(0, -10)),
+            BoxShadow(
+              color: Colors.black.withOpacity(0.8),
+              blurRadius: 60,
+              offset: const Offset(0, -15),
+            ),
           ],
         ),
         child: Column(
           children: [
-            const SizedBox(height: 12),
+            const SizedBox(height: 14),
             // Pull Handle
-            Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white12, borderRadius: BorderRadius.circular(2))),
-            const SizedBox(height: 24),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+            Container(
+              width: 50, height: 4,
+              decoration: BoxDecoration(
+                color: Colors.white24,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 28),
+            
+            // Header Section
+            Column(
               children: [
-                const Icon(Icons.stars_rounded, color: accentGold, size: 28),
-                const SizedBox(width: 12),
-                const Text(
-                  'HALL OF FAME',
-                  style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900, letterSpacing: 3),
+                ShaderMask(
+                  shaderCallback: (Rect bounds) {
+                    return const LinearGradient(
+                      colors: [accentGold, Color(0xFFFFFACD), accentGold],
+                    ).createShader(bounds);
+                  },
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.emoji_events_rounded, color: Colors.white, size: 36),
+                      SizedBox(width: 16),
+                      Text(
+                        'HALL OF FAME',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 32,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 6,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'RACE TO 31 • MINUS CHAMPIONSHIP',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.3),
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 2,
+                  ),
                 ),
               ],
             ),
-            const Text('Race through 31 points to victory', style: TextStyle(color: Colors.white38, fontSize: 11)),
-            const SizedBox(height: 32),
+            const SizedBox(height: 48),
 
-            // Table Header (Avatars)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              child: Row(
-                children: [
-                  const SizedBox(width: 70, child: Text('ROUND', style: TextStyle(color: Colors.white24, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1))),
-                  ...players.map((p) => Expanded(
-                    child: Center(
-                      child: Container(
-                        width: 42, height: 42,
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(colors: [accentGold.withOpacity(0.3), Colors.white10]),
-                          shape: BoxShape.circle,
-                          border: Border.all(color: accentGold.withOpacity(0.4), width: 1.5),
-                        ),
-                        child: Center(child: Text(p.name.substring(0, 1).toUpperCase(), style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w900))),
-                      ),
-                    ),
-                  )),
-                ],
-              ),
-            ),
-
-            // Results List
+            // Main Score List
             Expanded(
               child: resultsAsync.when(
                 data: (results) {
-                  if (results.isEmpty) {
-                    return const Center(child: Text('Scores will appear after the first round', style: TextStyle(color: Colors.white24, fontSize: 13)));
-                  }
-
-                  return ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                  return ListView(
+                    padding: const EdgeInsets.symmetric(horizontal: 28),
                     physics: const BouncingScrollPhysics(),
-                    itemCount: currentRound + 1,
-                    itemBuilder: (context, index) {
-                      if (index == currentRound) return _buildTotalRow(players);
-
-                      final rdNum = currentRound - index;
-                      final isCurrentRound = rdNum == currentRound;
-                      final historicalResults = results.where((r) => r['round_number'] == rdNum).toList();
-
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-                          decoration: BoxDecoration(
-                            color: isCurrentRound ? accentGold.withOpacity(0.08) : Colors.white.withOpacity(0.03),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: isCurrentRound ? accentGold.withOpacity(0.3) : Colors.white10),
-                          ),
-                          child: Row(
+                    children: [
+                      ...players.map((p) {
+                        final totalScore = _calculateTotalScore(p.id, results);
+                        final isDanger = totalScore >= 25;
+                        final progress = (totalScore / 31).clamp(0.0, 1.0);
+                        
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 40),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              SizedBox(width: 70, child: Text('R$rdNum', style: TextStyle(
-                                  color: isCurrentRound ? accentGold : Colors.white24, fontSize: 14, fontWeight: FontWeight.w900))),
-                              ...players.map((p) {
-                                if (isCurrentRound) {
-                                   return Expanded(
-                                     child: Column(
-                                       children: [
-                                         Text('${p.tricksWon}/${p.bid ?? "?"}', style: const TextStyle(color: accentGold, fontWeight: FontWeight.w900, fontSize: 18)),
-                                         const Text('LIVE', style: TextStyle(color: accentGold, fontSize: 8, fontWeight: FontWeight.bold)),
-                                       ],
-                                     ),
-                                   );
-                                } else {
-                                    final res = historicalResults.where((r) => r['player_id'] == p.id).firstOrNull;
-                                    if (res == null) return const Expanded(child: SizedBox());
-                                    final points = res['points_earned'] ?? 0;
-                                    final isNegative = points < 0;
-
-                                    return Expanded(
-                                      child: Column(
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Row(
+                                    children: [
+                                      _buildAvatar(p.name, isDanger),
+                                      const SizedBox(width: 20),
+                                      Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
-                                          Text('$points', style: TextStyle(
-                                            color: isNegative ? boxRed : Colors.lightGreenAccent,
-                                            fontWeight: FontWeight.w900, fontSize: 17,
-                                          )),
-                                          Text('${res['tricks_won']}/${res['bid']}', style: const TextStyle(color: Colors.white24, fontSize: 9)),
+                                          Text(
+                                            p.name.toUpperCase(),
+                                            style: TextStyle(
+                                              color: isDanger ? dangerRed : Colors.white,
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.w900,
+                                              letterSpacing: 1.2,
+                                              shadows: [
+                                                if (isDanger) Shadow(color: dangerRed.withOpacity(0.5), blurRadius: 10),
+                                              ],
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                            decoration: BoxDecoration(
+                                              color: isDanger ? dangerRed.withOpacity(0.1) : Colors.white.withOpacity(0.05),
+                                              borderRadius: BorderRadius.circular(4),
+                                              border: Border.all(color: isDanger ? dangerRed.withOpacity(0.2) : Colors.white12),
+                                            ),
+                                            child: Text(
+                                              isDanger ? 'DANGER ZONE' : 'SAFE ZONE',
+                                              style: TextStyle(
+                                                color: isDanger ? dangerRed : Colors.white24,
+                                                fontSize: 9,
+                                                fontWeight: FontWeight.w900,
+                                                letterSpacing: 1,
+                                              ),
+                                            ),
+                                          ),
                                         ],
                                       ),
-                                    );
-                                }
-                              }),
+                                    ],
+                                  ),
+                                  Column(
+                                    crossAxisAlignment: Alignment.end,
+                                    children: [
+                                      Text(
+                                        '$totalScore',
+                                        style: TextStyle(
+                                          color: isDanger ? dangerRed : Colors.white,
+                                          fontSize: 38,
+                                          height: 1,
+                                          fontWeight: FontWeight.w900,
+                                          letterSpacing: -1,
+                                          fontFeatures: const [FontFeature.tabularFigures()],
+                                        ),
+                                      ),
+                                      Text(
+                                        'POINTS',
+                                        style: TextStyle(
+                                          color: isDanger ? dangerRed.withOpacity(0.4) : Colors.white10,
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 16),
+                              _buildProgressBar(context, progress, isDanger),
                             ],
                           ),
-                        ),
-                      );
-                    },
+                        );
+                      }),
+                      const SizedBox(height: 30),
+                    ],
                   );
                 },
                 loading: () => const Center(child: CircularProgressIndicator(color: accentGold)),
-                error: (e, _) => Center(child: Text('Error: $e', style: const TextStyle(color: boxRed))),
+                error: (e, s) => Center(child: Text('Score sync in progress...', style: TextStyle(color: Colors.white.withOpacity(0.1)))),
               ),
             ),
 
-            // Race to 31 Progress
-            _buildRaceTo31Indicators(players),
-            
-            const SizedBox(height: 20),
-            _buildLegend(),
-            const SizedBox(height: 12),
-
-            // Back Button
+            // Footer Section
             Padding(
-              padding: const EdgeInsets.all(24),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(20),
-                child: BackdropFilter(
-                   filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
-                   child: ElevatedButton(
-                    onPressed: onClose,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: accentGold.withOpacity(0.8),
-                      foregroundColor: Colors.black,
-                      minimumSize: const Size(double.infinity, 64),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                      elevation: 0,
-                    ),
-                    child: const Text('RESUME GAME', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, letterSpacing: 2)),
+              padding: const EdgeInsets.fromLTRB(28, 0, 28, 48),
+              child: Column(
+                children: [
+                  const Text(
+                    'LAST MAN STANDING WINS',
+                    style: TextStyle(color: Colors.white12, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 2),
                   ),
-                ),
+                  const SizedBox(height: 24),
+                  Container(
+                    width: double.infinity,
+                    height: 64,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(24),
+                      gradient: const LinearGradient(
+                        colors: [accentGold, Color(0xFFDAA520)],
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: accentGold.withOpacity(0.3),
+                          blurRadius: 20,
+                          offset: const Offset(0, 8),
+                        ),
+                      ],
+                    ),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: onClose,
+                        borderRadius: BorderRadius.circular(24),
+                        child: const Center(
+                          child: Text(
+                            'RESUME ACTION',
+                            style: TextStyle(
+                              color: Colors.black,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 2,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -187,95 +256,82 @@ class ScoreboardOverlay extends ConsumerWidget {
     );
   }
 
-  Widget _buildTotalRow(List<dynamic> players) {
+  Widget _buildAvatar(String name, bool isDanger) {
     return Container(
-      margin: const EdgeInsets.only(top: 16, bottom: 24),
-      padding: const EdgeInsets.all(16),
+      width: 56, height: 56,
       decoration: BoxDecoration(
-        gradient: LinearGradient(colors: [Colors.white.withOpacity(0.05), Colors.transparent]),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: accentGold.withOpacity(0.2)),
-      ),
-      child: Row(
-        children: [
-          const SizedBox(width: 70, child: Text('SCORE', style: TextStyle(color: accentGold, fontWeight: FontWeight.bold, fontSize: 12))),
-          ...players.map((p) => Expanded(
-            child: Center(
-              child: Text('${p.totalScore}', style: TextStyle(
-                  color: p.totalScore < 0 ? boxRed : Colors.white, fontSize: 26, fontWeight: FontWeight.w900,
-                  shadows: [if (p.totalScore >= 20) Shadow(color: accentGold.withOpacity(0.5), blurRadius: 10)]
-              )),
-            ),
-          )),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRaceTo31Indicators(List<dynamic> players) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('CHAMPIONSHIP PROGRESS', style: TextStyle(color: Colors.white24, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 2)),
-          const SizedBox(height: 16),
-          Row(
-            children: players.map((p) {
-               final score = (p.totalScore as int).clamp(0, 31);
-               final double progress = score / 31.0;
-               final isNearWin = score >= 25;
-               
-               return Expanded(
-                 child: Padding(
-                   padding: const EdgeInsets.symmetric(horizontal: 5),
-                   child: Column(
-                     children: [
-                       Stack(
-                         children: [
-                           Container(height: 6, decoration: BoxDecoration(color: Colors.white10, borderRadius: BorderRadius.circular(3))),
-                           AnimatedContainer(
-                             duration: const Duration(seconds: 1),
-                             height: 6, width: progress * 100, // Approximation for flex
-                             decoration: BoxDecoration(
-                               gradient: LinearGradient(colors: isNearWin ? [Colors.orange, accentGold] : [accentGold, accentGold.withOpacity(0.4)]),
-                               borderRadius: BorderRadius.circular(3),
-                               boxShadow: [if (isNearWin) BoxShadow(color: accentGold.withOpacity(0.5), blurRadius: 8, spreadRadius: 1)],
-                             ),
-                           ),
-                         ],
-                       ),
-                       const SizedBox(height: 6),
-                       Text('${p.totalScore}/31', style: TextStyle(color: isNearWin ? accentGold : Colors.white24, fontSize: 10, fontWeight: FontWeight.bold)),
-                     ],
-                   ),
-                 ),
-               );
-            }).toList(),
+        shape: BoxShape.circle,
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: isDanger 
+            ? [dangerRed.withOpacity(0.6), dangerRed.withOpacity(0.2)]
+            : [accentGold.withOpacity(0.6), accentGold.withOpacity(0.2)],
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: (isDanger ? dangerRed : accentGold).withOpacity(0.2),
+            blurRadius: 15,
+            spreadRadius: 2,
           ),
         ],
+        border: Border.all(
+          color: (isDanger ? dangerRed : accentGold).withOpacity(0.4),
+          width: 2,
+        ),
+      ),
+      child: Center(
+        child: Text(
+          name.substring(0, 1).toUpperCase(),
+          style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900),
+        ),
       ),
     );
   }
 
-  Widget _buildLegend() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+  Widget _buildProgressBar(BuildContext context, double progress, bool isDanger) {
+    return Stack(
       children: [
-        _legendItem('WINS', Colors.lightGreenAccent),
-        _legendItem('PENALTY', boxRed),
-        _legendItem('STATS', Colors.white24),
+        Container(
+          height: 12,
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.05),
+            borderRadius: BorderRadius.circular(6),
+          ),
+        ),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            return AnimatedContainer(
+              duration: const Duration(milliseconds: 1200),
+              curve: Curves.elasticOut,
+              height: 12,
+              width: constraints.maxWidth * progress,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: isDanger 
+                    ? [dangerRed.withOpacity(0.8), dangerRed]
+                    : [const Color(0xFFFFF700), accentGold],
+                ),
+                borderRadius: BorderRadius.circular(6),
+                boxShadow: [
+                  BoxShadow(
+                    color: (isDanger ? dangerRed : accentGold).withOpacity(0.5),
+                    blurRadius: 12,
+                    spreadRadius: 1,
+                  ),
+                ],
+              ),
+            );
+          }
+        ),
       ],
     );
   }
 
-  Widget _legendItem(String label, Color color) {
-    return Row(
-      children: [
-        Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
-        const SizedBox(width: 8),
-        Text(label, style: const TextStyle(color: Colors.white24, fontSize: 10, fontWeight: FontWeight.bold)),
-      ],
-    );
+  int _calculateTotalScore(String playerId, List<Map<String, dynamic>> results) {
+    return results
+      .where((r) => r['player_id'] == playerId)
+      .fold(0, (sum, item) => sum + (item['score'] as int));
   }
 }

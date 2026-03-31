@@ -101,9 +101,9 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
                      decoration: const BoxDecoration(
                        gradient: RadialGradient(
                          center: Alignment.center,
-                         radius: 0.8,
+                         radius: 1.2,
                          colors: [
-                           Color(0xFF0E4D2A), // Lighter center felt
+                           Color(0xFF105C31), // Spotlight center
                            Color(0xFF062A14), // Darker edge felt
                          ],
                        ),
@@ -260,44 +260,70 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
       top: 0, left: 0, right: 0,
       child: ClipRRect(
         child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+          filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
           child: Container(
-            height: 60,
+            height: 64,
             padding: const EdgeInsets.symmetric(horizontal: 20),
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
-                colors: [Colors.black.withOpacity(0.7), Colors.black.withOpacity(0.3)],
+                colors: [Colors.black.withOpacity(0.8), Colors.black.withOpacity(0.5)],
               ),
-              border: Border(bottom: BorderSide(color: Colors.white.withOpacity(0.05))),
+              border: Border(bottom: BorderSide(color: Colors.white.withOpacity(0.1), width: 0.5)),
             ),
             child: Row(
               children: [
                 if (room.trumpSuit != null) ...[
                   Container(
                     padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(color: Colors.white10, shape: BoxShape.circle),
-                    child: Text(_getSuitEmojiStatic(room.trumpSuit!), style: const TextStyle(fontSize: 18)),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.08), 
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white10),
+                    ),
+                    child: Text(_getSuitEmojiStatic(room.trumpSuit!), style: const TextStyle(fontSize: 20)),
                   ),
-                  const SizedBox(width: 10),
-                  Text('Trump: ${_getSuitName(room.trumpSuit!)}', style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.bold)),
-                ],
-                const Spacer(),
-                Text('ROUND ${room.currentRound ?? 1} — TRICK ${(playedCardsCount ~/ 4) + 1}', 
-                  style: const TextStyle(color: accentGold, fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 1.5)),
-                const Spacer(),
-                // Miniature Player Scores
-                ...players.map((p) => Padding(
-                  padding: const EdgeInsets.only(left: 12),
-                  child: Column(
+                  const SizedBox(width: 14),
+                  Column(
                     mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(p.name.substring(0, 2).toUpperCase(), style: const TextStyle(color: Colors.white38, fontSize: 9, fontWeight: FontWeight.bold)),
-                      Text('${p.totalScore}', style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w900)),
+                      Text(
+                        _getSuitName(room.trumpSuit!).toUpperCase(), 
+                        style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w900, letterSpacing: 1)
+                      ),
+                      const Text('TRUMP SUIT', style: TextStyle(color: Colors.white24, fontSize: 8, fontWeight: FontWeight.bold)),
                     ],
                   ),
-                )),
+                ],
+                const Spacer(),
+                Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text('ROUND ${room.currentRound ?? 1}', 
+                      style: const TextStyle(color: Colors.white38, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
+                    Text('TRICK ${(playedCardsCount ~/ 4) + 1} / 13', 
+                      style: const TextStyle(color: accentGold, fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 1)),
+                  ],
+                ),
+                const Spacer(),
+                // Miniature Player Scores
+                ...players.map((p) {
+                   final isLeader = players.every((other) => p.totalScore >= other.totalScore);
+                   return Padding(
+                    padding: const EdgeInsets.only(left: 16),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(p.name.substring(0, 2).toUpperCase(), 
+                          style: TextStyle(color: isLeader ? accentGold : Colors.white24, fontSize: 9, fontWeight: FontWeight.bold)),
+                        Text('${p.totalScore}', 
+                          style: TextStyle(color: isLeader ? accentGold : Colors.white, fontSize: 15, fontWeight: FontWeight.w900)),
+                      ],
+                    ),
+                  );
+                }),
               ],
             ),
           ),
@@ -439,27 +465,10 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
             Stack(
               clipBehavior: Clip.none,
               children: [
-                // Avatar Circle with Pulse
+                // Rhythmic Pulse Animation
                 TweenAnimationBuilder<double>(
                   tween: Tween(begin: 0.0, end: isTurn ? 1.0 : 0.0),
-                  duration: const Duration(milliseconds: 1500),
-                  builder: (context, value, child) {
-                    return Container(
-                      width: 70 + (value * 8), height: 70 + (value * 8),
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          if (isTurn)
-                            BoxShadow(
-                              color: accentGold.withOpacity(0.3 * value),
-                              blurRadius: 20 * value,
-                              spreadRadius: 4 * value,
-                            ),
-                        ],
-                      ),
-                      child: child,
-                    );
-                  },
+                  duration: const Duration(seconds: 1),
                   child: Container(
                     width: 70, height: 70,
                     decoration: BoxDecoration(
@@ -467,12 +476,19 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
                       gradient: LinearGradient(
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
-                        colors: [color.withOpacity(0.4), color.withOpacity(0.1)],
+                        colors: [color.withOpacity(0.5), color.withOpacity(0.1)],
                       ),
                       border: Border.all(
                         color: isTurn ? accentGold : Colors.white10,
                         width: isTurn ? 3 : 1,
                       ),
+                      boxShadow: [
+                         BoxShadow(
+                           color: Colors.black.withOpacity(0.3),
+                           blurRadius: 10,
+                           offset: const Offset(0, 4),
+                         ),
+                      ],
                     ),
                     child: Center(
                       child: Text(
@@ -481,6 +497,26 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
                       ),
                     ),
                   ),
+                  builder: (context, value, child) {
+                    return Stack(
+                      alignment: Alignment.center,
+                      children: [
+                         if (isTurn)
+                           Container(
+                             width: 70 + (value * 20),
+                             height: 70 + (value * 20),
+                             decoration: BoxDecoration(
+                               shape: BoxShape.circle,
+                               border: Border.all(
+                                 color: accentGold.withOpacity(0.5 * (1 - value).clamp(0.0, 1.0)),
+                                 width: 2,
+                               ),
+                             ),
+                           ),
+                         child!,
+                      ],
+                    );
+                  },
                 ),
 
                 // Dealer Badge
@@ -488,33 +524,33 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
                   Positioned(
                     right: -2, top: -2,
                     child: Container(
-                      width: 24, height: 24,
+                      width: 26, height: 26,
                       decoration: BoxDecoration(
-                        color: const Color(0xFFE5B84B), 
+                        gradient: const LinearGradient(colors: [Color(0xFFE5B84B), Color(0xFFBF8F00)]),
                         shape: BoxShape.circle, 
                         border: Border.all(color: Colors.black, width: 2),
-                        boxShadow: const [BoxShadow(color: Colors.black45, blurRadius: 4)],
+                        boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 4)],
                       ),
-                      child: const Center(child: Text('D', style: TextStyle(color: Colors.black, fontSize: 11, fontWeight: FontWeight.w900))),
+                      child: const Center(child: Text('D', style: TextStyle(color: Colors.black, fontSize: 13, fontWeight: FontWeight.w900))),
                     ),
                   ),
               ],
             ),
             const SizedBox(height: 12),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
               decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.4),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.white.withOpacity(0.05)),
+                color: isTurn ? accentGold.withOpacity(0.2) : Colors.black.withOpacity(0.6),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: isTurn ? accentGold.withOpacity(0.4) : Colors.white12),
               ),
               child: Text(
-                player.name.split(' ').first,
+                player.name.toUpperCase(),
                 style: TextStyle(
-                  color: isTurn ? accentGold : Colors.white70,
+                  color: isTurn ? accentGold : Colors.white60,
                   fontSize: 10,
-                  fontWeight: isTurn ? FontWeight.bold : FontWeight.normal,
-                  letterSpacing: 0.5,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 1,
                 ),
               ),
             ),
@@ -1141,10 +1177,15 @@ class PlayedCardWidget extends StatelessWidget {
                        decoration: BoxDecoration(
                          boxShadow: [
                            BoxShadow(
-                             color: Colors.black.withOpacity(0.4 * (1.0 - winValue)),
-                             blurRadius: 15,
-                             spreadRadius: 2,
-                             offset: Offset(5 * (1.0 - value), 10 * (1.0 - value)),
+                             color: Colors.black.withOpacity(0.6 * (1.0 - winValue)),
+                             blurRadius: 25,
+                             spreadRadius: 4,
+                             offset: Offset(8 * (1.0 - value), 14 * (1.0 - value)),
+                           ),
+                           BoxShadow(
+                             color: accentGold.withOpacity(0.12 * (1.0 - winValue)),
+                             blurRadius: 10,
+                             spreadRadius: 1,
                            ),
                          ],
                        ),
