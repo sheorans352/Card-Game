@@ -152,6 +152,7 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
                                   ref.invalidate(playedCardsProvider(room.id));
                                   ref.invalidate(playersStreamProvider(room.id));
                                   ref.invalidate(playerHandProvider(localPlayerId!));
+                                  ref.read(pendingCardPlayProvider.notifier).state = {};
                                 }
                               }
                             },
@@ -829,8 +830,8 @@ class _CardsLayerState extends ConsumerState<CardsLayer> {
               // Optimistically hide from hand
               ref.read(pendingCardPlayProvider.notifier).update((state) => {...state, cardId});
               
-              // === ANTI-LOCK TIMEOUT (3s) ===
-              Future.delayed(const Duration(seconds: 3), () {
+              // === ANTI-LOCK TIMEOUT (8s) ===
+              Future.delayed(const Duration(seconds: 8), () {
                 if (mounted) {
                   ref.read(pendingCardPlayProvider.notifier).update((s) => s.where((id) => id != cardId).toSet());
                 }
