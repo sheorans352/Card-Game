@@ -128,20 +128,51 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
                     _buildTrumpHUD(room.trumpSuit!, room, playedCardsCount),
 
                   // Scoreboard Button (Top Right)
+                  // Top-Right Utility Buttons
                   Positioned(
                     top: MediaQuery.of(context).padding.top + 10,
                     right: 20,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Colors.black38,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: accentGold.withOpacity(0.5)),
-                      ),
-                      child: IconButton(
-                        onPressed: () => setState(() => _showScoreboard = true),
-                        icon: const Icon(Icons.leaderboard_rounded, color: accentGold, size: 28),
-                        tooltip: 'Scoreboard',
-                      ),
+                    child: Row(
+                      children: [
+                        // Sync Button
+                        Container(
+                          margin: const EdgeInsets.only(right: 12),
+                          decoration: BoxDecoration(
+                            color: Colors.black38,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white12),
+                          ),
+                          child: IconButton(
+                            onPressed: () {
+                              final roomCode = ref.read(currentRoomCodeProvider);
+                              if (roomCode != null) {
+                                final room = ref.read(roomMetadataProvider(roomCode)).value;
+                                if (room != null) {
+                                  ref.invalidate(roomMetadataProvider(roomCode));
+                                  ref.invalidate(playedCardsProvider(room.id));
+                                  ref.invalidate(playersStreamProvider(room.id));
+                                  ref.invalidate(playerHandProvider(localPlayerId!));
+                                }
+                              }
+                            },
+                            icon: const Icon(Icons.sync_rounded, color: Colors.white54, size: 24),
+                            tooltip: 'Force Sync',
+                          ),
+                        ),
+                        // Scoreboard Button
+                        Container(
+                          decoration: BoxDecoration(
+                            color: Colors.black38,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: accentGold.withOpacity(0.5)),
+                          ),
+                          child: IconButton(
+                            onPressed: () => setState(() => _showScoreboard = true),
+                            icon: const Icon(Icons.leaderboard_rounded, color: accentGold, size: 28),
+                            tooltip: 'Scoreboard',
+                          ),
+                        ),
+                      ],
                     ),
                   ),
 
@@ -705,7 +736,7 @@ class _CardsLayerState extends ConsumerState<CardsLayer> {
            _lastTrickCount = playedMaps.length;
            
            if (isTrickFinished) {
-              Future.delayed(const Duration(milliseconds: 1500), () {
+              Future.delayed(const Duration(milliseconds: 800), () {
                 if (mounted) setState(() => _forceHideTrick = true);
               });
            }
@@ -797,6 +828,14 @@ class _CardsLayerState extends ConsumerState<CardsLayer> {
               gameAudio.playCardPlay();
               // Optimistically hide from hand
               ref.read(pendingCardPlayProvider.notifier).update((state) => {...state, cardId});
+              
+              // === ANTI-LOCK TIMEOUT (3s) ===
+              Future.delayed(const Duration(seconds: 3), () {
+                if (mounted) {
+                  ref.read(pendingCardPlayProvider.notifier).update((s) => s.where((id) => id != cardId).toSet());
+                }
+              });
+
               try {
                 await ref.read(cardServiceProvider).playCard(roomId, localPlayerId, cardId);
               } catch (e) {

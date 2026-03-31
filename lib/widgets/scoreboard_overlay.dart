@@ -22,6 +22,9 @@ class ScoreboardOverlay extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final resultsAsync = ref.watch(roundResultsProvider(roomId));
+    final roomAsync = ref.watch(roomMetadataByIdProvider(roomId));
+
+    final currentRound = roomAsync.value?.currentRound ?? 1;
 
     return Container(
       decoration: BoxDecoration(
@@ -38,7 +41,7 @@ class ScoreboardOverlay extends ConsumerWidget {
           ),
           const SizedBox(height: 4),
           const Text(
-            'Race to 31 — Rounds 1 to 5',
+            'Race to 31',
             style: TextStyle(color: Colors.white38, fontSize: 13),
           ),
           const SizedBox(height: 30),
@@ -70,26 +73,21 @@ class ScoreboardOverlay extends ConsumerWidget {
                   return const Center(child: Text('No rounds completed yet', style: TextStyle(color: Colors.white30)));
                 }
 
-                // Group results by round_number
-                final Map<int, List<dynamic>> grouped = {};
-                for (var r in results) {
-                  final rd = r['round_number'] as int;
-                  grouped.putIfAbsent(rd, () => []).add(r);
-                }
-
-                final roundNumbers = grouped.keys.toList()..sort((a, b) => b.compareTo(a));
-
+                // Logic: Show rows from currentRound down to 1
                 return ListView.builder(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: roundNumbers.length + 1, // +1 for TOTAL row
+                  itemCount: currentRound + 1, // +1 for TOTAL row
                   itemBuilder: (context, index) {
-                    if (index == roundNumbers.length) {
+                    if (index == currentRound) {
                        return _buildTotalRow(players);
                     }
 
-                    final rdNum = roundNumbers[index];
-                    final rdResults = grouped[rdNum]!;
+                    final rdNum = currentRound - index;
+                    final isCurrentRound = rdNum == currentRound;
                     
+                    // Group results by round_number for historical rows
+                    final historicalResults = results.where((r) => r['round_number'] == rdNum).toList();
+
                     return Container(
                       padding: const EdgeInsets.symmetric(vertical: 8),
                       child: Row(
@@ -98,42 +96,71 @@ class ScoreboardOverlay extends ConsumerWidget {
                             width: 80, 
                             child: Row(
                               children: [
-                                Text('R$rdNum', style: const TextStyle(color: Colors.white24, fontSize: 14)),
-                                if (rdNum == roundNumbers.first) const Icon(Icons.arrow_left, color: accentGold, size: 20),
+                                Text('R$rdNum', style: TextStyle(
+                                  color: isCurrentRound ? accentGold : Colors.white24, 
+                                  fontSize: 14,
+                                  fontWeight: isCurrentRound ? FontWeight.bold : FontWeight.normal,
+                                )),
+                                if (isCurrentRound) const Icon(Icons.play_arrow_rounded, color: accentGold, size: 20),
                               ],
                             ),
                           ),
                           ...players.map((p) {
-                            final res = rdResults.firstWhere((r) => r['player_id'] == p.id, orElse: () => null);
-                            if (res == null) return const Expanded(child: SizedBox());
-                            
-                            final points = res['points_earned'] ?? 0;
-                            final isNegative = points < 0;
+                            if (isCurrentRound) {
+                               // ACTIVE ROUND stats: tricks / bid
+                               return Expanded(
+                                 child: Container(
+                                   margin: const EdgeInsets.all(4),
+                                   padding: const EdgeInsets.symmetric(vertical: 8),
+                                   decoration: BoxDecoration(
+                                     color: accentGold.withOpacity(0.05),
+                                     borderRadius: BorderRadius.circular(8),
+                                     border: Border.all(color: accentGold.withOpacity(0.2)),
+                                   ),
+                                   child: Column(
+                                     children: [
+                                       Text(
+                                         '${p.tricksWon}/${p.bid ?? "?"}',
+                                         style: const TextStyle(color: accentGold, fontWeight: FontWeight.w900, fontSize: 18),
+                                       ),
+                                       const Text('CURRENT', style: TextStyle(color: accentGold, fontSize: 8, fontWeight: FontWeight.bold)),
+                                     ],
+                                   ),
+                                 ),
+                               );
+                            } else {
+                                // HISTORICAL ROUND points
+                                final res = historicalResults.firstWhere((r) => r['player_id'] == p.id, orElse: () => null);
+                                if (res == null) return const Expanded(child: SizedBox());
+                                
+                                final points = res['points_earned'] ?? 0;
+                                final isNegative = points < 0;
 
-                            return Expanded(
-                              child: Container(
-                                margin: const EdgeInsets.all(4),
-                                padding: const EdgeInsets.symmetric(vertical: 8),
-                                decoration: BoxDecoration(
-                                  color: isNegative ? boxRed.withOpacity(0.15) : Colors.white.withOpacity(0.05),
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(color: isNegative ? boxRed.withOpacity(0.3) : Colors.white10),
-                                ),
-                                child: Column(
-                                  children: [
-                                    Text(
-                                      '${points >= 0 ? "+" : ""}$points',
-                                      style: TextStyle(
-                                        color: isNegative ? boxRed : Colors.lightGreenAccent,
-                                        fontWeight: FontWeight.w900,
-                                        fontSize: 18,
-                                      ),
+                                return Expanded(
+                                  child: Container(
+                                    margin: const EdgeInsets.all(4),
+                                    padding: const EdgeInsets.symmetric(vertical: 8),
+                                    decoration: BoxDecoration(
+                                      color: isNegative ? boxRed.withOpacity(0.15) : Colors.white.withOpacity(0.05),
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(color: isNegative ? boxRed.withOpacity(0.3) : Colors.white10),
                                     ),
-                                    Text('${res['tricks_won']}/${res['bid']}', style: TextStyle(color: Colors.white38, fontSize: 9)),
-                                  ],
-                                ),
-                              ),
-                            );
+                                    child: Column(
+                                      children: [
+                                        Text(
+                                          '$points',
+                                          style: TextStyle(
+                                            color: isNegative ? boxRed : Colors.lightGreenAccent,
+                                            fontWeight: FontWeight.w900,
+                                            fontSize: 18,
+                                          ),
+                                        ),
+                                        Text('${res['tricks_won']}/${res['bid']}', style: TextStyle(color: Colors.white38, fontSize: 9)),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                            }
                           }),
                         ],
                       ),
@@ -196,7 +223,14 @@ class ScoreboardOverlay extends ConsumerWidget {
                 border: Border.all(color: accentGold.withOpacity(0.3)),
               ),
               child: Center(
-                child: Text('${p.totalScore}', style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900)),
+                child: Text(
+                  '${p.totalScore}', 
+                  style: TextStyle(
+                    color: p.totalScore < 0 ? boxRed : Colors.white,
+                    fontSize: 24, 
+                    fontWeight: FontWeight.w900
+                  )
+                ),
               ),
             ),
           )),
@@ -249,9 +283,9 @@ class ScoreboardOverlay extends ConsumerWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          _legendItem('+5', 'Bid met or exceeded', Colors.lightGreenAccent),
-          _legendItem('-7', 'Bid missed (deducted)', boxRed),
-          _legendItem('4/6', 'Tricks taken / bid', Colors.white38),
+          _legendItem('POINTS', 'Bid met (Green)', Colors.lightGreenAccent),
+          _legendItem('PENALTY', 'Bid missed (Red/-)', boxRed),
+          _legendItem('STATS', 'Tricks / Bid', Colors.white38),
         ],
       ),
     );
