@@ -68,7 +68,13 @@ final playersStreamProvider = StreamProvider.family<List<Player>, String>((ref, 
       .eq('room_id', roomId)
       .map((data) {
         final sorted = List<Map<String, dynamic>>.from(data);
-        sorted.sort((a, b) => (a['joined_at']?.toString() ?? '').compareTo(b['joined_at']?.toString() ?? ''));
+        sorted.sort((a, b) {
+          final timeA = a['joined_at']?.toString() ?? '';
+          final timeB = b['joined_at']?.toString() ?? '';
+          final res = timeA.compareTo(timeB);
+          if (res != 0) return res;
+          return (a['id']?.toString() ?? '').compareTo(b['id']?.toString() ?? '');
+        });
         return sorted.map<Player>((p) => Player.fromJson(p)).toList();
       })
       .handleError((error) {
@@ -96,7 +102,13 @@ final playedCardsProvider = StreamProvider.family<List<Map<String, dynamic>>, St
       .eq('room_id', roomId)
       .map((data) {
         final sorted = data.map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e)).toList();
-        sorted.sort((a, b) => (a['played_at'] as String).compareTo(b['played_at'] as String));
+        sorted.sort((a, b) {
+          final timeA = a['played_at'] as String;
+          final timeB = b['played_at'] as String;
+          final res = timeA.compareTo(timeB);
+          if (res != 0) return res;
+          return (a['id'] as String).compareTo(b['id'] as String);
+        });
         return sorted;
       })
       .handleError((error) {
