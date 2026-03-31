@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'dart:async';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/room_provider.dart';
@@ -271,33 +272,35 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
               ),
               border: Border(bottom: BorderSide(color: Colors.white.withOpacity(0.05))),
             ),
-        child: Row(
-          children: [
-            if (room.trumpSuit != null) ...[
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(color: Colors.white10, shape: BoxShape.circle),
-                child: Text(_getSuitEmojiStatic(room.trumpSuit!), style: const TextStyle(fontSize: 18)),
-              ),
-              const SizedBox(width: 10),
-              Text('Trump: ${_getSuitName(room.trumpSuit!)}', style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.bold)),
-            ],
-            const Spacer(),
-            Text('ROUND ${room.currentRound ?? 1} — TRICK ${(playedCardsCount ~/ 4) + 1}', 
-              style: const TextStyle(color: accentGold, fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 1.5)),
-            const Spacer(),
-            // Miniature Player Scores
-            ...players.map((p) => Padding(
-              padding: const EdgeInsets.only(left: 12),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(p.name.substring(0, 2).toUpperCase(), style: const TextStyle(color: Colors.white38, fontSize: 9, fontWeight: FontWeight.bold)),
-                  Text('${p.totalScore}', style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w900)),
+            child: Row(
+              children: [
+                if (room.trumpSuit != null) ...[
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(color: Colors.white10, shape: BoxShape.circle),
+                    child: Text(_getSuitEmojiStatic(room.trumpSuit!), style: const TextStyle(fontSize: 18)),
+                  ),
+                  const SizedBox(width: 10),
+                  Text('Trump: ${_getSuitName(room.trumpSuit!)}', style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.bold)),
                 ],
-              ),
-            )),
-          ],
+                const Spacer(),
+                Text('ROUND ${room.currentRound ?? 1} — TRICK ${(playedCardsCount ~/ 4) + 1}', 
+                  style: const TextStyle(color: accentGold, fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 1.5)),
+                const Spacer(),
+                // Miniature Player Scores
+                ...players.map((p) => Padding(
+                  padding: const EdgeInsets.only(left: 12),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(p.name.substring(0, 2).toUpperCase(), style: const TextStyle(color: Colors.white38, fontSize: 9, fontWeight: FontWeight.bold)),
+                      Text('${p.totalScore}', style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w900)),
+                    ],
+                  ),
+                )),
+              ],
+            ),
+          ),
         ),
       ),
     );

@@ -222,12 +222,12 @@ final playableCardsProvider = Provider.family<Set<String>, String>((ref, roomId)
     for (var m in currentTrick) {
       final cVal = m['card_value'] as String;
       if (cVal.endsWith(leadSuit)) {
-        final r = _getRankValue(cVal.substring(0, cVal.length - 1));
+        final r = Player.getRankValue(cVal.substring(0, cVal.length - 1));
         if (r > highestRank) highestRank = r;
       }
     }
     
-    final winners = cardsOfLeadSuit.where((c) => Player._getRankValue(c) > highestRank).toList();
+    final winners = cardsOfLeadSuit.where((c) => Player.getRankValue(c) > highestRank).toList();
     if (winners.isNotEmpty) return winners.toSet(); // Forced to win if possible
     return cardsOfLeadSuit.toSet(); // Must follow suit
   }
@@ -238,7 +238,7 @@ final playableCardsProvider = Provider.family<Set<String>, String>((ref, roomId)
 
 
 
-int _getRankValue(String v) => Player._getRankValue(v);
+int _getRankValue(String v) => Player.getRankValue(v);
 
 final isLocalPlayerTurnProvider = Provider.family<bool, String>((ref, code) {
   final room = ref.watch(roomMetadataProvider(code)).value;

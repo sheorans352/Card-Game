@@ -188,7 +188,7 @@ class Player {
     final trump = (trumpSuit ?? 'S').toUpperCase();
 
     String winnerId = playedCards.first['player_id'];
-    int bestRank = _getRankValue(leadCard);
+    int bestRank = getRankValue(leadCard);
     String bestSuit = leadSuit;
 
     // 2. Compare subsequent cards
@@ -196,7 +196,7 @@ class Player {
        final card = playedCards[i]['card_value'] as String;
        final playerId = playedCards[i]['player_id'] as String;
        final suit = card.substring(card.length - 1);
-       final rank = _getRankValue(card);
+       final rank = getRankValue(card);
 
        bool isTrump = suit == trump;
        bool isBestTrump = bestSuit == trump;
@@ -222,7 +222,7 @@ class Player {
     return winnerId;
   }
 
-  static int _getRankValue(String cardOrRank) {
+  static int getRankValue(String cardOrRank) {
     // Handle both "AS" and "A"
     final value = cardOrRank.length > 1 && !RegExp(r'^\d+$').hasMatch(cardOrRank)
         ? cardOrRank.substring(0, cardOrRank.length - 1)
