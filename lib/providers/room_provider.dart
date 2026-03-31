@@ -137,12 +137,21 @@ final playableCardsProvider = Provider.family<Set<String>, String>((ref, roomId)
   final players = ref.watch(playersStreamProvider(room.id)).value;
   if (players == null || players.isEmpty) return {};
 
-  // === TURN CHECK ===
-  final isTurn = players[room.turnIndex % players.length].id == localId;
-  if (!isTurn) return {};
-
   final hand = ref.watch(playerHandProvider(localId)).value ?? [];
   final playedCards = ref.watch(playedCardsProvider(room.id)).value ?? [];
+  
+  // === TURN CHECK (Predictive) ===
+  bool isTurn = false;
+  if (playedCards.isNotEmpty && playedCards.length % 4 == 0) {
+    final lastTrick = playedCards.sublist(playedCards.length - 4);
+    final winnerId = Player.evaluateTrickWinner(lastTrick, room.trumpSuit, players);
+    isTurn = winnerId == localId;
+  } else {
+    isTurn = players[room.turnIndex % players.length].id == localId;
+  }
+  
+  if (!isTurn) return {};
+  
   final cardsInHand = hand.map((c) => c['card_value'] as String).toList();
   
   // Trick Logic
@@ -202,6 +211,15 @@ final isLocalPlayerTurnProvider = Provider.family<bool, String>((ref, code) {
     if (room.status == 'bidding_2' && room.highestBidderId != null && localId == room.highestBidderId) {
       return false;
     }
+    
+    // PREDICTIVE TURN LOGIC: If a trick just finished (count % 4 == 0), calculate winner locally
+    final playedCards = ref.watch(playedCardsProvider(room.id)).value ?? [];
+    if (room.status == 'playing' && playedCards.isNotEmpty && playedCards.length % 4 == 0) {
+      final lastTrick = playedCards.sublist(playedCards.length - 4);
+      final winnerId = Player.evaluateTrickWinner(lastTrick, room.trumpSuit, players);
+      return winnerId == localId;
+    }
+
     final currentPlayer = players[room.turnIndex % players.length];
     return currentPlayer.id == localId;
   }

@@ -178,4 +178,55 @@ class Player {
       totalScore: totalScore ?? this.totalScore,
     );
   }
+
+  static String? evaluateTrickWinner(List<Map<String, dynamic>> playedCards, String? trumpSuit, List<Player> players) {
+    if (playedCards.length < 4) return null;
+    
+    // The lead card is the first chronologically (index 0)
+    final leadCard = playedCards.first['card_value'] as String;
+    final leadSuit = leadCard.substring(leadCard.length - 1);
+    final trump = (trumpSuit ?? 'S').toUpperCase();
+
+    String winnerId = playedCards.first['player_id'];
+    int bestRank = _getRankValue(leadCard);
+    String bestSuit = leadSuit;
+
+    for (var i = 1; i < playedCards.length; i++) {
+       final card = playedCards[i]['card_value'] as String;
+       final playerId = playedCards[i]['player_id'] as String;
+       final suit = card.substring(card.length - 1);
+       final rank = _getRankValue(card);
+
+       bool isTrump = suit == trump;
+       bool isBestTrump = bestSuit == trump;
+       bool isLead = suit == leadSuit;
+
+       if (isTrump) {
+         if (!isBestTrump || rank > bestRank) {
+           winnerId = playerId;
+           bestRank = rank;
+           bestSuit = suit;
+         }
+       } else if (!isBestTrump && isLead) {
+         if (rank > bestRank) {
+           winnerId = playerId;
+           bestRank = rank;
+           bestSuit = suit;
+         }
+       }
+    }
+    return winnerId;
+  }
+
+  static int _getRankValue(String card) {
+    final value = card.substring(0, card.length - 1);
+    switch (value) {
+      case 'A': return 14;
+      case 'K': return 13;
+      case 'Q': return 12;
+      case 'J': return 11;
+      case '10': return 10;
+      default: return int.tryParse(value) ?? 0;
+    }
+  }
 }
