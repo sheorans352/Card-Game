@@ -242,18 +242,18 @@ final playableCardsProvider = Provider.family<Set<String>, String>((ref, roomId)
   
   final currentTrick = cards.sublist(cards.length - trickSize);
   final leadCard = currentTrick.first['card_value'] as String;
-  final leadSuit = leadCard.substring(leadCard.length - 1);
+  final leadSuit = CardModel.getSuit(leadCard);
   final trumpSuit = room.trumpSuit;
 
   // 1. Must follow suit
-  final cardsOfLeadSuit = cardsInHand.where((c) => c.endsWith(leadSuit)).toList();
+  final cardsOfLeadSuit = cardsInHand.where((c) => CardModel.getSuit(c) == leadSuit).toList();
   
   if (cardsOfLeadSuit.isNotEmpty) {
     // 2. MUST WIN RULE (Contextual)
     // If a trick is already "cut" by a TRUMP (that is not the lead suit), 
     // we don't force windows of lead suit because they can't win anyway.
-    final trump = trumpSuit ?? 'S';
-    final isTrickTrumped = currentTrick.any((m) => (m['card_value'] as String).endsWith(trump));
+    final trump = (trumpSuit ?? 'S').toUpperCase().trim();
+    final isTrickTrumped = currentTrick.any((m) => CardModel.getSuit(m['card_value'] as String) == trump);
     final leadIsTrump = leadSuit == trump;
 
     if (isTrickTrumped && !leadIsTrump) {
@@ -265,13 +265,13 @@ final playableCardsProvider = Provider.family<Set<String>, String>((ref, roomId)
     int highestRank = 0;
     for (var m in currentTrick) {
       final cVal = m['card_value'] as String;
-      if (cVal.endsWith(leadSuit)) {
-        final r = Player.getRankValue(cVal);
+      if (CardModel.getSuit(cVal) == leadSuit) {
+        final r = CardModel.getRankValue(cVal);
         if (r > highestRank) highestRank = r;
       }
     }
     
-    final winners = cardsOfLeadSuit.where((c) => Player.getRankValue(c) > highestRank).toList();
+    final winners = cardsOfLeadSuit.where((c) => CardModel.getRankValue(c) > highestRank).toList();
     if (winners.isNotEmpty) return winners.toSet(); // Forced to win if possible
     return cardsOfLeadSuit.toSet(); // Must follow suit
   }
@@ -288,11 +288,11 @@ final playableCardsProvider = Provider.family<Set<String>, String>((ref, roomId)
     }
   }
 
-  final playerTrumps = cardsInHand.where((c) => c.endsWith(trump)).toList();
-  final playerDiscards = cardsInHand.where((c) => !c.endsWith(trump)).toList();
+  final playerTrumps = cardsInHand.where((c) => CardModel.getSuit(c) == trump).toList();
+  final playerDiscards = cardsInHand.where((c) => CardModel.getSuit(c) != trump).toList();
   
   // Identify trumps that can overtrump the current highest trump
-  final overTrumps = playerTrumps.where((c) => Player.getRankValue(c) > highestTrumpInTrick).toList();
+  final overTrumps = playerTrumps.where((c) => CardModel.getRankValue(c) > highestTrumpInTrick).toList();
   
   if (playerTrumps.isNotEmpty) {
      if (overTrumps.isNotEmpty) {

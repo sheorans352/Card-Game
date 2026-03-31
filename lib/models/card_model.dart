@@ -8,8 +8,9 @@ enum Suit {
   const Suit(this.code);
 
   static Suit fromCode(String code) {
+    final cleanCode = code.trim().toUpperCase();
     return Suit.values.firstWhere(
-      (e) => e.code.toUpperCase() == code.toUpperCase(),
+      (e) => e.code == cleanCode,
       orElse: () => Suit.spades,
     );
   }
@@ -28,21 +29,39 @@ class CardModel {
 
   String get id => '$value${suit.code}';
 
-  static CardModel fromId(String id) {
-    final value = id.substring(0, id.length - 1);
-    final suitCode = id.substring(id.length - 1);
-    final suit = Suit.fromCode(suitCode);
-    
-    int rank;
-    switch (value) {
-      case 'A': rank = 14; break;
-      case 'K': rank = 13; break;
-      case 'Q': rank = 12; break;
-      case 'J': rank = 11; break;
-      default: rank = int.parse(value);
-    }
+  static String getSuit(String cardId) {
+    final clean = cardId.trim().toUpperCase();
+    if (clean.isEmpty) return 'S';
+    return clean.substring(clean.length - 1);
+  }
 
-    return CardModel(suit: suit, value: value, rank: rank);
+  static int getRankValue(String cardId) {
+    final clean = cardId.trim().toUpperCase();
+    if (clean.isEmpty) return 0;
+    
+    // Extract the rank portion (everything but the last character)
+    final rankStr = clean.substring(0, clean.length - 1);
+    
+    switch (rankStr) {
+      case 'A': return 14;
+      case 'K': return 13;
+      case 'Q': return 12;
+      case 'J': return 11;
+      case '10': return 10;
+      default: return int.tryParse(rankStr) ?? 0;
+    }
+  }
+
+  static CardModel fromId(String id) {
+    final suitCode = getSuit(id);
+    final value = id.trim().toUpperCase().substring(0, id.trim().length - 1);
+    final rank = getRankValue(id);
+    
+    return CardModel(
+      suit: Suit.fromCode(suitCode),
+      value: value,
+      rank: rank,
+    );
   }
 
   @override

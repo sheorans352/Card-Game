@@ -182,21 +182,21 @@ class Player {
   static String? evaluateTrickWinner(List<Map<String, dynamic>> playedCards, String? trumpSuit, List<Player> players) {
     if (playedCards.length < 4) return null;
     
-    // 1. Identify Lead Suit (from the first card played in this trick/batch of 4)
+    // 1. Identify Lead Suit (normalized)
     final leadCard = playedCards.first['card_value'] as String;
-    final leadSuit = leadCard.substring(leadCard.length - 1);
-    final trump = (trumpSuit ?? 'S').toUpperCase();
+    final leadSuit = CardModel.getSuit(leadCard);
+    final trump = (trumpSuit ?? 'S').toUpperCase().trim();
 
     String winnerId = playedCards.first['player_id'];
-    int bestRank = getRankValue(leadCard);
+    int bestRank = CardModel.getRankValue(leadCard);
     String bestSuit = leadSuit;
 
     // 2. Compare subsequent cards
     for (var i = 1; i < playedCards.length; i++) {
        final card = playedCards[i]['card_value'] as String;
        final playerId = playedCards[i]['player_id'] as String;
-       final suit = card.substring(card.length - 1);
-       final rank = getRankValue(card);
+       final suit = CardModel.getSuit(card);
+       final rank = CardModel.getRankValue(card);
 
        bool isTrump = suit == trump;
        bool isBestTrump = bestSuit == trump;
@@ -222,19 +222,5 @@ class Player {
     return winnerId;
   }
 
-  static int getRankValue(String cardOrRank) {
-    // Handle both "AS" and "A"
-    final value = cardOrRank.length > 1 && !RegExp(r'^\d+$').hasMatch(cardOrRank)
-        ? cardOrRank.substring(0, cardOrRank.length - 1)
-        : cardOrRank;
-    
-    switch (value) {
-      case 'A': return 14;
-      case 'K': return 13;
-      case 'Q': return 12;
-      case 'J': return 11;
-      case '10': return 10;
-      default: return int.tryParse(value) ?? 0;
-    }
-  }
+  static int getRankValue(String cardOrRank) => CardModel.getRankValue(cardOrRank);
 }
