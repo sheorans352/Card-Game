@@ -885,7 +885,8 @@ class _CardsLayerState extends ConsumerState<CardsLayer> {
       }).toList();
       
       for (var i = 0; i < visibleHand.length; i++) {
-        final cardId = visibleHand[i]['card_value'] as String;
+        final rawCardId = visibleHand[i]['card_value'] as String;
+        final cardId = rawCardId.trim().toUpperCase();
         final isPlayable = playableIds.contains(cardId); // Global lock removed for trick transition
         
         handWidgets.add(

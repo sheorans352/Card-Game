@@ -232,7 +232,7 @@ final playableCardsProvider = Provider.family<Set<String>, String>((ref, roomId)
   final currentTurnId = ref.watch(predictiveTurnIdProvider(roomId));
   if (currentTurnId != localId) return {};
   
-  final cardsInHand = hand.map((c) => c['card_value'] as String).toList();
+  final cardsInHand = hand.map((c) => (c['card_value'] as String).trim().toUpperCase()).toList();
   
   // Trick Logic
   final trickSize = cards.length % 4;
@@ -241,7 +241,7 @@ final playableCardsProvider = Provider.family<Set<String>, String>((ref, roomId)
   if (trickSize == 0) return cardsInHand.toSet(); 
   
   final currentTrick = cards.sublist(cards.length - trickSize);
-  final leadCard = currentTrick.first['card_value'] as String;
+  final leadCard = (currentTrick.first['card_value'] as String).trim().toUpperCase();
   final leadSuit = CardModel.getSuit(leadCard);
   final trumpSuit = room.trumpSuit;
 
@@ -281,9 +281,9 @@ final playableCardsProvider = Provider.family<Set<String>, String>((ref, roomId)
   final trump = (trumpSuit ?? 'S').toUpperCase().trim();
   int highestTrumpInTrick = 0;
   for (var m in currentTrick) {
-    final cVal = (m['card_value'] as String).trim();
-    if (cVal.endsWith(trump)) {
-      final r = Player.getRankValue(cVal);
+    final cVal = m['card_value'] as String;
+    if (CardModel.getSuit(cVal) == trump) {
+      final r = CardModel.getRankValue(cVal);
       if (r > highestTrumpInTrick) highestTrumpInTrick = r;
     }
   }
