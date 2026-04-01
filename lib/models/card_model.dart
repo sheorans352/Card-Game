@@ -64,6 +64,26 @@ class CardModel {
     );
   }
 
+  static String getSuitEmoji(String code) {
+    switch (code.trim().toUpperCase()) {
+      case 'S': return '♠';
+      case 'H': return '♥';
+      case 'D': return '♦';
+      case 'C': return '♣';
+      default: return '♠';
+    }
+  }
+
+  static String getSuitName(String code) {
+    switch (code.trim().toUpperCase()) {
+      case 'S': return 'Spades';
+      case 'H': return 'Hearts';
+      case 'D': return 'Diamonds';
+      case 'C': return 'Clubs';
+      default: return 'Spades';
+    }
+  }
+
   @override
   String toString() => id;
 }
