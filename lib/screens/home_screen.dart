@@ -24,12 +24,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final persistedName = ref.read(localPlayerNameProvider);
+      if (persistedName != null) {
+        _nameController.text = persistedName;
+      }
+    });
     _checkInitialSession();
   }
 
   Future<void> _checkInitialSession() async {
-    // If we have a room code in URL, prioritize it
-    final urlParams = Uri.base.queryParameters;
+    // Correctly handle both direct and hash-based URLs
+    final uri = Uri.parse(Uri.base.toString().replaceFirst('/#/', '/'));
+    final urlParams = uri.queryParameters;
     final urlCode = urlParams['room'] ?? urlParams['code'];
     
     if (urlCode != null) {
@@ -190,7 +197,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       ),
                       const SizedBox(height: 32),
 
-                      if (ref.watch(currentRoomCodeProvider) != null && ref.watch(localPlayerIdProvider) != null)
+                      if (ref.watch(currentRoomCodeProvider) != null && 
+                          ref.watch(localPlayerIdProvider) != null && 
+                          (Uri.base.queryParameters['room'] == null && Uri.base.queryParameters['code'] == null))
                         _buildRejoinButton(),
 
                       if (_isHostingTab) ...[
@@ -239,6 +248,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             ),
             child: const Text('Create Room & Get Link', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
           ),
+          if (ref.read(localPlayerNameProvider) != null)
+             Padding(
+               padding: const EdgeInsets.only(top: 16),
+               child: Center(
+                 child: Text('Welcome back, ${ref.read(localPlayerNameProvider)}!', 
+                   style: const TextStyle(color: Colors.white38, fontSize: 12, fontStyle: FontStyle.italic)),
+               ),
+             ),
         ],
       ),
     );
@@ -346,7 +363,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       final roomCode = result['roomCode']!;
       final playerId = result['playerId']!;
       
-      await ref.read(sessionProvider.notifier).saveSession(roomCode, playerId);
+      await ref.read(sessionProvider.notifier).saveSession(roomCode, playerId, name);
       if (mounted) {
         Navigator.of(context).push(MaterialPageRoute(builder: (context) => const LobbyScreen()));
       }
@@ -376,7 +393,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       );
       if (result != null) {
         final playerId = result['playerId']!;
-        await ref.read(sessionProvider.notifier).saveSession(code, playerId);
+        await ref.read(sessionProvider.notifier).saveSession(code, playerId, name);
         if (mounted) {
           Navigator.of(context).push(MaterialPageRoute(builder: (context) => const LobbyScreen()));
         }

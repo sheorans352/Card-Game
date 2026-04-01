@@ -18,6 +18,7 @@ final localPlayedCardsProvider = StateProvider<Set<String>>((ref) => {});
 // Session Persistence Keys
 const String kRoomCodeKey = 'minus_last_room_code';
 const String kPlayerIdKey = 'minus_last_player_id';
+const String kPlayerNameKey = 'minus_last_player_name';
 
 class SessionNotifier extends StateNotifier<AsyncValue<void>> {
   SessionNotifier(this.ref) : super(const AsyncValue.data(null)) {
@@ -32,6 +33,7 @@ class SessionNotifier extends StateNotifier<AsyncValue<void>> {
 
     final roomCode = urlParams['room'] ?? urlParams['code'] ?? prefs.getString(kRoomCodeKey);
     final playerId = urlParams['playerId'] ?? prefs.getString(kPlayerIdKey);
+    final playerName = prefs.getString(kPlayerNameKey);
 
     if (roomCode != null) {
       ref.read(currentRoomCodeProvider.notifier).state = roomCode;
@@ -41,14 +43,19 @@ class SessionNotifier extends StateNotifier<AsyncValue<void>> {
       ref.read(localPlayerIdProvider.notifier).state = playerId;
       await prefs.setString(kPlayerIdKey, playerId);
     }
+    if (playerName != null && playerName.isNotEmpty) {
+      ref.read(localPlayerNameProvider.notifier).state = playerName;
+    }
   }
 
-  Future<void> saveSession(String roomCode, String playerId) async {
+  Future<void> saveSession(String roomCode, String playerId, String playerName) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(kRoomCodeKey, roomCode);
     await prefs.setString(kPlayerIdKey, playerId);
+    await prefs.setString(kPlayerNameKey, playerName);
     ref.read(currentRoomCodeProvider.notifier).state = roomCode;
     ref.read(localPlayerIdProvider.notifier).state = playerId;
+    ref.read(localPlayerNameProvider.notifier).state = playerName;
   }
 
   Future<void> clearSession() async {
@@ -91,6 +98,9 @@ final localPlayerIdProvider = StateProvider<String?>((ref) {
   }
   return null;
 });
+
+final localPlayerNameProvider = StateProvider<String?>((ref) => null);
+
 // State tracking for optimistic UI updates
 final pendingCardPlayProvider = StateProvider<Set<String>>((ref) => {});
 
@@ -291,7 +301,15 @@ final playableCardsProvider = Provider.family<Set<String>, String>((ref, roomId)
   final currentTurnId = ref.watch(predictiveTurnIdProvider(roomId));
   if (currentTurnId != localId) return {};
   
-  final cardsInHand = hand.map((c) => (c['card_value'] as String).trim().toUpperCase()).toList();
+  // Filter out cards already played (Optimistic + Ground Truth)
+  final pendingPlays = ref.watch(pendingCardPlayProvider);
+  final localPlayed = ref.watch(localPlayedCardsProvider);
+  final serverPlayed = ref.watch(playedCardsProvider(roomId)).value ?? [];
+  final myPlayedIds = serverPlayed.where((m) => m['player_id'] == localId).map((m) => m['card_value'] as String).toSet();
+  
+  final cardsInHand = hand.map((c) => (c['card_value'] as String).trim().toUpperCase())
+      .where((id) => !pendingPlays.contains(id) && !localPlayed.contains(id) && !myPlayedIds.contains(id))
+      .toList();
   
   // Trick Logic
   final trickSize = cards.length % 4;
