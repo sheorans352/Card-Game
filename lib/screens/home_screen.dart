@@ -183,9 +183,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         ),
                         child: Row(
                           children: [
-                            if (!kIsWeb)
-                              _buildTabButton('Host Game', _isHostingTab, () => setState(() => _isHostingTab = true)),
-                            _buildTabButton('Join Game', !kIsWeb ? !_isHostingTab : true, () => setState(() => _isHostingTab = false)),
+                            _buildTabButton('Host Game', _isHostingTab, () => setState(() => _isHostingTab = true)),
+                            _buildTabButton('Join Game', !_isHostingTab, () => setState(() => _isHostingTab = false)),
                           ],
                         ),
                       ),
@@ -194,7 +193,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       if (ref.watch(currentRoomCodeProvider) != null && ref.watch(localPlayerIdProvider) != null)
                         _buildRejoinButton(),
 
-                      if (_isHostingTab && !kIsWeb) ...[
+                      if (_isHostingTab) ...[
                         _buildHostForm(),
                       ] else ...[
                         _buildJoinForm(),
