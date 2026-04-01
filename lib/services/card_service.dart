@@ -93,17 +93,16 @@ class SupabaseCardService extends CardService {
     // Build clockwise order starting from cutter
     final List<String> orderedPlayers = List.generate(4, (i) => playerIds[(cutterIndex + i) % 4]);
 
-    // Batch-insert initial 5 cards
-    final List<Map<String, dynamic>> allInitialCards = [];
+    // Batch-insert initial 5 cards with delay for UI animation (4 players)
     for (int i = 0; i < 4; i++) {
         final hand = deck.skip(i * 5).take(5).map((c) => {
           'room_id': roomId,
           'player_id': orderedPlayers[i],
           'card_value': c,
         }).toList();
-        allInitialCards.addAll(hand);
+        await _supabase.from('hands').insert(hand);
+        await Future.delayed(const Duration(milliseconds: 400));
     }
-    await _supabase.from('hands').insert(allInitialCards);
 
     // Phase: bidding (5 cards in hand, bid on trump)
     await _supabase.from('rooms').update({
@@ -129,17 +128,16 @@ class SupabaseCardService extends CardService {
 
     final List<String> orderedPlayers = List.generate(4, (i) => playerIds[(cutterIndex + i) % 4]);
 
-    // Batch-insert 4 cards per player
-    final List<Map<String, dynamic>> allDealCards = [];
+    // Batch-insert 4 cards per player with delay
     for (int i = 0; i < 4; i++) {
       final hand = deck.skip(deckOffset + i * 4).take(4).map((c) => {
         'room_id': roomId,
         'player_id': orderedPlayers[i],
         'card_value': c,
       }).toList();
-      allDealCards.addAll(hand);
+      await _supabase.from('hands').insert(hand);
+      await Future.delayed(const Duration(milliseconds: 400));
     }
-    await _supabase.from('hands').insert(allDealCards);
   }
 
   @override
@@ -333,8 +331,12 @@ class SupabaseCardService extends CardService {
       if (updated.isEmpty) return;
 
       // === Phase 1 trump selection: deal 4+4 remaining cards ===
-      await _dealFourCardsRound(roomId, pIds, 20); // Round 2
-      await _dealFourCardsRound(roomId, pIds, 36); // Round 3
+      await _dealFourCardsRound(roomId, pIds, 20); // Round 2 chunk (5+4=9 total)
+      
+      // Deliberate pause between chunks for visibility
+      await Future.delayed(const Duration(seconds: 2));
+      
+      await _dealFourCardsRound(roomId, pIds, 36); // Round 3 chunk (9+4=13 total)
 
       // Reset trump_bid_passed for all players (bidding_2 is a fresh declaration round)
       await _supabase.from('players')

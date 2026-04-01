@@ -14,13 +14,14 @@ import '../widgets/scoreboard_overlay.dart';
 import '../widgets/spade_background.dart';
 import '../services/audio_service.dart';
 
-const Color primaryBg = Color(0xFF062A14); // Deeper green
-const Color accentGold = Color(0xFFC7A14C);
+const Color primaryBg = Color(0xFF02070D); // Premium Dark Navy/Black
+const Color accentGold = Color(0xFFFFD700); // Higher contrast Gold
 const Color cardDark = Color(0xFF141414);
-const Color playerGreen = Color(0xFF2E7D32);
-const Color playerBlue = Color(0xFF1565C0);
-const Color playerRed = Color(0xFFC62828);
-const Color playerGold = Color(0xFFBF8F00);
+const Color playerGreen = Color(0xFF1B5E20);
+const Color playerBlue = Color(0xFF0D47A1);
+const Color playerRed = Color(0xFFB71C1C);
+const Color playerGold = Color(0xFFF9A825);
+const Color tableBorder = Color(0xFF1E2833);
 
 class GameTableScreen extends ConsumerStatefulWidget {
   const GameTableScreen({super.key});
@@ -109,12 +110,12 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
                 children: [
                    Container(
                      decoration: const BoxDecoration(
-                       gradient: RadialGradient(
-                         center: Alignment.center,
-                         radius: 1.2,
+                       gradient: LinearGradient(
+                         begin: Alignment.topCenter,
+                         end: Alignment.bottomCenter,
                          colors: [
-                           Color(0xFF105C31), // Spotlight center
-                           Color(0xFF062A14), // Darker edge felt
+                           Color(0xFF081221), // Top Darkest
+                           Color(0xFF02070D), // Bottom Almost Black
                          ],
                        ),
                      ),
@@ -138,7 +139,7 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
                   _buildBottomTricksHUD(players, localIndex, room),
                   
                   if (room.trumpSuit != null)
-                    _buildTrumpHUD(room.trumpSuit!, room, playedCardsCount),
+                    _buildBottomBar(room.trumpSuit!, room, playedCardsCount),
 
                   // Scoreboard Button (Top Right)
                   Positioned(
@@ -1093,7 +1094,8 @@ class OpponentCardWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final fanOffset = (index - (total - 1) / 2) * 10.0;
+    const spacing = 12.0;
+    final fanOffset = (index - (total - 1) / 2) * spacing;
     final rotation = (index - (total - 1) / 2) * 0.05;
 
     Alignment alignment;
@@ -1101,36 +1103,133 @@ class OpponentCardWidget extends StatelessWidget {
     double? angle;
 
     switch (position) {
-      case 'left': alignment = Alignment.centerLeft; left = 100; top = fanOffset; angle = math.pi / 2 + rotation; break;
-      case 'top': alignment = Alignment.topCenter; top = 110; left = fanOffset; angle = math.pi + rotation; break;
-      case 'right': alignment = Alignment.centerRight; right = 100; bottom = fanOffset; angle = -math.pi / 2 + rotation; break;
+      case 'left': alignment = Alignment.centerLeft; left = 140; top = fanOffset; angle = math.pi / 2 + rotation; break;
+      case 'top': alignment = Alignment.topCenter; top = 140; left = fanOffset; angle = math.pi + rotation; break;
+      case 'right': alignment = Alignment.centerRight; right = 140; bottom = fanOffset; angle = -math.pi / 2 + rotation; break;
       default: alignment = Alignment.center;
     }
 
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0.0, end: 1.0),
-      duration: Duration(milliseconds: 500 + (index * 80)),
+      duration: Duration(milliseconds: 400 + (index * 60)),
       curve: Curves.easeOutCubic,
       builder: (context, value, child) {
-        double offX = 0, offY = 0;
-        switch (position) {
-          case 'left': offX = 140; offY = fanOffset; break;
-          case 'top': offX = fanOffset; offY = 140; break;
-          case 'right': offX = -140; offY = -fanOffset; break;
-        }
-
         return Align(
           alignment: alignment,
           child: Transform.translate(
-            offset: Offset(offX * value, offY * value),
+            offset: Offset(
+              (position == 'right' ? -20.0 : (position == 'left' ? 20.0 : 0)) * value, 
+              (position == 'top' ? 20.0 : 0) * value
+            ),
             child: Transform.rotate(
               angle: (angle ?? 0) * value,
-              child: const PlayingCard(isFaceUp: false, width: 50, height: 75),
+              child: const PlayingCard(isFaceUp: false, width: 44, height: 66),
             ),
           ),
         );
       },
     );
+  }
+}
+
+Widget _buildPlayerAvatar(Player player, String position, bool isTurn, bool isDealer, Color color) {
+  return Align(
+    alignment: _getAlignmentFromPosition(position),
+    child: Padding(
+      padding: _getPaddingFromPosition(position),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 80,
+            height: 100,
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.05),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: isTurn ? accentGold : Colors.white10,
+                width: isTurn ? 2.5 : 1,
+              ),
+              boxShadow: [
+                if (isTurn)
+                  BoxShadow(color: accentGold.withOpacity(0.2), blurRadius: 15, spreadRadius: 2),
+              ],
+            ),
+            child: Stack(
+              children: [
+                Center(
+                  child: Container(
+                    width: 54,
+                    height: 54,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: color.withOpacity(0.15),
+                      border: Border.all(color: color.withOpacity(0.5), width: 2),
+                    ),
+                    child: Center(
+                      child: Text(
+                        '${player.totalScore}',
+                        style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900),
+                      ),
+                    ),
+                  ),
+                ),
+                if (isDealer)
+                  Positioned(
+                    top: 6,
+                    right: 6,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(color: accentGold, borderRadius: BorderRadius.circular(4)),
+                      child: const Text('D', style: TextStyle(color: Colors.black, fontSize: 9, fontWeight: FontWeight.w900)),
+                    ),
+                  ),
+                if (position == 'bottom')
+                   const Positioned(
+                    top: 6,
+                    left: 6,
+                    child: Text('YOU', style: TextStyle(color: accentGold, fontSize: 8, fontWeight: FontWeight.w900)),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            player.name.toUpperCase(),
+            style: TextStyle(
+              color: isTurn ? Colors.white : Colors.white60,
+              fontSize: 11,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 1,
+            ),
+          ),
+          Text(
+            'Score: ${player.totalScore}',
+            style: const TextStyle(color: Colors.white24, fontSize: 9, fontWeight: FontWeight.bold),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+Alignment _getAlignmentFromPosition(String pos) {
+  switch (pos) {
+    case 'bottom': return Alignment.bottomLeft;
+    case 'left': return Alignment.topLeft;
+    case 'top': return Alignment.topRight;
+    case 'right': return Alignment.bottomRight;
+    default: return Alignment.center;
+  }
+}
+
+EdgeInsets _getPaddingFromPosition(String pos) {
+  switch (pos) {
+    case 'bottom': return const EdgeInsets.only(left: 30, bottom: 60);
+    case 'left': return const EdgeInsets.only(left: 30, top: 40);
+    case 'top': return const EdgeInsets.only(right: 30, top: 40);
+    case 'right': return const EdgeInsets.only(right: 30, bottom: 60);
+    default: return EdgeInsets.zero;
   }
 }
 
@@ -1160,13 +1259,13 @@ class PlayedCardWidget extends StatelessWidget {
     double offsetY = 0;
     double rotation = 0;
 
-    final spread = isExpanded ? 110.0 : 60.0;
-
+    const gridOffset = 45.0; // Half of (cardSize + gap)
+    
     switch (position) {
-      case 'bottom': offsetY = spread; rotation = 0; break;
-      case 'left': offsetX = -spread; rotation = math.pi / 2; break;
-      case 'top': offsetY = -spread; rotation = math.pi; break;
-      case 'right': offsetX = spread; rotation = -math.pi / 2; break;
+      case 'bottom': offsetX = -gridOffset; offsetY = gridOffset; rotation = 0; break;
+      case 'left': offsetX = -gridOffset; offsetY = -gridOffset; rotation = 0; break;
+      case 'top': offsetX = gridOffset; offsetY = -gridOffset; rotation = 0; break;
+      case 'right': offsetX = gridOffset; offsetY = gridOffset; rotation = 0; break;
     }
 
     double winOffsetX = 0;
@@ -1201,21 +1300,25 @@ class PlayedCardWidget extends StatelessWidget {
                   child: Opacity(
                     opacity: 1.0 - (winValue * 0.8), // Fades out slightly as it reaches winner
                     child: Container(
-                       decoration: BoxDecoration(
-                         boxShadow: [
-                           BoxShadow(
-                             color: Colors.black.withOpacity(0.6 * (1.0 - winValue)),
-                             blurRadius: 25,
-                             spreadRadius: 4,
-                             offset: Offset(8 * (1.0 - value), 14 * (1.0 - value)),
-                           ),
-                           BoxShadow(
-                             color: accentGold.withOpacity(0.12 * (1.0 - winValue)),
-                             blurRadius: 10,
-                             spreadRadius: 1,
-                           ),
-                         ],
-                       ),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(10),
+                          border: isTrickFinished && winnerPosition == position
+                              ? Border.all(color: accentGold, width: 3)
+                              : Border.all(color: Colors.white10),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.5),
+                              blurRadius: 15,
+                              offset: const Offset(4, 8),
+                            ),
+                            if (isTrickFinished && winnerPosition == position)
+                               BoxShadow(
+                                color: accentGold.withOpacity(0.3),
+                                blurRadius: 20,
+                                spreadRadius: 4,
+                              ),
+                          ],
+                        ),
                        child: Column(
                          mainAxisSize: MainAxisSize.min,
                          children: [
@@ -1236,7 +1339,7 @@ class PlayedCardWidget extends StatelessWidget {
                                ),
                              ),
                            Transform.rotate(
-                             angle: isExpanded ? -rotation : 0, // Keep card upright when expanded
+                             angle: 0, 
                              child: PlayingCard(card: card, isFaceUp: true),
                            ),
                          ],
@@ -1251,6 +1354,42 @@ class PlayedCardWidget extends StatelessWidget {
       ),
     );
   }
+}
+
+Widget _buildBottomBar(String trumpSuit, Room room, int? playedCardsCount) {
+  final currentTrick = ((playedCardsCount ?? 0) ~/ 4) + 1;
+  final displayTrick = currentTrick.clamp(1, 13);
+  final suitEmoji = CardModel.getSuitEmoji(trumpSuit);
+
+  return Positioned(
+    bottom: 0,
+    left: 0,
+    right: 0,
+    child: Container(
+      height: 44,
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      decoration: const BoxDecoration(
+        color: Colors.black,
+        border: Border(top: BorderSide(color: Color(0xFF1E2833), width: 0.5)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            '$suitEmoji Trump Suit: ${CardModel.getSuitName(trumpSuit)}',
+            style: const TextStyle(color: accentGold, fontSize: 13, fontWeight: FontWeight.w800, letterSpacing: 0.5),
+          ),
+          const SizedBox(width: 24),
+          const Text('·', style: TextStyle(color: Colors.white24, fontSize: 18)),
+          const SizedBox(width: 24),
+          Text(
+            'Round ${room.currentRound}  ·  Trick $displayTrick of 13',
+            style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+          ),
+        ],
+      ),
+    ),
+  );
 }
 
 class _TurnTimerPainter extends CustomPainter {
