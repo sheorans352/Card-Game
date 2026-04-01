@@ -236,6 +236,16 @@ final predictivePlayedCardsProvider = Provider.family<List<Map<String, dynamic>>
 
   // Merge: Server cards come first, then local ones (approximating true play order)
   final total = [...serverPlayed];
+  
+  // PRUNING SIDE-EFFECT: Remove cards from localPlayed that are already on server
+  if (localPlayed.any((id) => serverCardIds.contains(id))) {
+    Future.microtask(() {
+       ref.read(localPlayedCardsProvider.notifier).update((state) => 
+         state.where((id) => !serverCardIds.contains(id)).toSet()
+       );
+    });
+  }
+
   for (var cardId in localOnly) {
      total.add({
        'card_id': 'opt_$cardId', // Unique local ID

@@ -86,10 +86,8 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
               final localIndex = players.indexWhere((p) => p.id == localPlayerId);
               if (localIndex == -1) return const Center(child: Text('You are not in this room'));
 
-              final playedCardsCount = ref.watch(playedCardsProvider(room.id)).maybeWhen(
-                data: (cards) => cards.length,
-                orElse: () => 0,
-              );
+              final predictivePlayedCards = ref.watch(predictivePlayedCardsProvider(room.id));
+              final playedCardsCount = predictivePlayedCards.length;
 
               final rotatedPlayers = List.generate(4, (i) {
                 return players[(localIndex + i) % players.length];
@@ -776,18 +774,14 @@ class _CardsLayerState extends ConsumerState<CardsLayer> {
     ref.listen<List<Map<String, dynamic>>>(
       predictivePlayedCardsProvider(widget.roomId),
       (prev, next) {
-        if (next.length % 4 == 0 && next.isNotEmpty && next.length != _lastTrickCount) {
+         if (next.length % 4 == 0 && next.isNotEmpty && next.length != _lastTrickCount) {
+            _lastTrickCount = next.length;
+            _sweepTimer?.cancel();
+            // We NO LONGER clear localPlayedCards here. 
+            // The room_provider.dart pruning side-effect will clear it once server catches up.
+         } else if (next.length != _lastTrickCount) {
            _lastTrickCount = next.length;
-           _sweepTimer?.cancel();
-           _sweepTimer = Timer(const Duration(milliseconds: 1500), () {
-             if (mounted) {
-               ref.read(localPlayedCardsProvider.notifier).state = {};
-               // We don't hide here; the UI will update naturally when next.length changes via the server or new plays
-             }
-           });
-        } else if (next.length != _lastTrickCount) {
-          _lastTrickCount = next.length;
-        }
+         }
       },
     );
 
