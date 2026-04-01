@@ -74,6 +74,18 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
       });
     });
 
+    // Auto-show scoreboard and force clear table on round transition
+    ref.listen<int?>(
+      roomMetadataProvider(roomCode).select((data) => data.value?.currentRound),
+      (prev, next) {
+        if (next != null && prev != null && next > prev) {
+          setState(() => _showScoreboard = true);
+          ref.read(localPlayedCardsProvider.notifier).state = {};
+          debugPrint('Round transitioned: $prev -> $next. Resetting table and showing scoreboard.');
+        }
+      },
+    );
+
     return Scaffold(
       body: roomAsync.when(
         data: (room) {

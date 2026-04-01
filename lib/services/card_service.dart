@@ -84,24 +84,26 @@ class SupabaseCardService extends CardService {
     // Cutter is to the LEFT of dealer (clockwise next): (dealerIndex + 1) % 4
     final int cutterIndex = (dealerIndex + 1) % 4;
     
-    // Clear all old hands for these players
-    for (final pid in playerIds) {
-      try { await _supabase.from('hands').delete().eq('player_id', pid); } catch (_) {}
-    }
+    // 1. Definitively clear all hands for this room (Atomic)
+    await _supabase.from('hands').delete().eq('room_id', roomId);
+    
+    // 2. Clear played cards for this room (Safety)
+    await _supabase.from('played_cards').delete().eq('room_id', roomId);
     
     // Build clockwise order starting from cutter
     final List<String> orderedPlayers = List.generate(4, (i) => playerIds[(cutterIndex + i) % 4]);
 
-    // === DEAL ROUND 1: 5 cards each (deck[0..19]) ===
+    // Batch-insert initial 5 cards
+    final List<Map<String, dynamic>> allInitialCards = [];
     for (int i = 0; i < 4; i++) {
-      final hand = deck.skip(i * 5).take(5).map((c) => {
-        'room_id': roomId,
-        'player_id': orderedPlayers[i],
-        'card_value': c,
-      }).toList();
-      await _supabase.from('hands').insert(hand);
-      await Future.delayed(const Duration(milliseconds: 500));
+        final hand = deck.skip(i * 5).take(5).map((c) => {
+          'room_id': roomId,
+          'player_id': orderedPlayers[i],
+          'card_value': c,
+        }).toList();
+        allInitialCards.addAll(hand);
     }
+    await _supabase.from('hands').insert(allInitialCards);
 
     // Phase: bidding (5 cards in hand, bid on trump)
     await _supabase.from('rooms').update({
@@ -111,7 +113,7 @@ class SupabaseCardService extends CardService {
       'highest_bid': 0,
       'highest_bidder_id': null,
       'pass_count': 0,
-      'current_round': 1,
+       // 'current_round': 1, // FIXED: DON'T reset current_round here! It propagates across rounds.
       'turn_index': cutterIndex, // Bidding starts with Cutter
     }).eq('id', roomId);
   }
@@ -127,15 +129,17 @@ class SupabaseCardService extends CardService {
 
     final List<String> orderedPlayers = List.generate(4, (i) => playerIds[(cutterIndex + i) % 4]);
 
+    // Batch-insert 4 cards per player
+    final List<Map<String, dynamic>> allDealCards = [];
     for (int i = 0; i < 4; i++) {
       final hand = deck.skip(deckOffset + i * 4).take(4).map((c) => {
         'room_id': roomId,
         'player_id': orderedPlayers[i],
         'card_value': c,
       }).toList();
-      await _supabase.from('hands').insert(hand);
-      await Future.delayed(const Duration(milliseconds: 400));
+      allDealCards.addAll(hand);
     }
+    await _supabase.from('hands').insert(allDealCards);
   }
 
   @override

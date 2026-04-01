@@ -144,8 +144,8 @@ class ScoreboardOverlay extends ConsumerWidget {
           if (result.isEmpty) return const _Cell(text: '-');
 
           final bid = result['bid'] ?? 0;
-          final tricks = result['tricks_taken'] ?? 0;
-          final score = result['score'] ?? 0;
+          final tricks = result['tricks_won'] ?? 0;
+          final score = result['points_earned'] ?? 0;
           final isSuccess = score > 0;
 
           return _Cell(
@@ -166,7 +166,7 @@ class ScoreboardOverlay extends ConsumerWidget {
         ...players.map((p) {
           final total = allResults
               .where((r) => r['player_id'] == p.id)
-              .fold(0, (sum, item) => sum + (item['score'] as int));
+              .fold(0, (sum, item) => sum + (item['points_earned'] as int));
           
           return _Cell(
             text: '$total', 
