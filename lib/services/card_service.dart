@@ -463,48 +463,55 @@ class SupabaseCardService extends CardService {
     final handCards = playerHand.map((c) => CardModel.fromId(c)).toList();
 
     final hasSameSuit = handCards.any((c) => c.suit == leadSuit);
+    final isTrumpOnTable = currentTrick.any((t) {
+      final tc = CardModel.fromId(t['card_value'] as String);
+      return tc.suit == trumpSuitEnum;
+    });
 
     if (hasSameSuit) {
       // Rule 1: Must follow lead suit
       if (playedCard.suit != leadSuit) return false;
 
-      // Must-beat rule: find current best card of lead suit on table
-      CardModel? currentBest;
-      for (var t in currentTrick) {
-        final tc = CardModel.fromId(t['card_value'] as String);
-        if (tc.suit == leadSuit) {
-          if (currentBest == null || tc.rank > currentBest.rank) currentBest = tc;
+      // Must-beat rule: ONLY if NO Trump is on the table
+      if (!isTrumpOnTable) {
+        CardModel? currentBestLead;
+        for (var t in currentTrick) {
+          final tc = CardModel.fromId(t['card_value'] as String);
+          if (tc.suit == leadSuit) {
+            if (currentBestLead == null || tc.rank > currentBestLead.rank) currentBestLead = tc;
+          }
         }
-      }
-      // If player can beat the best, they MUST
-      if (currentBest != null) {
-        final canBeat = handCards.any((c) => c.suit == leadSuit && c.rank > currentBest!.rank);
-        if (canBeat && playedCard.rank <= currentBest.rank) return false;
+        // If player can beat the best lead card, they MUST
+        if (currentBestLead != null) {
+          final canBeat = handCards.any((c) => c.suit == leadSuit && c.rank > currentBestLead!.rank);
+          if (canBeat && playedCard.rank <= currentBestLead.rank) return false;
+        }
       }
       return true;
     }
 
     // No lead-suit cards in hand
     
-    // If the player chooses to play a trump card
+    // If the player chooses to play a trump card (Ruffing)
     if (trumpSuitEnum != null && playedCard.suit == trumpSuitEnum) {
       // Find current best trump on table
-      CardModel? bestTrump;
+      CardModel? bestTrumpOnTable;
       for (var t in currentTrick) {
         final tc = CardModel.fromId(t['card_value'] as String);
         if (tc.suit == trumpSuitEnum) {
-          if (bestTrump == null || tc.rank > bestTrump.rank) bestTrump = tc;
+          if (bestTrumpOnTable == null || tc.rank > bestTrumpOnTable.rank) bestTrumpOnTable = tc;
         }
       }
-      // If trump already played, must play higher trump if possible
-      if (bestTrump != null) {
-        final canBeatTrump = handCards.any((c) => c.suit == trumpSuitEnum && c.rank > bestTrump!.rank);
-        if (canBeatTrump && playedCard.rank <= bestTrump.rank) return false;
+      
+      // If a trump is already played, MUST play higher if possible
+      if (bestTrumpOnTable != null) {
+        final canBeatTrump = handCards.any((c) => c.suit == trumpSuitEnum && c.rank > bestTrumpOnTable!.rank);
+        if (canBeatTrump && playedCard.rank <= bestTrumpOnTable.rank) return false;
       }
       return true;
     }
 
-    // Rule 3: No lead suit cards in hand, and player chose to play a non-trump card (Throwaway) — always valid
+    // Rule: No lead suit cards in hand, and player chose to play a non-trump card (Throwaway) — always valid
     return true;
   }
 

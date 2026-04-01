@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/room_provider.dart';
 import '../widgets/spade_background.dart';
@@ -23,13 +24,40 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    final code = Uri.base.queryParameters['code'];
-    if (code != null) {
-      _codeController.text = code;
-      _isHostingTab = false; // Switch to join tab if code is provided
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        ref.read(currentRoomCodeProvider.notifier).state = code;
-      });
+    _checkInitialSession();
+  }
+
+  Future<void> _checkInitialSession() async {
+    // If we have a room code in URL, prioritize it
+    final urlParams = Uri.base.queryParameters;
+    final urlCode = urlParams['room'] ?? urlParams['code'];
+    
+    if (urlCode != null) {
+      _codeController.text = urlCode;
+      setState(() { _isHostingTab = false; });
+      ref.read(currentRoomCodeProvider.notifier).state = urlCode;
+      
+      // If we also have a playerId in URL, try auto-join
+      final urlPlayerId = urlParams['playerId'];
+      if (urlPlayerId != null) {
+        ref.read(localPlayerIdProvider.notifier).state = urlPlayerId;
+        _autoJoin(urlCode, urlPlayerId);
+      }
+    }
+  }
+
+  Future<void> _autoJoin(String code, String playerId) async {
+    try {
+      final result = await ref.read(lobbyServiceProvider).joinRoom(
+        code, 
+        '', 
+        existingPlayerId: playerId
+      );
+      if (result != null && mounted) {
+        Navigator.of(context).push(MaterialPageRoute(builder: (context) => const LobbyScreen()));
+      }
+    } catch (e) {
+      debugPrint('Auto-join failed: $e');
     }
   }
 
@@ -155,14 +183,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         ),
                         child: Row(
                           children: [
-                            _buildTabButton('Host Game', _isHostingTab, () => setState(() => _isHostingTab = true)),
-                            _buildTabButton('Join Game', !_isHostingTab, () => setState(() => _isHostingTab = false)),
+                            if (!kIsWeb)
+                              _buildTabButton('Host Game', _isHostingTab, () => setState(() => _isHostingTab = true)),
+                            _buildTabButton('Join Game', !kIsWeb ? !_isHostingTab : true, () => setState(() => _isHostingTab = false)),
                           ],
                         ),
                       ),
                       const SizedBox(height: 32),
 
-                      if (_isHostingTab) ...[
+                      if (ref.watch(currentRoomCodeProvider) != null && ref.watch(localPlayerIdProvider) != null)
+                        _buildRejoinButton(),
+
+                      if (_isHostingTab && !kIsWeb) ...[
                         _buildHostForm(),
                       ] else ...[
                         _buildJoinForm(),
@@ -213,6 +245,41 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
+  Widget _buildRejoinButton() {
+    final code = ref.watch(currentRoomCodeProvider);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 32),
+      child: InkWell(
+        onTap: () => _autoJoin(code!, ref.read(localPlayerIdProvider)!),
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: accentGold.withOpacity(0.15),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: accentGold.withOpacity(0.5)),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.history_rounded, color: accentGold, size: 28),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('RE-JOIN LAST GAME', style: TextStyle(color: accentGold, fontWeight: FontWeight.w900, fontSize: 13, letterSpacing: 1)),
+                    Text('Room: $code', style: const TextStyle(color: Colors.white70, fontSize: 11)),
+                  ],
+                ),
+              ),
+              const Icon(Icons.arrow_forward_ios_rounded, color: accentGold, size: 16),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildJoinForm() {
     return Column(
       children: [
@@ -228,7 +295,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             children: [
               const Text('ROOM CODE', style: TextStyle(color: accentGold, fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 1.5)),
               const SizedBox(height: 16),
-              // Simplified 6-dot or digit display
               TextField(
                 controller: _codeController,
                 textAlign: TextAlign.center,
@@ -263,7 +329,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       ],
     );
   }
-
   Widget _buildSuitIcon(String char, Color color) {
     return Text(
       char,
@@ -279,8 +344,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     }
     try {
       final result = await ref.read(lobbyServiceProvider).createRoom(name);
-      ref.read(currentRoomCodeProvider.notifier).state = result['roomCode'];
-      ref.read(localPlayerIdProvider.notifier).state = result['playerId'];
+      final roomCode = result['roomCode']!;
+      final playerId = result['playerId']!;
+      
+      await ref.read(sessionProvider.notifier).saveSession(roomCode, playerId);
       if (mounted) {
         Navigator.of(context).push(MaterialPageRoute(builder: (context) => const LobbyScreen()));
       }
@@ -292,15 +359,25 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Future<void> _joinGame() async {
     final name = _nameController.text.trim();
     final code = _codeController.text.trim();
-    if (name.isEmpty || code.isEmpty) {
-      _showError('Name and Room Code are required');
+    final existingPlayerId = ref.read(localPlayerIdProvider);
+
+    if (name.isEmpty && existingPlayerId == null) {
+      _showError('Please enter your name');
+      return;
+    }
+    if (code.isEmpty) {
+      _showError('Room Code is required');
       return;
     }
     try {
-      final result = await ref.read(lobbyServiceProvider).joinRoom(code, name);
+      final result = await ref.read(lobbyServiceProvider).joinRoom(
+        code, 
+        name, 
+        existingPlayerId: existingPlayerId
+      );
       if (result != null) {
-        ref.read(currentRoomCodeProvider.notifier).state = code;
-        ref.read(localPlayerIdProvider.notifier).state = result['playerId'];
+        final playerId = result['playerId']!;
+        await ref.read(sessionProvider.notifier).saveSession(code, playerId);
         if (mounted) {
           Navigator.of(context).push(MaterialPageRoute(builder: (context) => const LobbyScreen()));
         }

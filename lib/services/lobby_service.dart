@@ -3,7 +3,7 @@ import 'card_service.dart';
 
 abstract class LobbyService {
   Future<Map<String, String>> createRoom(String hostName);
-  Future<Map<String, String>?> joinRoom(String code, String playerName);
+  Future<Map<String, String>?> joinRoom(String code, String playerName, {String? existingPlayerId});
   Future<void> startGame(String roomId);
 }
 
@@ -43,30 +43,34 @@ class SupabaseLobbyService extends LobbyService {
   }
 
   @override
-  Future<Map<String, String>?> joinRoom(String code, String playerName) async {
+  Future<Map<String, String>?> joinRoom(String code, String playerName, {String? existingPlayerId}) async {
     final roomResponse = await _supabase.from('rooms').select().eq('code', code);
-    if (roomResponse.isEmpty || roomResponse.first['status'] != 'waiting') return null;
+    if (roomResponse.isEmpty) return null;
     final room = roomResponse.first;
+    final String roomId = room['id'];
 
-    // Check current player count
-    final playersResponse = await _supabase
-        .from('players')
-        .select('id')
-        .eq('room_id', room['id']);
-    
+    if (existingPlayerId != null) {
+      final existing = await _supabase.from('players').select().match({
+        'id': existingPlayerId,
+        'room_id': roomId,
+      }).maybeSingle();
+      
+      if (existing != null) return {'playerId': existingPlayerId};
+    }
+
+    if (room['status'] != 'waiting') return null;
+
+    final playersResponse = await _supabase.from('players').select('id').eq('room_id', roomId);
     if (playersResponse.length >= 4) return null;
 
     final playerResponseList = await _supabase.from('players').insert({
-      'room_id': room['id'],
+      'room_id': roomId,
       'name': playerName,
       'is_host': false,
       'total_score': 0,
     }).select();
-    final playerResponse = playerResponseList.first;
-
-    return {
-      'playerId': playerResponse['id'],
-    };
+    
+    return {'playerId': playerResponseList.first['id']};
   }
 
   @override

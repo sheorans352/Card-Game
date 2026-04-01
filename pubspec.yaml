@@ -41,6 +41,7 @@ dependencies:
   supabase_flutter: ^2.10.2
   audioplayers: ^6.0.0
   vibration: ^2.0.1
+  shared_preferences: ^2.2.3
 
 dev_dependencies:
   flutter_test:

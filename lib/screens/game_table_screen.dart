@@ -755,6 +755,7 @@ class CardsLayer extends ConsumerStatefulWidget {
 class _CardsLayerState extends ConsumerState<CardsLayer> {
   int _lastTrickCount = 0;
   Timer? _sweepTimer;
+  bool _isTrickExpanded = false;
 
   @override
   void dispose() {
@@ -834,22 +835,58 @@ class _CardsLayerState extends ConsumerState<CardsLayer> {
     }
 
     return Stack(
+      clipBehavior: Clip.none,
       children: [
         ..._buildPlayerHands(ref),
-        ...currentTrick.map((m) {
-          final player = widget.players.cast<Player?>().firstWhere((p) => p?.id == m['player_id'], orElse: () => null);
-          if (player == null) return const SizedBox();
-          final playerIdxInRotated = widget.players.indexOf(player);
-          final pos = _getPositionFromIndex(playerIdxInRotated);
-          return PlayedCardWidget(
-            key: ValueKey('played_${m['card_value']}'),
-            card: CardModel.fromId(m['card_value']),
-            position: pos,
-            order: currentTrick.indexOf(m),
-            isTrickFinished: isTrickFinished,
-            winnerPosition: winnerPos,
-          );
-        }),
+        
+        // Trick Area with Swipe interaction
+        Positioned.fill(
+          child: GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onScaleStart: (_) => setState(() => _isTrickExpanded = true),
+            onScaleEnd: (_) => setState(() => _isTrickExpanded = false),
+            onLongPressStart: (_) => setState(() => _isTrickExpanded = true),
+            onLongPressEnd: (_) => setState(() => _isTrickExpanded = false),
+            onHorizontalDragStart: (_) => setState(() => _isTrickExpanded = true),
+            onHorizontalDragEnd: (_) => setState(() => _isTrickExpanded = false),
+            child: Stack(
+              children: currentTrick.map((m) {
+                final player = widget.players.cast<Player?>().firstWhere((p) => p?.id == m['player_id'], orElse: () => null);
+                if (player == null) return const SizedBox();
+                final playerIdxInRotated = widget.players.indexOf(player);
+                final pos = _getPositionFromIndex(playerIdxInRotated);
+                return PlayedCardWidget(
+                  key: ValueKey('played_${m['card_value']}'),
+                  card: CardModel.fromId(m['card_value']),
+                  position: pos,
+                  playerName: player.name,
+                  order: currentTrick.indexOf(m),
+                  isTrickFinished: isTrickFinished,
+                  winnerPosition: winnerPos,
+                  isExpanded: _isTrickExpanded,
+                );
+              }).toList(),
+            ),
+          ),
+        ),
+
+        // Expanded Hint
+        if (currentTrick.isNotEmpty && !_isTrickExpanded && !isTrickFinished)
+          Align(
+            alignment: Alignment.center,
+            child: Padding(
+              padding: const EdgeInsets.only(top: 160),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.black45,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Text('Swipe center to see all cards', 
+                  style: TextStyle(color: Colors.white38, fontSize: 10, fontWeight: FontWeight.bold)),
+              ),
+            ),
+          ),
       ],
     );
   }
@@ -1094,17 +1131,21 @@ class OpponentCardWidget extends StatelessWidget {
 class PlayedCardWidget extends StatelessWidget {
   final CardModel card;
   final String position;
+  final String playerName;
   final int order;
   final bool isTrickFinished;
   final String? winnerPosition;
+  final bool isExpanded;
 
   const PlayedCardWidget({
     super.key,
     required this.card,
     required this.position,
+    required this.playerName,
     required this.order,
     this.isTrickFinished = false,
     this.winnerPosition,
+    this.isExpanded = false,
   });
 
   @override
@@ -1113,11 +1154,13 @@ class PlayedCardWidget extends StatelessWidget {
     double offsetY = 0;
     double rotation = 0;
 
+    final spread = isExpanded ? 110.0 : 60.0;
+
     switch (position) {
-      case 'bottom': offsetY = 60; rotation = 0; break;
-      case 'left': offsetX = -60; rotation = math.pi / 2; break;
-      case 'top': offsetY = -60; rotation = math.pi; break;
-      case 'right': offsetX = 60; rotation = -math.pi / 2; break;
+      case 'bottom': offsetY = spread; rotation = 0; break;
+      case 'left': offsetX = -spread; rotation = math.pi / 2; break;
+      case 'top': offsetY = -spread; rotation = math.pi; break;
+      case 'right': offsetX = spread; rotation = -math.pi / 2; break;
     }
 
     double winOffsetX = 0;
@@ -1167,7 +1210,31 @@ class PlayedCardWidget extends StatelessWidget {
                            ),
                          ],
                        ),
-                       child: PlayingCard(card: card, isFaceUp: true),
+                       child: Column(
+                         mainAxisSize: MainAxisSize.min,
+                         children: [
+                           if (isExpanded)
+                             Padding(
+                               padding: const EdgeInsets.only(bottom: 8),
+                               child: Container(
+                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                 decoration: BoxDecoration(
+                                   color: Colors.black87,
+                                   borderRadius: BorderRadius.circular(4),
+                                   border: Border.all(color: accentGold.withOpacity(0.5)),
+                                 ),
+                                 child: Text(
+                                   playerName.split(' ').first.toUpperCase(), 
+                                   style: const TextStyle(color: accentGold, fontSize: 10, fontWeight: FontWeight.bold)
+                                 ),
+                               ),
+                             ),
+                           Transform.rotate(
+                             angle: isExpanded ? -rotation : 0, // Keep card upright when expanded
+                             child: PlayingCard(card: card, isFaceUp: true),
+                           ),
+                         ],
+                       ),
                     ),
                   ),
                 ),

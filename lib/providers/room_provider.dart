@@ -6,15 +6,74 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/game_models.dart';
 import '../models/card_model.dart';
 import '../services/lobby_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../services/card_service.dart';
 import '../config/env_config.dart';
-
-// Removed dart:html to fix Vercel compilation issues
 
 SupabaseClient get supabase => Supabase.instance.client;
 
 // Track cards locally played in the current round to bypass Realtime lag.
 final localPlayedCardsProvider = StateProvider<Set<String>>((ref) => {});
+
+// Session Persistence Keys
+const String kRoomCodeKey = 'minus_last_room_code';
+const String kPlayerIdKey = 'minus_last_player_id';
+
+class SessionNotifier extends StateNotifier<AsyncValue<void>> {
+  SessionNotifier(this.ref) : super(const AsyncValue.data(null)) {
+    _init();
+  }
+
+  final Ref ref;
+
+  Future<void> _init() async {
+    final prefs = await SharedPreferences.getInstance();
+    final urlParams = Uri.base.queryParameters;
+
+    final roomCode = urlParams['room'] ?? urlParams['code'] ?? prefs.getString(kRoomCodeKey);
+    final playerId = urlParams['playerId'] ?? prefs.getString(kPlayerIdKey);
+
+    if (roomCode != null) {
+      ref.read(currentRoomCodeProvider.notifier).state = roomCode;
+      await prefs.setString(kRoomCodeKey, roomCode);
+    }
+    if (playerId != null) {
+      ref.read(localPlayerIdProvider.notifier).state = playerId;
+      await prefs.setString(kPlayerIdKey, playerId);
+    }
+  }
+
+  Future<void> saveSession(String roomCode, String playerId) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(kRoomCodeKey, roomCode);
+    await prefs.setString(kPlayerIdKey, playerId);
+    ref.read(currentRoomCodeProvider.notifier).state = roomCode;
+    ref.read(localPlayerIdProvider.notifier).state = playerId;
+  }
+
+  Future<void> clearSession() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(kRoomCodeKey);
+    await prefs.remove(kPlayerIdKey);
+    ref.read(currentRoomCodeProvider.notifier).state = null;
+    ref.read(localPlayerIdProvider.notifier).state = null;
+  }
+}
+
+final sessionProvider = StateNotifierProvider<SessionNotifier, AsyncValue<void>>((ref) {
+  return SessionNotifier(ref);
+});
+
+// Heartbeat Polling Provider
+final heartbeatProvider = StreamProvider.family<void, String>((ref, roomId) async* {
+  while (true) {
+    await Future.delayed(const Duration(seconds: 3));
+    // Quietly refresh the most critical data
+    ref.invalidate(roomMetadataByIdProvider(roomId));
+    ref.invalidate(playedCardsProvider(roomId));
+    yield null;
+  }
+});
 
 // Mock Providers for Verification
 final currentRoomCodeProvider = StateProvider<String?>((ref) {
@@ -243,69 +302,57 @@ final playableCardsProvider = Provider.family<Set<String>, String>((ref, roomId)
   final currentTrick = cards.sublist(cards.length - trickSize);
   final leadCard = (currentTrick.first['card_value'] as String).trim().toUpperCase();
   final leadSuit = CardModel.getSuit(leadCard);
-  final trumpSuit = room.trumpSuit;
+  final trump = (room.trumpSuit ?? 'S').toUpperCase().trim();
+  final isTrumpOnTable = currentTrick.any((m) => CardModel.getSuit(m['card_value'] as String) == trump);
 
-  // 1. Must follow suit
-  final cardsOfLeadSuit = cardsInHand.where((c) => CardModel.getSuit(c) == leadSuit).toList();
+  final hasLeadSuit = cardsInHand.any((c) => CardModel.getSuit(c) == leadSuit);
   
-  if (cardsOfLeadSuit.isNotEmpty) {
-    // 2. MUST WIN RULE (Contextual)
-    // If a trick is already "cut" by a TRUMP (that is not the lead suit), 
-    // we don't force windows of lead suit because they can't win anyway.
-    final trump = (trumpSuit ?? 'S').toUpperCase().trim();
-    final isTrickTrumped = currentTrick.any((m) => CardModel.getSuit(m['card_value'] as String) == trump);
-    final leadIsTrump = leadSuit == trump;
-
-    if (isTrickTrumped && !leadIsTrump) {
-      // Trick is trumped, lead suit CANNOT win. Allow any card of lead suit.
-      return cardsOfLeadSuit.toSet();
+  if (hasLeadSuit) {
+    final cardsOfLeadSuit = cardsInHand.where((c) => CardModel.getSuit(c) == leadSuit).toSet();
+    
+    if (isTrumpOnTable) {
+      // If trick is trumped, lead suit CANNOT win. Allow any card of lead suit.
+      return cardsOfLeadSuit;
+    } else {
+      // Must beat highest lead suit card on table
+      int highestLeadRank = 0;
+      for (var m in currentTrick) {
+        final val = m['card_value'] as String;
+        if (CardModel.getSuit(val) == leadSuit) {
+          final r = CardModel.getRankValue(val);
+          if (r > highestLeadRank) highestLeadRank = r;
+        }
+      }
+      final winners = cardsOfLeadSuit.where((c) => CardModel.getRankValue(c) > highestLeadRank).toSet();
+      return winners.isNotEmpty ? winners : cardsOfLeadSuit;
     }
+  } else {
+    // No lead suit -> Option: Trump or Throwaway
+    final playerTrumps = cardsInHand.where((c) => CardModel.getSuit(c) == trump).toSet();
+    final playerDiscards = cardsInHand.where((c) => CardModel.getSuit(c) != trump).toSet();
+    
+    if (playerTrumps.isEmpty) return playerDiscards; // Only discards possible
 
-    // Standard "Must Win" logic: Find highest card of the lead suit currently in trick
-    int highestRank = 0;
+    // Calculate best trump on table
+    int highestTrumpRank = 0;
     for (var m in currentTrick) {
-      final cVal = m['card_value'] as String;
-      if (CardModel.getSuit(cVal) == leadSuit) {
-        final r = CardModel.getRankValue(cVal);
-        if (r > highestRank) highestRank = r;
+      final val = m['card_value'] as String;
+      if (CardModel.getSuit(val) == trump) {
+        final r = CardModel.getRankValue(val);
+        if (r > highestTrumpRank) highestTrumpRank = r;
       }
     }
+
+    final winningTrumps = playerTrumps.where((c) => CardModel.getRankValue(c) > highestTrumpRank).toSet();
     
-    final winners = cardsOfLeadSuit.where((c) => CardModel.getRankValue(c) > highestRank).toList();
-    if (winners.isNotEmpty) return winners.toSet(); // Forced to win if possible
-    return cardsOfLeadSuit.toSet(); // Must follow suit
-  }
-  
-  // 3. No lead suit -> Choice: Trump or Throw
-  // Rule: If playing a trump, it must be higher than any trump already in the trick (if possible).
-  final trump = (trumpSuit ?? 'S').toUpperCase().trim();
-  int highestTrumpInTrick = 0;
-  for (var m in currentTrick) {
-    final cVal = m['card_value'] as String;
-    if (CardModel.getSuit(cVal) == trump) {
-      final r = CardModel.getRankValue(cVal);
-      if (r > highestTrumpInTrick) highestTrumpInTrick = r;
+    // If player chooses to play trump and CAN win, they MUST play a winning trump.
+    // If they CANNOT win with trump, they can still play a lower trump or any discard.
+    if (winningTrumps.isNotEmpty) {
+      return {...winningTrumps, ...playerDiscards};
+    } else {
+      return {...playerTrumps, ...playerDiscards};
     }
   }
-
-  final playerTrumps = cardsInHand.where((c) => CardModel.getSuit(c) == trump).toList();
-  final playerDiscards = cardsInHand.where((c) => CardModel.getSuit(c) != trump).toList();
-  
-  // Identify trumps that can overtrump the current highest trump
-  final overTrumps = playerTrumps.where((c) => CardModel.getRankValue(c) > highestTrumpInTrick).toList();
-  
-  if (playerTrumps.isNotEmpty) {
-     if (overTrumps.isNotEmpty) {
-        // Must play winning trump OR a discard (can't undertrump if you can overtrump)
-        return {...overTrumps, ...playerDiscards}.toSet();
-     } else {
-        // Cannot overtrump, but MUST play a card (can undertrump or discard)
-        return cardsInHand.toSet();
-     }
-  }
-  
-  // No trumps at all -> can play any card (all are discards)
-  return cardsInHand.toSet();
 });
 
 
