@@ -135,10 +135,10 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
                       playerPositions: _playerKeys,
                     ),
 
-                    _buildPlayerAvatar(rotatedPlayers[0], 'bottom', ref.watch(predictiveTurnIdProvider(room.id)) == rotatedPlayers[0].id, room.dealerIndex == (players.indexOf(rotatedPlayers[0])), Colors.green),
-                    _buildPlayerAvatar(rotatedPlayers[1], 'left', ref.watch(predictiveTurnIdProvider(room.id)) == rotatedPlayers[1].id, room.dealerIndex == (players.indexOf(rotatedPlayers[1])), Colors.blue),
-                    _buildPlayerAvatar(rotatedPlayers[2], 'top', ref.watch(predictiveTurnIdProvider(room.id)) == rotatedPlayers[2].id, room.dealerIndex == (players.indexOf(rotatedPlayers[2])), Colors.red),
-                    _buildPlayerAvatar(rotatedPlayers[3], 'right', ref.watch(predictiveTurnIdProvider(room.id)) == rotatedPlayers[3].id, room.dealerIndex == (players.indexOf(rotatedPlayers[3])), Colors.amber),
+                    _buildPlayerAvatar(rotatedPlayers[0], 'bottom', ref.watch(predictiveTurnIdProvider(room.id)) == rotatedPlayers[0].id, room.dealerIndex == (players.indexOf(rotatedPlayers[0])), Colors.green, localPlayerId),
+                    _buildPlayerAvatar(rotatedPlayers[1], 'left', ref.watch(predictiveTurnIdProvider(room.id)) == rotatedPlayers[1].id, room.dealerIndex == (players.indexOf(rotatedPlayers[1])), Colors.blue, localPlayerId),
+                    _buildPlayerAvatar(rotatedPlayers[2], 'top', ref.watch(predictiveTurnIdProvider(room.id)) == rotatedPlayers[2].id, room.dealerIndex == (players.indexOf(rotatedPlayers[2])), Colors.red, localPlayerId),
+                    _buildPlayerAvatar(rotatedPlayers[3], 'right', ref.watch(predictiveTurnIdProvider(room.id)) == rotatedPlayers[3].id, room.dealerIndex == (players.indexOf(rotatedPlayers[3])), Colors.amber, localPlayerId),
 
                     if (room.trumpSuit != null)
                       _buildBottomBar(room.trumpSuit!, room, playedCardsCount),
@@ -415,12 +415,8 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
               ],
             );
           }).toList(),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPlayerAvatar(Player player, String position, bool isTurn, bool isDealer, Color color) {
+  Widget _buildPlayerAvatar(Player player, String position, bool isTurn, bool isDealer, Color color, String localId) {
+    final bool isLocal = player.id == localId;
     return Padding(
     padding: _getPaddingFromPosition(position),
     child: Align(
@@ -445,6 +441,7 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
             ),
             child: Column(
               children: [
+                // Top Score Circle
                 Expanded(
                   flex: 3,
                   child: Center(
@@ -472,14 +469,15 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
                     ),
                   ),
                 ),
+                // Player Name
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 4),
                   child: Text(
-                    player.name.toUpperCase(),
+                    isLocal ? 'YOU' : player.name.toUpperCase(),
                     textAlign: TextAlign.center,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.w900),
+                    style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900),
                   ),
                 ),
                 const Spacer(),
@@ -533,10 +531,10 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
 
   EdgeInsets _getPaddingFromPosition(String pos) {
     switch (pos) {
-      case 'bottom': return const EdgeInsets.only(left: 30, bottom: 180);
-      case 'left': return const EdgeInsets.only(left: 30, top: 100);
-      case 'top': return const EdgeInsets.only(right: 30, top: 100);
-      case 'right': return const EdgeInsets.only(right: 30, bottom: 180);
+      case 'bottom': return const EdgeInsets.only(left: 20, bottom: 210);
+      case 'left': return const EdgeInsets.only(left: 20, top: 100);
+      case 'top': return const EdgeInsets.only(right: 20, top: 100);
+      case 'right': return const EdgeInsets.only(right: 20, bottom: 210);
       default: return EdgeInsets.zero;
     }
   }
@@ -732,7 +730,7 @@ class HandCardWidget extends StatelessWidget {
         return Align(
           alignment: Alignment.bottomCenter,
           child: Transform.translate(
-            offset: Offset(fanOffset * value, -110 - (1 - value) * 400),
+            offset: Offset(fanOffset * value, -85 - (1 - value) * 400),
             child: Transform.rotate(
               angle: rotation * value,
               child: GestureDetector(
@@ -781,17 +779,17 @@ class OpponentCardWidget extends StatelessWidget {
     switch (position) {
       case 'left': 
         alignment = Alignment.topLeft; 
-        padding = const EdgeInsets.only(left: 30, top: 100);
+        padding = const EdgeInsets.only(left: 20, top: 100);
         rotationAngle = math.pi / 6 + (rotation * 0.5); 
         break;
       case 'top': 
         alignment = Alignment.topRight; 
-        padding = const EdgeInsets.only(right: 30, top: 100);
+        padding = const EdgeInsets.only(right: 20, top: 100);
         rotationAngle = -math.pi / 6 + (rotation * 0.5); 
         break;
       case 'right': 
         alignment = Alignment.bottomRight; 
-        padding = const EdgeInsets.only(right: 30, bottom: 180);
+        padding = const EdgeInsets.only(right: 20, bottom: 210);
         rotationAngle = -math.pi / 12 + (rotation * 0.5); 
         break;
       default: 
