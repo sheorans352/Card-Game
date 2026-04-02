@@ -125,10 +125,7 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
                     const SpadeBackground(),
                     _buildTopHUD(players, room, playedCardsCount),
 
-                    _buildPlayerAvatar(rotatedPlayers[0], 'bottom', ref.watch(predictiveTurnIdProvider(room.id)) == rotatedPlayers[0].id, room.dealerIndex == (players.indexOf(rotatedPlayers[0])), Colors.green),
-                    _buildPlayerAvatar(rotatedPlayers[1], 'left', ref.watch(predictiveTurnIdProvider(room.id)) == rotatedPlayers[1].id, room.dealerIndex == (players.indexOf(rotatedPlayers[1])), Colors.blue),
-                    _buildPlayerAvatar(rotatedPlayers[2], 'top', ref.watch(predictiveTurnIdProvider(room.id)) == rotatedPlayers[2].id, room.dealerIndex == (players.indexOf(rotatedPlayers[2])), Colors.red),
-                    _buildPlayerAvatar(rotatedPlayers[3], 'right', ref.watch(predictiveTurnIdProvider(room.id)) == rotatedPlayers[3].id, room.dealerIndex == (players.indexOf(rotatedPlayers[3])), Colors.amber),
+                    ..._buildPlayerHands(ref, localHandAsync, myPlayedIds, pendingPlays, localPlayed, room.id, players, localPlayerId),
 
                     CardsLayer(
                       roomId: room.id,
@@ -138,7 +135,10 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
                       playerPositions: _playerKeys,
                     ),
 
-                    ..._buildPlayerHands(ref, localHandAsync, myPlayedIds, pendingPlays, localPlayed, room.id, players, localPlayerId),
+                    _buildPlayerAvatar(rotatedPlayers[0], 'bottom', ref.watch(predictiveTurnIdProvider(room.id)) == rotatedPlayers[0].id, room.dealerIndex == (players.indexOf(rotatedPlayers[0])), Colors.green),
+                    _buildPlayerAvatar(rotatedPlayers[1], 'left', ref.watch(predictiveTurnIdProvider(room.id)) == rotatedPlayers[1].id, room.dealerIndex == (players.indexOf(rotatedPlayers[1])), Colors.blue),
+                    _buildPlayerAvatar(rotatedPlayers[2], 'top', ref.watch(predictiveTurnIdProvider(room.id)) == rotatedPlayers[2].id, room.dealerIndex == (players.indexOf(rotatedPlayers[2])), Colors.red),
+                    _buildPlayerAvatar(rotatedPlayers[3], 'right', ref.watch(predictiveTurnIdProvider(room.id)) == rotatedPlayers[3].id, room.dealerIndex == (players.indexOf(rotatedPlayers[3])), Colors.amber),
 
                     if (room.trumpSuit != null)
                       _buildBottomBar(room.trumpSuit!, room, playedCardsCount),
@@ -147,16 +147,26 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
                     Positioned(
                       top: MediaQuery.of(context).padding.top + 10,
                       right: 20,
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: Colors.black38,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: accentGold.withOpacity(0.5)),
-                        ),
-                        child: IconButton(
-                          onPressed: () => setState(() => _showScoreboard = true),
-                          icon: const Icon(Icons.leaderboard_rounded, color: accentGold, size: 28),
-                          tooltip: 'Scoreboard',
+                      child: GestureDetector(
+                        onTap: () => setState(() => _showScoreboard = true),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.black45,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: accentGold.withOpacity(0.5)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: const [
+                              Icon(Icons.leaderboard_rounded, color: accentGold, size: 20),
+                              SizedBox(width: 8),
+                              Text(
+                                'SCOREBOARD',
+                                style: TextStyle(color: accentGold, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
@@ -523,10 +533,10 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
 
   EdgeInsets _getPaddingFromPosition(String pos) {
     switch (pos) {
-      case 'bottom': return const EdgeInsets.only(left: 30, bottom: 60);
-      case 'left': return const EdgeInsets.only(left: 30, top: 40);
-      case 'top': return const EdgeInsets.only(right: 30, top: 40);
-      case 'right': return const EdgeInsets.only(right: 30, bottom: 60);
+      case 'bottom': return const EdgeInsets.only(left: 30, bottom: 180);
+      case 'left': return const EdgeInsets.only(left: 30, top: 100);
+      case 'top': return const EdgeInsets.only(right: 30, top: 100);
+      case 'right': return const EdgeInsets.only(right: 30, bottom: 180);
       default: return EdgeInsets.zero;
     }
   }
@@ -711,8 +721,8 @@ class HandCardWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final fanOffset = (index - (total - 1) / 2) * 30.0;
-    final rotation = (index - (total - 1) / 2) * 0.1;
+    final fanOffset = (index - (total - 1) / 2) * 22.0;
+    final rotation = (index - (total - 1) / 2) * 0.08;
 
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0.0, end: 1.0),
@@ -766,21 +776,49 @@ class OpponentCardWidget extends StatelessWidget {
 
     Alignment alignment;
     double? rotationAngle;
+    EdgeInsets padding;
 
     switch (position) {
-      case 'left': alignment = Alignment.centerLeft; rotationAngle = math.pi / 2 + rotation; break;
-      case 'top': alignment = Alignment.topCenter; rotationAngle = math.pi + rotation; break;
-      case 'right': alignment = Alignment.centerRight; rotationAngle = -math.pi / 2 + rotation; break;
-      default: alignment = Alignment.center; rotationAngle = 0;
+      case 'left': 
+        alignment = Alignment.topLeft; 
+        padding = const EdgeInsets.only(left: 30, top: 100);
+        rotationAngle = math.pi / 6 + (rotation * 0.5); 
+        break;
+      case 'top': 
+        alignment = Alignment.topRight; 
+        padding = const EdgeInsets.only(right: 30, top: 100);
+        rotationAngle = -math.pi / 6 + (rotation * 0.5); 
+        break;
+      case 'right': 
+        alignment = Alignment.bottomRight; 
+        padding = const EdgeInsets.only(right: 30, bottom: 180);
+        rotationAngle = -math.pi / 12 + (rotation * 0.5); 
+        break;
+      default: 
+        alignment = Alignment.center; 
+        padding = EdgeInsets.zero;
+        rotationAngle = 0;
     }
 
     return Align(
       alignment: alignment,
       child: Padding(
-        padding: const EdgeInsets.all(40),
-        child: Transform.rotate(
-          angle: rotationAngle,
-          child: const PlayingCard(isFaceUp: false, width: 44, height: 66),
+        padding: padding,
+        child: SizedBox(
+          width: 86, height: 120, // Match avatar size for fanning logic
+          child: Stack(
+            alignment: Alignment.center,
+            clipBehavior: Clip.none,
+            children: [
+              Transform.translate(
+                offset: Offset(fanOffset, -10), // Fan out slightly behind avatar
+                child: Transform.rotate(
+                  angle: rotationAngle,
+                  child: const PlayingCard(isFaceUp: false, width: 44, height: 66),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
