@@ -97,7 +97,7 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
             data: (players) {
               final localPlayerId = ref.watch(localPlayerIdProvider);
               final localIndex = players.indexWhere((p) => p.id == localPlayerId);
-              if (localIndex == -1) return const Center(child: Text('You are not in this room'));
+              if (localIndex == -1 || localPlayerId == null) return const Center(child: Text('You are not in this room'));
 
               final predictivePlayedCards = ref.watch(predictivePlayedCardsProvider(room.id));
               final playedCardsCount = predictivePlayedCards.length;
@@ -105,126 +105,123 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
               final localHandAsync = ref.watch(playerHandProvider(localPlayerId));
               final myPlayedIds = predictivePlayedCards.where((m) => m['player_id'] == localPlayerId).map((m) => m['card_value'] as String).toSet();
               
-              // ROBUST FLICKER FIX: Stay hidden if local state OR table state has it.
-              // We only clear the local list once the HAND database confirms it is gone.
               final pendingPlays = ref.watch(pendingCardPlayProvider);
               final localPlayed = ref.watch(localPlayedCardsProvider);
-
 
               final rotatedPlayers = List.generate(4, (i) {
                 return players[(localIndex + i) % players.length];
               });
 
-              return Scaffold(
-        body: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [primaryBg, Color(0xFF050B14)],
-            ),
-          ),
-          child: Stack(
-                children: [
-                   const SpadeBackground(),
-                  _buildTopHUD(players, room, playedCardsCount),
-
-                  _buildPlayerAvatar(rotatedPlayers[0], 'bottom', ref.watch(predictiveTurnIdProvider(room.id)) == rotatedPlayers[0].id, room.dealerIndex == (players.indexOf(rotatedPlayers[0])), Colors.green),
-                  _buildPlayerAvatar(rotatedPlayers[1], 'left', ref.watch(predictiveTurnIdProvider(room.id)) == rotatedPlayers[1].id, room.dealerIndex == (players.indexOf(rotatedPlayers[1])), Colors.blue),
-                  _buildPlayerAvatar(rotatedPlayers[2], 'top', ref.watch(predictiveTurnIdProvider(room.id)) == rotatedPlayers[2].id, room.dealerIndex == (players.indexOf(rotatedPlayers[2])), Colors.red),
-                  _buildPlayerAvatar(rotatedPlayers[3], 'right', ref.watch(predictiveTurnIdProvider(room.id)) == rotatedPlayers[3].id, room.dealerIndex == (players.indexOf(rotatedPlayers[3])), Colors.amber),
-
-                  CardsLayer(
-                    roomId: room.id,
-                    players: rotatedPlayers,
-                    localPlayerId: localPlayerId!,
-                    currentPhase: room.currentPhase ?? 'playing',
-                    playerPositions: _playerKeys,
+              return Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [primaryBg, Color(0xFF050B14)],
                   ),
+                ),
+                child: Stack(
+                  children: [
+                    const SpadeBackground(),
+                    _buildTopHUD(players, room, playedCardsCount),
 
-                  ..._buildPlayerHands(ref, localHandAsync, myPlayedIds, pendingPlays, localPlayed),
+                    _buildPlayerAvatar(rotatedPlayers[0], 'bottom', ref.watch(predictiveTurnIdProvider(room.id)) == rotatedPlayers[0].id, room.dealerIndex == (players.indexOf(rotatedPlayers[0])), Colors.green),
+                    _buildPlayerAvatar(rotatedPlayers[1], 'left', ref.watch(predictiveTurnIdProvider(room.id)) == rotatedPlayers[1].id, room.dealerIndex == (players.indexOf(rotatedPlayers[1])), Colors.blue),
+                    _buildPlayerAvatar(rotatedPlayers[2], 'top', ref.watch(predictiveTurnIdProvider(room.id)) == rotatedPlayers[2].id, room.dealerIndex == (players.indexOf(rotatedPlayers[2])), Colors.red),
+                    _buildPlayerAvatar(rotatedPlayers[3], 'right', ref.watch(predictiveTurnIdProvider(room.id)) == rotatedPlayers[3].id, room.dealerIndex == (players.indexOf(rotatedPlayers[3])), Colors.amber),
 
-                  _buildBottomTricksHUD(players, localIndex, room),
-                  
-                  if (room.trumpSuit != null)
-                    _buildBottomBar(room.trumpSuit!, room, playedCardsCount),
-
-                  // Scoreboard Button (Top Right)
-                  Positioned(
-                    top: MediaQuery.of(context).padding.top + 10,
-                    right: 20,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Colors.black38,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: accentGold.withOpacity(0.5)),
-                      ),
-                      child: IconButton(
-                        onPressed: () => setState(() => _showScoreboard = true),
-                        icon: const Icon(Icons.leaderboard_rounded, color: accentGold, size: 28),
-                        tooltip: 'Scoreboard',
-                      ),
-                    ),
-                  ),
-
-                  if ((room.currentPhase == 'bidding' || room.currentPhase == 'bidding_2' || room.currentPhase == 'trump_selection') && 
-                      ref.watch(isLocalPlayerTurnProvider(room.code)))
-                    BiddingOverlay(
-                      isRoundTwo: room.currentPhase == 'bidding_2',
-                      currentHighBid: room.highestBid,
-                      trumpSuit: room.trumpSuit ?? 'S',
-                      isTrumpSelection: room.currentPhase == 'trump_selection',
-                      isScenarioB: room.currentPhase == 'bidding_2' && room.highestBidderId == null,
-                      onBidSubmitted: (score) => ref.read(cardServiceProvider).placeBid(room.id, localPlayerId, score),
-                      onTrumpSelected: (suit) => ref.read(cardServiceProvider).selectTrump(room.id, localPlayerId, suit.name.toUpperCase().substring(0, 1)),
-                      onPass: () => ref.read(cardServiceProvider).placeBid(room.id, localPlayerId, 0),
+                    CardsLayer(
+                      roomId: room.id,
+                      players: rotatedPlayers,
+                      localPlayerId: localPlayerId,
+                      currentPhase: room.currentPhase ?? 'playing',
+                      playerPositions: _playerKeys,
                     ),
 
-                  if (room.currentPhase == 'bidding_2' && room.highestBidderId == localPlayerId)
-                    _buildTrumpSetterWaitingScreen(players, room),
+                    ..._buildPlayerHands(ref, localHandAsync, myPlayedIds, pendingPlays, localPlayed, room.id, players, localPlayerId),
 
-                  if ((room.currentPhase == 'bidding' || room.currentPhase == 'trump_selection') && 
-                      !ref.watch(isLocalPlayerTurnProvider(room.code)) &&
-                      room.highestBidderId != localPlayerId)
-                   Align(
-                     alignment: Alignment.bottomCenter,
-                     child: Padding(
-                       padding: const EdgeInsets.only(bottom: 100),
-                       child: Text(
-                         room.currentPhase == 'trump_selection'
-                           ? 'Waiting for winner to set trump...'
-                           : 'Waiting for others to bid...',
-                         style: const TextStyle(color: Colors.white54, fontStyle: FontStyle.italic)),
-                     ),
-                   ),
+                    _buildBottomTricksHUD(players, localIndex, room),
+                    
+                    if (room.trumpSuit != null)
+                      _buildBottomBar(room.trumpSuit!, room, playedCardsCount),
 
-                  if (room.currentPhase == 'bidding_2' &&
-                      room.highestBidderId != localPlayerId &&
-                      !ref.watch(isLocalPlayerTurnProvider(room.code)))
-                    _buildBidding2WaitingText(players, room),
-
-                  if (room.currentPhase == 'cutting')
-                    const DeckCutOverlay(),
-
-                  if (_showScoreboard)
-                    Positioned.fill(
-                      child: GestureDetector(
-                        onTap: () => setState(() => _showScoreboard = false),
-                        child: Container(
-                          color: Colors.black87,
-                          padding: const EdgeInsets.only(top: 80),
-                          child: ScoreboardOverlay(
-                            roomId: room.id,
-                            players: players,
-                            onClose: () => setState(() => _showScoreboard = false),
-                          ),
+                    // Scoreboard Button (Top Right)
+                    Positioned(
+                      top: MediaQuery.of(context).padding.top + 10,
+                      right: 20,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.black38,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: accentGold.withOpacity(0.5)),
+                        ),
+                        child: IconButton(
+                          onPressed: () => setState(() => _showScoreboard = true),
+                          icon: const Icon(Icons.leaderboard_rounded, color: accentGold, size: 28),
+                          tooltip: 'Scoreboard',
                         ),
                       ),
                     ),
 
-                  if (room.status == 'game_over')
-                    _buildGameOverOverlay(context),
-                ],
+                    if ((room.currentPhase == 'bidding' || room.currentPhase == 'bidding_2' || room.currentPhase == 'trump_selection') && 
+                        ref.watch(isLocalPlayerTurnProvider(room.code)))
+                      BiddingOverlay(
+                        isRoundTwo: room.currentPhase == 'bidding_2',
+                        currentHighBid: room.highestBid,
+                        trumpSuit: room.trumpSuit ?? 'S',
+                        isTrumpSelection: room.currentPhase == 'trump_selection',
+                        isScenarioB: room.currentPhase == 'bidding_2' && room.highestBidderId == null,
+                        onBidSubmitted: (score) => ref.read(cardServiceProvider).placeBid(room.id, localPlayerId, score),
+                        onTrumpSelected: (suit) => ref.read(cardServiceProvider).selectTrump(room.id, localPlayerId, suit.name.toUpperCase().substring(0, 1)),
+                        onPass: () => ref.read(cardServiceProvider).placeBid(room.id, localPlayerId, 0),
+                      ),
+
+                    if (room.currentPhase == 'bidding_2' && room.highestBidderId == localPlayerId)
+                      _buildTrumpSetterWaitingScreen(players, room),
+
+                    if ((room.currentPhase == 'bidding' || room.currentPhase == 'trump_selection') && 
+                        !ref.watch(isLocalPlayerTurnProvider(room.code)) &&
+                        room.highestBidderId != localPlayerId)
+                     Align(
+                       alignment: Alignment.bottomCenter,
+                       child: Padding(
+                         padding: const EdgeInsets.only(bottom: 100),
+                         child: Text(
+                           room.currentPhase == 'trump_selection'
+                             ? 'Waiting for winner to set trump...'
+                             : 'Waiting for others to bid...',
+                           style: const TextStyle(color: Colors.white54, fontStyle: FontStyle.italic)),
+                       ),
+                     ),
+
+                    if (room.currentPhase == 'bidding_2' &&
+                        room.highestBidderId != localPlayerId &&
+                        !ref.watch(isLocalPlayerTurnProvider(room.code)))
+                      _buildBidding2WaitingText(players, room),
+
+                    if (room.currentPhase == 'cutting')
+                      const DeckCutOverlay(),
+
+                    if (_showScoreboard)
+                      Positioned.fill(
+                        child: GestureDetector(
+                          onTap: () => setState(() => _showScoreboard = false),
+                          child: Container(
+                            color: Colors.black87,
+                            padding: const EdgeInsets.only(top: 80),
+                            child: ScoreboardOverlay(
+                              roomId: room.id,
+                              players: players,
+                              onClose: () => setState(() => _showScoreboard = false),
+                            ),
+                          ),
+                        ),
+                      ),
+
+                    if (room.status == 'game_over')
+                      _buildGameOverOverlay(context),
+                  ],
+                ),
               );
             },
             loading: () => const Center(child: CircularProgressIndicator(color: accentGold)),
@@ -325,7 +322,6 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
                   ],
                 ),
                 const Spacer(),
-                // Miniature Player Scores
                 ...players.map((p) {
                    final isLeader = players.every((other) => p.totalScore >= other.totalScore);
                    return Padding(
@@ -359,7 +355,6 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
     }
   }
 
-  /// Full waiting screen shown to the trump setter (Scenario A) during bidding_2
   Widget _buildTrumpSetterWaitingScreen(List<Player> players, Room room) {
     final currentPlayer = players.isNotEmpty ? players[room.turnIndex % players.length] : null;
     final waitingFor = currentPlayer?.name.split(' ').first ?? 'other players';
@@ -384,7 +379,6 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
     );
   }
 
-  /// Bottom hint for non-active, non-trump-setter players in bidding_2
   Widget _buildBidding2WaitingText(List<Player> players, Room room) {
     final currentPlayer = players.isNotEmpty ? players[room.turnIndex % players.length] : null;
     final waitingFor = currentPlayer?.name.split(' ').first ?? 'other players';
@@ -458,7 +452,6 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
             ),
             child: Column(
               children: [
-                // Top Score Circle
                 Expanded(
                   flex: 3,
                   child: Center(
@@ -486,7 +479,6 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
                     ),
                   ),
                 ),
-                // Player Name
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 4),
                   child: Text(
@@ -498,7 +490,6 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
                   ),
                 ),
                 const Spacer(),
-                // Bottom Info Section
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(vertical: 6),
@@ -535,7 +526,7 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
       ),
     ),
   );
-}  }
+  }
 
   Alignment _getAlignmentFromPosition(String pos) {
     switch (pos) {
@@ -556,59 +547,79 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
       default: return EdgeInsets.zero;
     }
   }
-}
 
-class _ErrorView extends StatelessWidget {
-  final String message;
-  final VoidCallback onRetry;
+  List<Widget> _buildPlayerHands(
+    WidgetRef ref, 
+    AsyncValue<List<Map<String, dynamic>>> localHandAsync, 
+    Set<String> myPlayedIds,
+    Set<String> pendingPlays,
+    Set<String> localPlayed,
+    String roomId,
+    List<Player> players,
+    String localPlayerId,
+  ) {
+    List<Widget> handWidgets = [];
 
-  const _ErrorView({required this.message, required this.onRetry});
+    // 1. YOUR HAND
+    localHandAsync.whenData((hand) {
+      final playableIds = ref.watch(playableCardsProvider(roomId));
+      final visibleHand = hand.where((h) {
+        final val = h['card_value'] as String;
+        return !pendingPlays.contains(val) && !localPlayed.contains(val) && !myPlayedIds.contains(val);
+      }).toList();
+      
+      for (var i = 0; i < visibleHand.length; i++) {
+        final cardId = (visibleHand[i]['card_value'] as String).trim().toUpperCase();
+        final isPlayable = playableIds.contains(cardId);
+        
+        handWidgets.add(
+          HandCardWidget(
+            key: ValueKey('hand_$cardId'),
+            card: CardModel.fromId(cardId),
+            index: i,
+            total: visibleHand.length,
+            isPlayable: isPlayable,
+            onTap: isPlayable ? () async {
+              gameAudio.playCardPlay();
+              ref.read(pendingCardPlayProvider.notifier).update((state) => {...state, cardId});
+              ref.read(localPlayedCardsProvider.notifier).update((state) => {...state, cardId});
+              try {
+                await ref.read(cardServiceProvider).playCard(roomId, localPlayerId, cardId);
+              } catch (e) {
+                ref.read(pendingCardPlayProvider.notifier).update((state) => state.where((id) => id != cardId).toSet());
+                ref.read(localPlayedCardsProvider.notifier).update((state) => state.where((id) => id != cardId).toSet());
+              }
+            } : () => gameAudio.playInvalidMove(),
+          ),
+        );
+      }
+    });
 
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Container(
-        padding: const EdgeInsets.all(24),
-        margin: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: const Color(0xFF0B2111),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.redAccent.withOpacity(0.5)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.wifi_off, color: Colors.redAccent, size: 48),
-            const SizedBox(height: 16),
-            Text(message, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
-            const SizedBox(height: 8),
-            const Text('The Realtime connection was interrupted.', 
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.white70)),
-            const SizedBox(height: 24),
-            ElevatedButton.icon(
-              icon: const Icon(Icons.refresh),
-              label: const Text('RECONNECT NOW'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFC7A14C),
-                foregroundColor: Colors.black,
-              ),
-              onPressed: onRetry,
-            ),
-          ],
-        ),
-      ),
-    );
+    // 2. OPPONENT HANDS
+    for (var i = 1; i < 4; i++) {
+      final p = players[i];
+      final pos = _getPositionFromIndex(i);
+      final pHandAsync = ref.watch(playerHandProvider(p.id));
+      pHandAsync.whenData((hand) {
+        final cardsPlayedInTrick = ref.watch(predictivePlayedCardsProvider(roomId)).where((m) => m['player_id'] == p.id).length;
+        final actualHandSize = (hand.length - cardsPlayedInTrick).clamp(0, 52);
+        for (var j = 0; j < actualHandSize; j++) {
+          handWidgets.add(OpponentCardWidget(position: pos, index: j, total: actualHandSize));
+        }
+      });
+    }
+
+    return handWidgets;
   }
-}
 
-String _getSuitEmojiStatic(String code) {
-  switch (code) {
-    case 'S': return '♠️';
-    case 'H': return '♥️';
-    case 'D': return '♦️';
-    case 'C': return '♣️';
-    default: return '';
+  String _getPositionFromIndex(int index) {
+    switch (index) {
+      case 0: return 'bottom';
+      case 1: return 'left';
+      case 2: return 'top';
+      case 3: return 'right';
+      default: return 'bottom';
+    }
   }
 }
 
@@ -633,76 +644,28 @@ class CardsLayer extends ConsumerStatefulWidget {
 }
 
 class _CardsLayerState extends ConsumerState<CardsLayer> {
-  int _lastTrickCount = 0;
-  Timer? _sweepTimer;
   bool _isTrickExpanded = false;
 
   @override
-  void dispose() {
-    _sweepTimer?.cancel();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    // === USE PREDICTIVE STATE FOR UI RENDERING ===
     final playedMaps = ref.watch(predictivePlayedCardsProvider(widget.roomId));
-    
-    // We need the room code to get the turnIndex (winner)
     final roomCode = ref.watch(currentRoomCodeProvider);
     final room = roomCode != null ? ref.watch(roomMetadataProvider(roomCode)).value : null;
 
-    // Side-effect: Clear local tracking after a trick finishes (delay is for sweep animation)
-    ref.listen<List<Map<String, dynamic>>>(
-      predictivePlayedCardsProvider(widget.roomId),
-      (prev, next) {
-         if (next.length % 4 == 0 && next.isNotEmpty && next.length != _lastTrickCount) {
-            _lastTrickCount = next.length;
-            _sweepTimer?.cancel();
-            // We NO LONGER clear localPlayedCards here. 
-            // The room_provider.dart pruning side-effect will clear it once server catches up.
-         } else if (next.length != _lastTrickCount) {
-           _lastTrickCount = next.length;
-         }
-      },
-    );
-
-    // Watch for round changes or lobby resets to reset local state
-    if (room != null) {
-      ref.listen<int?>(
-        roomMetadataProvider(roomCode!).select((data) => data.value?.currentRound),
-        (prev, next) {
-          if (prev != next) ref.read(localPlayedCardsProvider.notifier).state = {};
-        },
-      );
-      ref.listen<String?>(
-        roomMetadataProvider(roomCode).select((data) => data.value?.status),
-        (prev, next) {
-          if (next == 'shuffling' || next == 'waiting') ref.read(localPlayedCardsProvider.notifier).state = {};
-        },
-      );
-    }
-
-    // --- Table Rendering Logic ---
-    if (playedMaps.isEmpty) return Stack(children: _buildPlayerHands(ref));
+    if (playedMaps.isEmpty) return const SizedBox();
 
     final trickSize = playedMaps.length % 4;
     final isTrickFinished = trickSize == 0;
-    
-    // Always show the "current" trick (the last 4 if finished, or the current n if in progress)
     final trickStartIndex = playedMaps.length - (isTrickFinished ? 4 : trickSize);
     final currentTrick = playedMaps.sublist(trickStartIndex < 0 ? 0 : trickStartIndex);
     
-    // Winner Position Logic for Sweep Animation
     String? winnerPos;
     if (isTrickFinished && room != null) {
        final playersList = ref.read(playersStreamProvider(room.id)).value ?? [];
        final winnerId = Player.evaluateTrickWinner(currentTrick, room.trumpSuit, playersList);
-       
        if (winnerId != null && playersList.isNotEmpty) {
           final winnerIdxInList = playersList.indexWhere((p) => p.id == winnerId);
           final localPlayerIdxInList = playersList.indexWhere((p) => p.id == widget.localPlayerId);
-          
           if (winnerIdxInList != -1 && localPlayerIdxInList != -1) {
             final winnerIdxInRotated = (winnerIdxInList - localPlayerIdxInList + 4) % 4;
             winnerPos = _getPositionFromIndex(winnerIdxInRotated);
@@ -710,60 +673,29 @@ class _CardsLayerState extends ConsumerState<CardsLayer> {
        }
     }
 
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        ..._buildPlayerHands(ref),
-        
-        // Trick Area with Swipe interaction
-        Positioned.fill(
-          child: GestureDetector(
-            behavior: HitTestBehavior.translucent,
-            onScaleStart: (_) => setState(() => _isTrickExpanded = true),
-            onScaleEnd: (_) => setState(() => _isTrickExpanded = false),
-            onLongPressStart: (_) => setState(() => _isTrickExpanded = true),
-            onLongPressEnd: (_) => setState(() => _isTrickExpanded = false),
-            onHorizontalDragStart: (_) => setState(() => _isTrickExpanded = true),
-            onHorizontalDragEnd: (_) => setState(() => _isTrickExpanded = false),
-            child: Stack(
-              children: currentTrick.map((m) {
-                final player = widget.players.cast<Player?>().firstWhere((p) => p?.id == m['player_id'], orElse: () => null);
-                if (player == null) return const SizedBox();
-                final playerIdxInRotated = widget.players.indexOf(player);
-                final pos = _getPositionFromIndex(playerIdxInRotated);
-                return PlayedCardWidget(
-                  key: ValueKey('played_${m['card_value']}'),
-                  card: CardModel.fromId(m['card_value']),
-                  position: pos,
-                  playerName: player.name,
-                  order: currentTrick.indexOf(m),
-                  isTrickFinished: isTrickFinished,
-                  winnerPosition: winnerPos,
-                  isExpanded: _isTrickExpanded,
-                );
-              }).toList(),
-            ),
-          ),
+    return Positioned.fill(
+      child: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onScaleStart: (_) => setState(() => _isTrickExpanded = true),
+        onScaleEnd: (_) => setState(() => _isTrickExpanded = false),
+        child: Stack(
+          children: currentTrick.map((m) {
+            final player = widget.players.firstWhere((p) => p.id == m['player_id']);
+            final playerIdxInRotated = widget.players.indexOf(player);
+            final pos = _getPositionFromIndex(playerIdxInRotated);
+            return PlayedCardWidget(
+              key: ValueKey('played_${m['card_value']}'),
+              card: CardModel.fromId(m['card_value']),
+              position: pos,
+              playerName: player.name,
+              order: currentTrick.indexOf(m),
+              isTrickFinished: isTrickFinished,
+              winnerPosition: winnerPos,
+              isExpanded: _isTrickExpanded,
+            );
+          }).toList(),
         ),
-
-        // Expanded Hint
-        if (currentTrick.isNotEmpty && !_isTrickExpanded && !isTrickFinished)
-          Align(
-            alignment: Alignment.center,
-            child: Padding(
-              padding: const EdgeInsets.only(top: 160),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.black45,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Text('Swipe center to see all cards', 
-                  style: TextStyle(color: Colors.white38, fontSize: 10, fontWeight: FontWeight.bold)),
-              ),
-            ),
-          ),
-      ],
+      ),
     );
   }
 
@@ -775,101 +707,6 @@ class _CardsLayerState extends ConsumerState<CardsLayer> {
       case 3: return 'right';
       default: return 'bottom';
     }
-  }
-
-  List<Widget> _buildPlayerHands(
-    WidgetRef ref, 
-    AsyncValue<List<Map<String, dynamic>>> localHandAsync, 
-    Set<String> myPlayedIds,
-    Set<String> pendingPlays,
-    Set<String> localPlayed
-  ) {
-    List<Widget> handWidgets = [];
-
-    localHandAsync.whenData((hand) {
-      // Filter out cards already played (Optimisic + Ground Truth from Table)
-      final visibleHand = hand.where((h) {
-        final val = h['card_value'] as String;
-        return !pendingPlays.contains(val) && !localPlayed.contains(val) && !myPlayedIds.contains(val);
-      }).toList();
-      
-      for (var i = 0; i < visibleHand.length; i++) {
-        final rawCardId = visibleHand[i]['card_value'] as String;
-        final cardId = rawCardId.trim().toUpperCase();
-        final isPlayable = playableIds.contains(cardId); // Global lock removed for trick transition
-        
-        handWidgets.add(
-          HandCardWidget(
-            key: ValueKey('hand_$cardId'),
-            card: CardModel.fromId(cardId),
-            index: i,
-            total: visibleHand.length,
-            isPlayable: isPlayable,
-            onTap: isPlayable ? () async {
-              gameAudio.playCardPlay();
-              // Optimistically hide from hand
-              ref.read(pendingCardPlayProvider.notifier).update((state) => {...state, cardId});
-              ref.read(localPlayedCardsProvider.notifier).update((state) => {...state, cardId});
-              
-              try {
-                await ref.read(cardServiceProvider).playCard(roomId, localPlayerId, cardId);
-              } catch (e) {
-                // If it fails, restore the card to hand
-                ref.read(pendingCardPlayProvider.notifier).update((state) => state.where((id) => id != cardId).toSet());
-                ref.read(localPlayedCardsProvider.notifier).update((state) => state.where((id) => id != cardId).toSet());
-                debugPrint('Play card failed: $e');
-              }
-              // pendingCardPlayProvider will be cleared by ref.listen below
-            } : () {
-              gameAudio.playInvalidMove();
-            },
-          ),
-        );
-      }
-    });
-
-    for (var i = 1; i < 4; i++) {
-      final p = players[i];
-      final pos = _getPositionFromIndex(i);
-      final pHandAsync = ref.watch(playerHandProvider(p.id));
-      pHandAsync.whenData((hand) {
-        final cardsPlayedByOpponent = ref.watch(predictivePlayedCardsProvider(roomId)).where((m) => m['player_id'] == p.id).length;
-        final actualHandSize = (hand.length - cardsPlayedByOpponent).clamp(0, 52);
-        
-        for (var j = 0; j < actualHandSize; j++) {
-          handWidgets.add(OpponentCardWidget(
-            key: ValueKey('opp_${pos}_${p.id}_$j'),
-            position: pos, 
-            index: j, 
-            total: actualHandSize
-          ));
-        }
-      });
-    }
-    // Listen for new cards in local hand for dealing SFX and to clear pending plays
-    ref.listen(playerHandProvider(localPlayerId), (prev, next) {
-      next.whenData((hand) {
-        // 1. Manage pending plays set: remove if the card is actually gone from the DB hand
-        final handIds = hand.map((h) => h['card_value'] as String).toSet();
-        ref.read(pendingCardPlayProvider.notifier).update((state) => 
-          state.where((id) => handIds.contains(id)).toSet()
-        );
-
-        // 2. Deal SFX
-        final prevLen = prev?.value?.length ?? 0;
-        final nextLen = hand.length;
-        if (nextLen > prevLen) {
-          final addedCount = nextLen - prevLen;
-          for (int i = 0; i < addedCount; i++) {
-            Future.delayed(Duration(milliseconds: i * 150), () {
-              gameAudio.playCardDeal();
-            });
-          }
-        }
-      });
-    });
-
-    return handWidgets;
   }
 }
 
@@ -905,37 +742,18 @@ class HandCardWidget extends StatelessWidget {
             offset: Offset(fanOffset * value, -110 - (1 - value) * 400),
             child: Transform.rotate(
               angle: rotation * value,
-              child: Stack(
-                alignment: Alignment.center,
-                clipBehavior: Clip.none,
-                children: [
-                  GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                    onTap: onTap,
-                    child: Opacity(
-                      opacity: isPlayable ? 1.0 : 0.6,
-                      child: PlayingCard(
-                        card: card,
-                        isFaceUp: true,
-                        isPlayable: isPlayable,
-                        width: 70, 
-                        height: 105,
-                      ),
-                    ),
+              child: GestureDetector(
+                onTap: onTap,
+                child: Opacity(
+                  opacity: isPlayable ? 1.0 : 0.6,
+                  child: PlayingCard(
+                    card: card,
+                    isFaceUp: true,
+                    isPlayable: isPlayable,
+                    width: 70, 
+                    height: 105,
                   ),
-                  if (isPlayable)
-                    Positioned(
-                      bottom: -10,
-                      child: Container(
-                        width: 10, height: 10,
-                        decoration: const BoxDecoration(
-                          color: Color(0xFFE5B84B), 
-                          shape: BoxShape.circle,
-                          boxShadow: [BoxShadow(color: Colors.amber, blurRadius: 4)],
-                        ),
-                      ),
-                    ),
-                ],
+                ),
               ),
             ),
           ),
@@ -964,35 +782,24 @@ class OpponentCardWidget extends StatelessWidget {
     final rotation = (index - (total - 1) / 2) * 0.05;
 
     Alignment alignment;
-    double? top, bottom, left, right;
-    double? angle;
+    double? rotationAngle;
 
     switch (position) {
-      case 'left': alignment = Alignment.centerLeft; left = 140; top = fanOffset; angle = math.pi / 2 + rotation; break;
-      case 'top': alignment = Alignment.topCenter; top = 140; left = fanOffset; angle = math.pi + rotation; break;
-      case 'right': alignment = Alignment.centerRight; right = 140; bottom = fanOffset; angle = -math.pi / 2 + rotation; break;
-      default: alignment = Alignment.center;
+      case 'left': alignment = Alignment.centerLeft; rotationAngle = math.pi / 2 + rotation; break;
+      case 'top': alignment = Alignment.topCenter; rotationAngle = math.pi + rotation; break;
+      case 'right': alignment = Alignment.centerRight; rotationAngle = -math.pi / 2 + rotation; break;
+      default: alignment = Alignment.center; rotationAngle = 0;
     }
 
-    return TweenAnimationBuilder<double>(
-      tween: Tween(begin: 0.0, end: 1.0),
-      duration: Duration(milliseconds: 400 + (index * 60)),
-      curve: Curves.easeOutCubic,
-      builder: (context, value, child) {
-        return Align(
-          alignment: alignment,
-          child: Transform.translate(
-            offset: Offset(
-              (position == 'right' ? -20.0 : (position == 'left' ? 20.0 : 0)) * value, 
-              (position == 'top' ? 20.0 : 0) * value
-            ),
-            child: Transform.rotate(
-              angle: (angle ?? 0) * value,
-              child: const PlayingCard(isFaceUp: false, width: 44, height: 66),
-            ),
-          ),
-        );
-      },
+    return Align(
+      alignment: alignment,
+      child: Padding(
+        padding: const EdgeInsets.all(40),
+        child: Transform.rotate(
+          angle: rotationAngle,
+          child: const PlayingCard(isFaceUp: false, width: 44, height: 66),
+        ),
+      ),
     );
   }
 }
@@ -1021,15 +828,13 @@ class PlayedCardWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     double offsetX = 0;
     double offsetY = 0;
-    double rotation = 0;
-
-    const gridOffset = 45.0; // Half of (cardSize + gap)
+    const gridOffset = 45.0;
     
     switch (position) {
-      case 'bottom': offsetX = -gridOffset; offsetY = gridOffset; rotation = 0; break;
-      case 'left': offsetX = -gridOffset; offsetY = -gridOffset; rotation = 0; break;
-      case 'top': offsetX = gridOffset; offsetY = -gridOffset; rotation = 0; break;
-      case 'right': offsetX = gridOffset; offsetY = gridOffset; rotation = 0; break;
+      case 'bottom': offsetX = -gridOffset; offsetY = gridOffset; break;
+      case 'left': offsetX = -gridOffset; offsetY = -gridOffset; break;
+      case 'top': offsetX = gridOffset; offsetY = -gridOffset; break;
+      case 'right': offsetX = gridOffset; offsetY = gridOffset; break;
     }
 
     double winOffsetX = 0;
@@ -1045,66 +850,39 @@ class PlayedCardWidget extends StatelessWidget {
 
     return Center(
       child: TweenAnimationBuilder<double>(
-        tween: Tween(begin: 1.0, end: 0.0),
-        duration: const Duration(milliseconds: 350),
-        curve: Curves.easeOutCubic,
-        builder: (context, value, child) {
-          return TweenAnimationBuilder<double>(
-            tween: isTrickFinished ? Tween(begin: 0.0, end: 1.0) : Tween(begin: 0.0, end: 0.0),
-            duration: const Duration(milliseconds: 500),
-            curve: Curves.easeInQuint,
-            builder: (context, winValue, child) {
-              return Transform.translate(
-                offset: Offset(
-                  (offsetX * value) + (winOffsetX * winValue), 
-                  (offsetY * value) + (winOffsetY * winValue),
+        tween: isTrickFinished ? Tween(begin: 0.0, end: 1.0) : Tween(begin: 0.0, end: 0.0),
+        duration: const Duration(milliseconds: 500),
+        curve: Curves.easeInQuint,
+        builder: (context, winValue, child) {
+          return Transform.translate(
+            offset: Offset(offsetX + (winOffsetX * winValue), offsetY + (winOffsetY * winValue)),
+            child: Opacity(
+              opacity: 1.0 - (winValue * 0.8),
+              child: Container(
+                width: 80, height: 100,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(10),
+                  border: isTrickFinished && winnerPosition == position
+                      ? Border.all(color: accentGold, width: 4)
+                      : Border.all(color: Colors.white, width: 1),
+                  boxShadow: [
+                    BoxShadow(color: Colors.black.withOpacity(0.4), blurRadius: 10, offset: const Offset(2, 4)),
+                    if (isTrickFinished && winnerPosition == position)
+                      BoxShadow(color: accentGold.withOpacity(0.4), blurRadius: 15, spreadRadius: 2),
+                  ],
                 ),
-                child: Transform.rotate(
-                  angle: rotation + (order * 0.1),
-                  child: Opacity(
-                    opacity: 1.0 - (winValue * 0.8), // Fades out slightly as it reaches winner
-                    child: Container(
-                          width: 80,
-                          height: 100,
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(10),
-                            border: isTrickFinished && winnerPosition == position
-                                ? Border.all(color: accentGold, width: 4)
-                                : Border.all(color: Colors.white, width: 1),
-                            boxShadow: [
-                              BoxShadow(color: Colors.black.withOpacity(0.4), blurRadius: 10, offset: const Offset(2, 4)),
-                              if (isTrickFinished && winnerPosition == position)
-                                BoxShadow(color: accentGold.withOpacity(0.4), blurRadius: 15, spreadRadius: 2),
-                            ],
-                          ),
-                          child: Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text(
-                                  card.value,
-                                  style: TextStyle(
-                                    color: (card.suit.code == 'H' || card.suit.code == 'D') ? Colors.red : Colors.black87,
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.w900,
-                                  ),
-                                ),
-                                Text(
-                                  CardModel.getSuitEmoji(card.suit.code),
-                                  style: TextStyle(
-                                    color: (card.suit.code == 'H' || card.suit.code == 'D') ? Colors.red : Colors.black87,
-                                    fontSize: 18,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(card.value, style: TextStyle(color: (card.suit.code == 'H' || card.suit.code == 'D') ? Colors.red : Colors.black87, fontSize: 24, fontWeight: FontWeight.w900)),
+                      Text(CardModel.getSuitEmoji(card.suit.code), style: TextStyle(color: (card.suit.code == 'H' || card.suit.code == 'D') ? Colors.red : Colors.black87, fontSize: 18)),
+                    ],
                   ),
                 ),
-              );
-            },
+              ),
+            ),
           );
         },
       ),
@@ -1113,57 +891,60 @@ class PlayedCardWidget extends StatelessWidget {
 }
 
 Widget _buildBottomBar(String trumpSuit, Room room, int? playedCardsCount) {
-  final currentTrick = ((playedCardsCount ?? 0) ~/ 4) + 1;
-  final displayTrick = currentTrick.clamp(1, 13);
-  final suitEmoji = CardModel.getSuitEmoji(trumpSuit);
-
+  final displayTrick = ((playedCardsCount ?? 0) ~/ 4 + 1).clamp(1, 13);
   return Positioned(
-    bottom: 0,
-    left: 0,
-    right: 0,
+    bottom: 0, left: 0, right: 0,
     child: Container(
       height: 44,
       padding: const EdgeInsets.symmetric(horizontal: 24),
-      decoration: const BoxDecoration(
-        color: Colors.black,
-        border: Border(top: BorderSide(color: Color(0xFF1E2833), width: 0.5)),
-      ),
+      decoration: const BoxDecoration(color: Colors.black, border: Border(top: BorderSide(color: Color(0xFF1E2833), width: 0.5))),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text(
-            '${suitEmoji} TRUMP SUIT: ${CardModel.getSuitName(trumpSuit).toUpperCase()}',
-            style: const TextStyle(color: accentGold, fontSize: 12, fontWeight: FontWeight.w900, letterSpacing: 0.8),
-          ),
+          Text('${CardModel.getSuitEmoji(trumpSuit)} TRUMP SUIT: ${CardModel.getSuitName(trumpSuit).toUpperCase()}',
+               style: const TextStyle(color: accentGold, fontSize: 12, fontWeight: FontWeight.w900, letterSpacing: 0.8)),
           const SizedBox(width: 24),
           const Text('·', style: TextStyle(color: Colors.white24, fontSize: 20)),
           const SizedBox(width: 24),
-          Text(
-            'ROUND ${room.currentRound}  ·  TRICK $displayTrick OF 13',
-            style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 0.8),
-          ),
+          Text('ROUND ${room.currentRound}  ·  TRICK $displayTrick OF 13',
+               style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 0.8)),
         ],
       ),
     ),
   );
 }
 
-class _TurnTimerPainter extends CustomPainter {
-  final double angle;
-  _TurnTimerPainter({required this.angle});
-
+class _ErrorView extends StatelessWidget {
+  final String message;
+  final VoidCallback onRetry;
+  const _ErrorView({required this.message, required this.onRetry});
   @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = const Color(0xFFE5B84B).withOpacity(0.8)
-      ..strokeWidth = 3
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round;
-
-    final rect = Rect.fromLTWH(0, 0, size.width, size.height);
-    canvas.drawArc(rect, -1.57, angle * 6.28, false, paint);
+  Widget build(BuildContext context) {
+    return Center(
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(color: const Color(0xFF0B2111), borderRadius: BorderRadius.circular(16)),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.wifi_off, color: Colors.redAccent, size: 48),
+            const SizedBox(height: 16),
+            Text(message, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
+            const SizedBox(height: 24),
+            ElevatedButton(onPressed: onRetry, child: const Text('RETRY')),
+          ],
+        ),
+      ),
+    );
   }
+}
 
-  @override
-  bool shouldRepaint(covariant _TurnTimerPainter oldDelegate) => oldDelegate.angle != angle;
+String _getSuitEmojiStatic(String code) {
+  switch (code) {
+    case 'S': return '♠️';
+    case 'H': return '♥️';
+    case 'D': return '♦️';
+    case 'C': return '♣️';
+    default: return '';
+  }
 }
