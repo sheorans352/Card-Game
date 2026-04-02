@@ -102,24 +102,30 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
               final predictivePlayedCards = ref.watch(predictivePlayedCardsProvider(room.id));
               final playedCardsCount = predictivePlayedCards.length;
 
+              final localHandAsync = ref.watch(playerHandProvider(localPlayerId));
+              final myPlayedIds = predictivePlayedCards.where((m) => m['player_id'] == localPlayerId).map((m) => m['card_value'] as String).toSet();
+              
+              // ROBUST FLICKER FIX: Stay hidden if local state OR table state has it.
+              // We only clear the local list once the HAND database confirms it is gone.
+              final pendingPlays = ref.watch(pendingCardPlayProvider);
+              final localPlayed = ref.watch(localPlayedCardsProvider);
+
+
               final rotatedPlayers = List.generate(4, (i) {
                 return players[(localIndex + i) % players.length];
               });
 
-              return Stack(
+              return Scaffold(
+        body: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [primaryBg, Color(0xFF050B14)],
+            ),
+          ),
+          child: Stack(
                 children: [
-                   Container(
-                     decoration: const BoxDecoration(
-                       gradient: LinearGradient(
-                         begin: Alignment.topCenter,
-                         end: Alignment.bottomCenter,
-                         colors: [
-                           Color(0xFF081221), // Top Darkest
-                           Color(0xFF02070D), // Bottom Almost Black
-                         ],
-                       ),
-                     ),
-                   ),
                    const SpadeBackground(),
                   _buildTopHUD(players, room, playedCardsCount),
 
@@ -135,6 +141,8 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
                     currentPhase: room.currentPhase ?? 'playing',
                     playerPositions: _playerKeys,
                   ),
+
+                  ..._buildPlayerHands(ref, localHandAsync, myPlayedIds, pendingPlays, localPlayed),
 
                   _buildBottomTricksHUD(players, localIndex, room),
                   
@@ -427,107 +435,107 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
 
   Widget _buildPlayerAvatar(Player player, String position, bool isTurn, bool isDealer, Color color) {
     return Padding(
-      padding: _getPaddingFromPosition(position),
-      child: Align(
-        alignment: _getAlignmentFromPosition(position),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 86,
-              height: 120,
-              decoration: BoxDecoration(
-                color: playerCardBg,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: isTurn ? accentGold : (position == 'bottom' ? activeCardBg.withOpacity(0.5) : Colors.white10),
-                  width: isTurn ? 2 : 1,
-                ),
-                boxShadow: [
-                  if (isTurn)
-                    BoxShadow(color: accentGold.withOpacity(0.2), blurRadius: 15, spreadRadius: 2),
-                ],
+    padding: _getPaddingFromPosition(position),
+    child: Align(
+      alignment: _getAlignmentFromPosition(position),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 86,
+            height: 120,
+            decoration: BoxDecoration(
+              color: playerCardBg,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: isTurn ? accentGold : (position == 'bottom' ? activeCardBg.withOpacity(0.5) : Colors.white10),
+                width: isTurn ? 2 : 1,
               ),
-              child: Column(
-                children: [
-                  // Top Score Circle
-                  Expanded(
-                    flex: 3,
-                    child: Center(
-                      child: Container(
-                        width: 50,
-                        height: 50,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: (player.totalScore < 0 ? boxRed : (isTurn ? accentGold : Colors.white)).withOpacity(0.12),
-                          border: Border.all(
-                            color: (player.totalScore < 0 ? boxRed : (isTurn ? accentGold : Colors.white)).withOpacity(0.4),
-                            width: 1.5
-                          ),
+              boxShadow: [
+                if (isTurn)
+                  BoxShadow(color: accentGold.withOpacity(0.2), blurRadius: 15, spreadRadius: 2),
+              ],
+            ),
+            child: Column(
+              children: [
+                // Top Score Circle
+                Expanded(
+                  flex: 3,
+                  child: Center(
+                    child: Container(
+                      width: 50,
+                      height: 50,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: (player.totalScore < 0 ? boxRed : (isTurn ? accentGold : Colors.white)).withOpacity(0.12),
+                        border: Border.all(
+                          color: (player.totalScore < 0 ? boxRed : (isTurn ? accentGold : Colors.white)).withOpacity(0.4),
+                          width: 1.5
                         ),
-                        child: Center(
-                          child: Text(
-                            '${player.totalScore}',
-                            style: TextStyle(
-                              color: player.totalScore < 0 ? boxRed : Colors.white,
-                              fontSize: 18,
-                              fontWeight: FontWeight.w900,
-                            ),
+                      ),
+                      child: Center(
+                        child: Text(
+                          '${player.totalScore}',
+                          style: TextStyle(
+                            color: player.totalScore < 0 ? boxRed : Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w900,
                           ),
                         ),
                       ),
                     ),
                   ),
-                  // Player Name
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    child: Text(
-                      player.name.toUpperCase(),
-                      textAlign: TextAlign.center,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.w900),
-                    ),
+                ),
+                // Player Name
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: Text(
+                    player.name.toUpperCase(),
+                    textAlign: TextAlign.center,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.w900),
                   ),
-                  const Spacer(),
-                  // Bottom Info Section
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Colors.black26,
-                      borderRadius: const BorderRadius.vertical(bottom: Radius.circular(11)),
-                    ),
-                    child: Column(
-                      children: [
-                        Text(
-                          '${player.tricksWon} / ${player.bid ?? 0}',
-                          style: TextStyle(color: isTurn ? accentGold : Colors.white54, fontSize: 11, fontWeight: FontWeight.bold),
-                        ),
-                        const Text(
-                          'tricks',
-                          style: TextStyle(color: Colors.white24, fontSize: 7, fontWeight: FontWeight.bold),
-                        ),
-                        Text(
-                          'Score: ${player.totalScore}',
-                          style: const TextStyle(color: Colors.white24, fontSize: 8),
-                        ),
-                      ],
-                    ),
+                ),
+                const Spacer(),
+                // Bottom Info Section
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.black26,
+                    borderRadius: const BorderRadius.vertical(bottom: Radius.circular(11)),
                   ),
-                ],
-              ),
+                  child: Column(
+                    children: [
+                      Text(
+                        '${player.tricksWon} / ${player.bid ?? 0}',
+                        style: TextStyle(color: isTurn ? accentGold : Colors.white54, fontSize: 11, fontWeight: FontWeight.bold),
+                      ),
+                      const Text(
+                        'tricks',
+                        style: TextStyle(color: Colors.white24, fontSize: 7, fontWeight: FontWeight.bold),
+                      ),
+                      Text(
+                        'Score: ${player.totalScore}',
+                        style: const TextStyle(color: Colors.white24, fontSize: 8),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-            if (isDealer)
-               const Padding(
-                 padding: EdgeInsets.only(top: 4),
-                 child: Text('DEALER', style: TextStyle(color: accentGold, fontSize: 8, fontWeight: FontWeight.w900)),
-               ),
-          ],
-        ),
+          ),
+          if (isDealer)
+             const Padding(
+               padding: EdgeInsets.only(top: 4),
+               child: Text('DEALER', style: TextStyle(color: accentGold, fontSize: 8, fontWeight: FontWeight.w900)),
+             ),
+        ],
       ),
-    );
-  }
+    ),
+  );
+}  }
 
   Alignment _getAlignmentFromPosition(String pos) {
     switch (pos) {
@@ -769,24 +777,20 @@ class _CardsLayerState extends ConsumerState<CardsLayer> {
     }
   }
 
-  List<Widget> _buildPlayerHands(WidgetRef ref) {
-    final roomId = widget.roomId;
-    final players = widget.players;
-    final localPlayerId = widget.localPlayerId;
-    final localHandAsync = ref.watch(playerHandProvider(localPlayerId));
-    final playableIds = ref.watch(playableCardsProvider(roomId));
-    final pendingPlays = ref.watch(pendingCardPlayProvider);
-    final localPlayed = ref.watch(localPlayedCardsProvider);
+  List<Widget> _buildPlayerHands(
+    WidgetRef ref, 
+    AsyncValue<List<Map<String, dynamic>>> localHandAsync, 
+    Set<String> myPlayedIds,
+    Set<String> pendingPlays,
+    Set<String> localPlayed
+  ) {
     List<Widget> handWidgets = [];
 
     localHandAsync.whenData((hand) {
-      // FIX FLICKER: Filter ONLY based on local optimistic state and actual hand database.
-      // We IGNORE what is on the table (myPlayedIds) to avoid the "reappearing card" gap.
+      // Filter out cards already played (Optimisic + Ground Truth from Table)
       final visibleHand = hand.where((h) {
         final val = h['card_value'] as String;
-        // If it's in pending or localPlayed, we keep it hidden.
-        // Once the server-side 'hands' table update reaches here, it will be gone from 'hand' anyway.
-        return !pendingPlays.contains(val) && !localPlayed.contains(val);
+        return !pendingPlays.contains(val) && !localPlayed.contains(val) && !myPlayedIds.contains(val);
       }).toList();
       
       for (var i = 0; i < visibleHand.length; i++) {

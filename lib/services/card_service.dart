@@ -76,46 +76,12 @@ class SupabaseCardService extends CardService {
 
   @override
   Future<void> dealInitialFive(String roomId, List<String> playerIds) async {
-    final roomResponse = await _supabase.from('rooms').select().eq('id', roomId);
-    if (roomResponse.isEmpty) return;
-    final room = roomResponse.first;
-    final List<dynamic> deck = room['shuffled_deck'];
-    final int dealerIndex = room['dealer_index'] ?? 0;
-    // Cutter is to the LEFT of dealer (clockwise next): (dealerIndex + 1) % 4
-    final int cutterIndex = (dealerIndex + 1) % 4;
+    // Call the atomic server-side RPC for 100% stability
+    // This handles Shuffle, Clear Table, Dealer Selection, and Initial Deal
+    await _supabase.rpc('start_deal_round', params: {'p_room_id': roomId});
     
-    // 1. Definitively clear all hands and played cards for this room (Atomic)
-    await _supabase.from('hands').delete().eq('room_id', roomId);
-    await _supabase.from('played_cards').delete().eq('room_id', roomId);
-    
-    // 2. Clear played cards for this room (Safety)
-    await _supabase.from('played_cards').delete().eq('room_id', roomId);
-    
-    // Build clockwise order starting from cutter
-    final List<String> orderedPlayers = List.generate(4, (i) => playerIds[(cutterIndex + i) % 4]);
-
-    // Batch-insert initial 5 cards with delay for UI animation (4 players)
-    for (int i = 0; i < 4; i++) {
-        final hand = deck.skip(i * 5).take(5).map((c) => {
-          'room_id': roomId,
-          'player_id': orderedPlayers[i],
-          'card_value': c,
-        }).toList();
-        await _supabase.from('hands').insert(hand);
-        await Future.delayed(const Duration(milliseconds: 400));
-    }
-
-    // Phase: bidding (5 cards in hand, bid on trump)
-    await _supabase.from('rooms').update({
-      'status': 'bidding',
-      'current_phase': 'bidding',
-      'trump_suit': null,
-      'highest_bid': 0,
-      'highest_bidder_id': null,
-      'pass_count': 0,
-       // 'current_round': 1, // FIXED: DON'T reset current_round here! It propagates across rounds.
-      'turn_index': cutterIndex, // Bidding starts with Cutter
-    }).eq('id', roomId);
+    // UI Pause to let players see the "Dealer" badge move and the deck shuffle
+    await Future.delayed(const Duration(milliseconds: 1500));
   }
 
   // Deal 4 more cards per player (called after trump selection)
