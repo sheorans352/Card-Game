@@ -860,10 +860,22 @@ class PlayedCardWidget extends StatelessWidget {
     double winOffsetY = 0;
     if (isTrickFinished && winnerPosition != null) {
       switch (winnerPosition) {
-        case 'bottom': winOffsetY = 240; break;
-        case 'left': winOffsetX = -180; break;
-        case 'top': winOffsetY = -240; break;
-        case 'right': winOffsetX = 180; break;
+        case 'bottom': // Bottom Left
+          winOffsetX = -350; 
+          winOffsetY = 450; 
+          break;
+        case 'left': // Top Left
+          winOffsetX = -350; 
+          winOffsetY = -450; 
+          break;
+        case 'top': // Top Right
+          winOffsetX = 350; 
+          winOffsetY = -450; 
+          break;
+        case 'right': // Bottom Right
+          winOffsetX = 350; 
+          winOffsetY = 450; 
+          break;
       }
     }
 
