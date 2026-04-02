@@ -140,8 +140,6 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
 
                     ..._buildPlayerHands(ref, localHandAsync, myPlayedIds, pendingPlays, localPlayed, room.id, players, localPlayerId),
 
-                    _buildBottomTricksHUD(players, localIndex, room),
-                    
                     if (room.trumpSuit != null)
                       _buildBottomBar(room.trumpSuit!, room, playedCardsCount),
 
@@ -322,21 +320,6 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
                   ],
                 ),
                 const Spacer(),
-                ...players.map((p) {
-                   final isLeader = players.every((other) => p.totalScore >= other.totalScore);
-                   return Padding(
-                    padding: const EdgeInsets.only(left: 16),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(p.name.substring(0, 2).toUpperCase(), 
-                          style: TextStyle(color: isLeader ? accentGold : Colors.white24, fontSize: 9, fontWeight: FontWeight.bold)),
-                        Text('${p.totalScore}', 
-                          style: TextStyle(color: isLeader ? accentGold : Colors.white, fontSize: 15, fontWeight: FontWeight.w900)),
-                      ],
-                    ),
-                  );
-                }),
               ],
             ),
           ),
