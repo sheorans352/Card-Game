@@ -14,13 +14,13 @@ import '../widgets/scoreboard_overlay.dart';
 import '../widgets/spade_background.dart';
 import '../services/audio_service.dart';
 
-const Color primaryBg = Color(0xFF02070D); // Premium Dark Navy/Black
-const Color accentGold = Color(0xFFFFD700); // Higher contrast Gold
-const Color cardDark = Color(0xFF141414);
-const Color playerGreen = Color(0xFF1B5E20);
-const Color playerBlue = Color(0xFF0D47A1);
-const Color playerRed = Color(0xFFB71C1C);
-const Color playerGold = Color(0xFFF9A825);
+const Color primaryBg = Color(0xFF0A1A2F); // Deep Navy Black from Mock
+const Color tableFelt = Color(0xFF0D1B2A);
+const Color accentGold = Color(0xFFE5B84B); // Premium Gold
+const Color playerCardBg = Color(0xFF101E33); // Inactive player card
+const Color activeCardBg = Color(0xFF1A2F4A); // Active/YOU card border
+const Color boxGreen = Color(0xFF4CAF50);
+const Color boxRed = Color(0xFFEF5350);
 const Color tableBorder = Color(0xFF1E2833);
 
 class GameTableScreen extends ConsumerStatefulWidget {
@@ -123,10 +123,10 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
                    const SpadeBackground(),
                   _buildTopHUD(players, room, playedCardsCount),
 
-                  _buildPlayerAvatar(rotatedPlayers[0], 'bottom', ref.watch(predictiveTurnIdProvider(room.id)) == rotatedPlayers[0].id, room.dealerIndex == (players.indexOf(rotatedPlayers[0])), playerGreen),
-                  _buildPlayerAvatar(rotatedPlayers[1], 'left', ref.watch(predictiveTurnIdProvider(room.id)) == rotatedPlayers[1].id, room.dealerIndex == (players.indexOf(rotatedPlayers[1])), playerBlue),
-                  _buildPlayerAvatar(rotatedPlayers[2], 'top', ref.watch(predictiveTurnIdProvider(room.id)) == rotatedPlayers[2].id, room.dealerIndex == (players.indexOf(rotatedPlayers[2])), playerRed),
-                  _buildPlayerAvatar(rotatedPlayers[3], 'right', ref.watch(predictiveTurnIdProvider(room.id)) == rotatedPlayers[3].id, room.dealerIndex == (players.indexOf(rotatedPlayers[3])), playerGold),
+                  _buildPlayerAvatar(rotatedPlayers[0], 'bottom', ref.watch(predictiveTurnIdProvider(room.id)) == rotatedPlayers[0].id, room.dealerIndex == (players.indexOf(rotatedPlayers[0])), Colors.green),
+                  _buildPlayerAvatar(rotatedPlayers[1], 'left', ref.watch(predictiveTurnIdProvider(room.id)) == rotatedPlayers[1].id, room.dealerIndex == (players.indexOf(rotatedPlayers[1])), Colors.blue),
+                  _buildPlayerAvatar(rotatedPlayers[2], 'top', ref.watch(predictiveTurnIdProvider(room.id)) == rotatedPlayers[2].id, room.dealerIndex == (players.indexOf(rotatedPlayers[2])), Colors.red),
+                  _buildPlayerAvatar(rotatedPlayers[3], 'right', ref.watch(predictiveTurnIdProvider(room.id)) == rotatedPlayers[3].id, room.dealerIndex == (players.indexOf(rotatedPlayers[3])), Colors.amber),
 
                   CardsLayer(
                     roomId: room.id,
@@ -235,8 +235,6 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
     );
   }
 
-  // Duplicate removed
-
   Widget _buildGameOverOverlay(BuildContext context) {
     return Center(
       child: Container(
@@ -343,8 +341,6 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
     );
   }
 
-  // playedCardsCount(room) removed as we watch the stream directly in build()
-
   String _getSuitName(String suit) {
     switch (suit) {
       case 'S': return 'Spades';
@@ -429,146 +425,103 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
     );
   }
 
-  Widget _buildTrumpHUD(String suit, Room room, int playedCardsCount) {
-    final trickNumber = (playedCardsCount ~/ 4) + 1;
-    return Positioned(
-      bottom: 90,
-      left: 20,
-      child: Row(
-        children: [
-          Text(_getSuitEmojiStatic(suit), style: const TextStyle(fontSize: 16)),
-          const SizedBox(width: 8),
-          Text('Trump Suit: ${_getSuitName(suit)}', style: const TextStyle(color: accentGold, fontSize: 12, fontWeight: FontWeight.bold)),
-          const SizedBox(width: 8),
-          const Text('•', style: TextStyle(color: Colors.white24)),
-          const SizedBox(width: 8),
-          Text('Round ${room.currentRound}  •  Trick $trickNumber of 13', 
-            style: const TextStyle(color: Colors.white38, fontSize: 11)),
-        ],
-      )
-    );
-  }
-
   Widget _buildPlayerAvatar(Player player, String position, bool isTurn, bool isDealer, Color color) {
-    Alignment alignment;
-    double? top, bottom, left, right;
-
-    switch (position) {
-      case 'bottom': alignment = Alignment.bottomCenter; bottom = 100; break;
-      case 'left': alignment = Alignment.centerLeft; left = 20; break;
-      case 'top': alignment = Alignment.topCenter; top = 80; break;
-      case 'right': alignment = Alignment.centerRight; right = 20; break;
-      default: alignment = Alignment.center;
-    }
-
-    return Align(
-      alignment: alignment,
-      child: Padding(
-        padding: EdgeInsets.only(
-          top: top ?? 0, bottom: bottom ?? 0, left: left ?? 0, right: right ?? 0,
-        ),
+    return Padding(
+      padding: _getPaddingFromPosition(position),
+      child: Align(
+        alignment: _getAlignmentFromPosition(position),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (isTurn && position == 'bottom')
-               _buildYourTurnBadge(),
-            const SizedBox(height: 8),
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                // Rhythmic Pulse Animation
-                TweenAnimationBuilder<double>(
-                  tween: Tween(begin: 0.0, end: isTurn ? 1.0 : 0.0),
-                  duration: const Duration(seconds: 1),
-                  child: Container(
-                    width: 70, height: 70,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [color.withOpacity(0.5), color.withOpacity(0.1)],
-                      ),
-                      border: Border.all(
-                        color: isTurn ? accentGold : Colors.white10,
-                        width: isTurn ? 3 : 1,
-                      ),
-                      boxShadow: [
-                         BoxShadow(
-                           color: Colors.black.withOpacity(0.3),
-                           blurRadius: 10,
-                           offset: const Offset(0, 4),
-                         ),
-                      ],
-                    ),
-                    child: Center(
-                      child: Text(
-                        player.name.substring(0, 1).toUpperCase(),
-                        style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w900),
-                      ),
-                    ),
-                  ),
-                  builder: (context, value, child) {
-                    return Stack(
-                      alignment: Alignment.center,
-                      children: [
-                         if (isTurn)
-                           Container(
-                             width: 70 + (value * 20),
-                             height: 70 + (value * 20),
-                             decoration: BoxDecoration(
-                               shape: BoxShape.circle,
-                               border: Border.all(
-                                 color: accentGold.withOpacity(0.5 * (1 - value).clamp(0.0, 1.0)),
-                                 width: 2,
-                               ),
-                             ),
-                           ),
-                         child!,
-                      ],
-                    );
-                  },
-                ),
-
-                // Dealer Badge
-                if (isDealer)
-                  Positioned(
-                    right: -2, top: -2,
-                    child: Container(
-                      width: 26, height: 26,
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(colors: [Color(0xFFE5B84B), Color(0xFFBF8F00)]),
-                        shape: BoxShape.circle, 
-                        border: Border.all(color: Colors.black, width: 2),
-                        boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 4)],
-                      ),
-                      child: const Center(child: Text('D', style: TextStyle(color: Colors.black, fontSize: 13, fontWeight: FontWeight.w900))),
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 12),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              width: 86,
+              height: 120,
               decoration: BoxDecoration(
-                color: isTurn ? accentGold.withOpacity(0.2) : Colors.black.withOpacity(0.6),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: isTurn ? accentGold.withOpacity(0.4) : Colors.white12),
-              ),
-              child: Text(
-                player.name.toUpperCase(),
-                style: TextStyle(
-                  color: isTurn ? accentGold : Colors.white60,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 1,
+                color: playerCardBg,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: isTurn ? accentGold : (position == 'bottom' ? activeCardBg.withOpacity(0.5) : Colors.white10),
+                  width: isTurn ? 2 : 1,
                 ),
+                boxShadow: [
+                  if (isTurn)
+                    BoxShadow(color: accentGold.withOpacity(0.2), blurRadius: 15, spreadRadius: 2),
+                ],
+              ),
+              child: Column(
+                children: [
+                  // Top Score Circle
+                  Expanded(
+                    flex: 3,
+                    child: Center(
+                      child: Container(
+                        width: 50,
+                        height: 50,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: (player.totalScore < 0 ? boxRed : (isTurn ? accentGold : Colors.white)).withOpacity(0.12),
+                          border: Border.all(
+                            color: (player.totalScore < 0 ? boxRed : (isTurn ? accentGold : Colors.white)).withOpacity(0.4),
+                            width: 1.5
+                          ),
+                        ),
+                        child: Center(
+                          child: Text(
+                            '${player.totalScore}',
+                            style: TextStyle(
+                              color: player.totalScore < 0 ? boxRed : Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  // Player Name
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: Text(
+                      player.name.toUpperCase(),
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.w900),
+                    ),
+                  ),
+                  const Spacer(),
+                  // Bottom Info Section
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.black26,
+                      borderRadius: const BorderRadius.vertical(bottom: Radius.circular(11)),
+                    ),
+                    child: Column(
+                      children: [
+                        Text(
+                          '${player.tricksWon} / ${player.bid ?? 0}',
+                          style: TextStyle(color: isTurn ? accentGold : Colors.white54, fontSize: 11, fontWeight: FontWeight.bold),
+                        ),
+                        const Text(
+                          'tricks',
+                          style: TextStyle(color: Colors.white24, fontSize: 7, fontWeight: FontWeight.bold),
+                        ),
+                        Text(
+                          'Score: ${player.totalScore}',
+                          style: const TextStyle(color: Colors.white24, fontSize: 8),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
-            if (player.bid != null && position != 'bottom' && player.bid! > 0) 
-               Padding(
-                 padding: const EdgeInsets.only(top: 4),
-                 child: Text('${player.tricksWon}/${player.bid}', style: const TextStyle(color: accentGold, fontSize: 10, fontWeight: FontWeight.w900)),
+            if (isDealer)
+               const Padding(
+                 padding: EdgeInsets.only(top: 4),
+                 child: Text('DEALER', style: TextStyle(color: accentGold, fontSize: 8, fontWeight: FontWeight.w900)),
                ),
           ],
         ),
@@ -576,16 +529,24 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
     );
   }
 
-  Widget _buildYourTurnBadge() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: Color(0xFFE5B84B),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [BoxShadow(color: Colors.black54, blurRadius: 10)],
-      ),
-      child: const Text('YOUR TURN', style: TextStyle(color: Colors.black, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1)),
-    );
+  Alignment _getAlignmentFromPosition(String pos) {
+    switch (pos) {
+      case 'bottom': return Alignment.bottomLeft;
+      case 'left': return Alignment.topLeft;
+      case 'top': return Alignment.topRight;
+      case 'right': return Alignment.bottomRight;
+      default: return Alignment.center;
+    }
+  }
+
+  EdgeInsets _getPaddingFromPosition(String pos) {
+    switch (pos) {
+      case 'bottom': return const EdgeInsets.only(left: 30, bottom: 60);
+      case 'left': return const EdgeInsets.only(left: 30, top: 40);
+      case 'top': return const EdgeInsets.only(right: 30, top: 40);
+      case 'right': return const EdgeInsets.only(right: 30, bottom: 60);
+      default: return EdgeInsets.zero;
+    }
   }
 }
 
@@ -628,106 +589,6 @@ class _ErrorView extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class TableLayer extends StatelessWidget {
-  const TableLayer({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: math.min(MediaQuery.of(context).size.width * 0.85, 650),
-      height: math.min(MediaQuery.of(context).size.width * 0.85, 650),
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: RadialGradient(
-          colors: [
-            const Color(0xFF1B5E20), // Lighter green center
-            const Color(0xFF144525), 
-            const Color(0xFF0B2111), // Dark edge
-          ],
-          stops: const [0.0, 0.4, 1.0],
-        ),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.8), blurRadius: 60, spreadRadius: 10),
-          BoxShadow(color: const Color(0xFFC7A14C).withOpacity(0.15), blurRadius: 30, spreadRadius: 2),
-        ],
-        border: Border.all(
-          color: const Color(0xFFC7A14C).withOpacity(0.8), 
-          width: 8,
-          strokeAlign: BorderSide.strokeAlignOutside,
-        ),
-      ),
-      child: Stack(
-        children: [
-          // Detailed Felt Texture
-          Positioned.fill(
-            child: ClipOval(
-              child: Opacity(
-                opacity: 0.15,
-                child: Image.network(
-                  'https://www.transparenttextures.com/patterns/felt.png',
-                  repeat: ImageRepeat.repeat,
-                  color: Colors.black,
-                  errorBuilder: (context, error, stackTrace) => const SizedBox(),
-                ),
-              ),
-            ),
-          ),
-          
-          // Outer Gold Ring (Decorative)
-          Positioned.fill(
-            child: Container(
-              margin: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: const Color(0xFFC7A14C).withOpacity(0.3), width: 1),
-              ),
-            ),
-          ),
-
-          Center(
-            child: Consumer(builder: (context, ref, _) {
-              final roomCode = ref.watch(currentRoomCodeProvider);
-              final room = roomCode != null ? ref.watch(roomMetadataProvider(roomCode)).value : null;
-              final players = room != null ? ref.watch(playersStreamProvider(room.id)).value : null;
-              final localId = ref.watch(localPlayerIdProvider);
-
-              if (room == null || players == null || localId == null) return const SizedBox();
-
-              final localIndex = players.indexWhere((p) => p.id == localId);
-              final playerTurnIndexInRotated = (room.turnIndex - localIndex + 4) % 4;
-              
-              Alignment alignment;
-              switch (playerTurnIndexInRotated) {
-                 case 0: alignment = Alignment.bottomCenter; break;
-                 case 1: alignment = Alignment.centerLeft; break;
-                 case 2: alignment = Alignment.topCenter; break;
-                 case 3: alignment = Alignment.centerRight; break;
-                 default: alignment = Alignment.center;
-              }
-
-              return AnimatedAlign(
-                duration: const Duration(milliseconds: 600),
-                curve: Curves.easeInOutBack,
-                alignment: alignment,
-                child: Container(
-                  width: 160, height: 160,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: RadialGradient(
-                      colors: [const Color(0xFFC7A14C).withOpacity(0.3), Colors.transparent],
-                      stops: const [0.4, 1.0],
-                    ),
-                  ),
-                ),
-              );
-            }),
-          ),
-        ],
       ),
     );
   }
@@ -918,14 +779,14 @@ class _CardsLayerState extends ConsumerState<CardsLayer> {
     final localPlayed = ref.watch(localPlayedCardsProvider);
     List<Widget> handWidgets = [];
 
-    final playedCards = ref.watch(playedCardsProvider(roomId)).value ?? [];
-    final myPlayedIds = playedCards.where((m) => m['player_id'] == localPlayerId).map((m) => m['card_value'] as String).toSet();
-
     localHandAsync.whenData((hand) {
-      // Filter out cards already played (Optimisic + Ground Truth from Table)
+      // FIX FLICKER: Filter ONLY based on local optimistic state and actual hand database.
+      // We IGNORE what is on the table (myPlayedIds) to avoid the "reappearing card" gap.
       final visibleHand = hand.where((h) {
         final val = h['card_value'] as String;
-        return !pendingPlays.contains(val) && !localPlayed.contains(val) && !myPlayedIds.contains(val);
+        // If it's in pending or localPlayed, we keep it hidden.
+        // Once the server-side 'hands' table update reaches here, it will be gone from 'hand' anyway.
+        return !pendingPlays.contains(val) && !localPlayed.contains(val);
       }).toList();
       
       for (var i = 0; i < visibleHand.length; i++) {
@@ -968,7 +829,7 @@ class _CardsLayerState extends ConsumerState<CardsLayer> {
       final pos = _getPositionFromIndex(i);
       final pHandAsync = ref.watch(playerHandProvider(p.id));
       pHandAsync.whenData((hand) {
-        final cardsPlayedByOpponent = playedCards.where((m) => m['player_id'] == p.id).length;
+        final cardsPlayedByOpponent = ref.watch(predictivePlayedCardsProvider(roomId)).where((m) => m['player_id'] == p.id).length;
         final actualHandSize = (hand.length - cardsPlayedByOpponent).clamp(0, 52);
         
         for (var j = 0; j < actualHandSize; j++) {
@@ -1132,107 +993,6 @@ class OpponentCardWidget extends StatelessWidget {
   }
 }
 
-Widget _buildPlayerAvatar(Player player, String position, bool isTurn, bool isDealer, Color color) {
-  return Align(
-    alignment: _getAlignmentFromPosition(position),
-    child: Padding(
-      padding: _getPaddingFromPosition(position),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 80,
-            height: 100,
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.05),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: isTurn ? accentGold : Colors.white10,
-                width: isTurn ? 2.5 : 1,
-              ),
-              boxShadow: [
-                if (isTurn)
-                  BoxShadow(color: accentGold.withOpacity(0.2), blurRadius: 15, spreadRadius: 2),
-              ],
-            ),
-            child: Stack(
-              children: [
-                Center(
-                  child: Container(
-                    width: 54,
-                    height: 54,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: color.withOpacity(0.15),
-                      border: Border.all(color: color.withOpacity(0.5), width: 2),
-                    ),
-                    child: Center(
-                      child: Text(
-                        '${player.totalScore}',
-                        style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900),
-                      ),
-                    ),
-                  ),
-                ),
-                if (isDealer)
-                  Positioned(
-                    top: 6,
-                    right: 6,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(color: accentGold, borderRadius: BorderRadius.circular(4)),
-                      child: const Text('D', style: TextStyle(color: Colors.black, fontSize: 9, fontWeight: FontWeight.w900)),
-                    ),
-                  ),
-                if (position == 'bottom')
-                   const Positioned(
-                    top: 6,
-                    left: 6,
-                    child: Text('YOU', style: TextStyle(color: accentGold, fontSize: 8, fontWeight: FontWeight.w900)),
-                  ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            player.name.toUpperCase(),
-            style: TextStyle(
-              color: isTurn ? Colors.white : Colors.white60,
-              fontSize: 11,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 1,
-            ),
-          ),
-          Text(
-            'Score: ${player.totalScore}',
-            style: const TextStyle(color: Colors.white24, fontSize: 9, fontWeight: FontWeight.bold),
-          ),
-        ],
-      ),
-    ),
-  );
-}
-
-Alignment _getAlignmentFromPosition(String pos) {
-  switch (pos) {
-    case 'bottom': return Alignment.bottomLeft;
-    case 'left': return Alignment.topLeft;
-    case 'top': return Alignment.topRight;
-    case 'right': return Alignment.bottomRight;
-    default: return Alignment.center;
-  }
-}
-
-EdgeInsets _getPaddingFromPosition(String pos) {
-  switch (pos) {
-    case 'bottom': return const EdgeInsets.only(left: 30, bottom: 60);
-    case 'left': return const EdgeInsets.only(left: 30, top: 40);
-    case 'top': return const EdgeInsets.only(right: 30, top: 40);
-    case 'right': return const EdgeInsets.only(right: 30, bottom: 60);
-    default: return EdgeInsets.zero;
-  }
-}
-
 class PlayedCardWidget extends StatelessWidget {
   final CardModel card;
   final String position;
@@ -1300,51 +1060,43 @@ class PlayedCardWidget extends StatelessWidget {
                   child: Opacity(
                     opacity: 1.0 - (winValue * 0.8), // Fades out slightly as it reaches winner
                     child: Container(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(10),
-                          border: isTrickFinished && winnerPosition == position
-                              ? Border.all(color: accentGold, width: 3)
-                              : Border.all(color: Colors.white10),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.5),
-                              blurRadius: 15,
-                              offset: const Offset(4, 8),
+                          width: 80,
+                          height: 100,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(10),
+                            border: isTrickFinished && winnerPosition == position
+                                ? Border.all(color: accentGold, width: 4)
+                                : Border.all(color: Colors.white, width: 1),
+                            boxShadow: [
+                              BoxShadow(color: Colors.black.withOpacity(0.4), blurRadius: 10, offset: const Offset(2, 4)),
+                              if (isTrickFinished && winnerPosition == position)
+                                BoxShadow(color: accentGold.withOpacity(0.4), blurRadius: 15, spreadRadius: 2),
+                            ],
+                          ),
+                          child: Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  card.value,
+                                  style: TextStyle(
+                                    color: (card.suit.code == 'H' || card.suit.code == 'D') ? Colors.red : Colors.black87,
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                                Text(
+                                  CardModel.getSuitEmoji(card.suit.code),
+                                  style: TextStyle(
+                                    color: (card.suit.code == 'H' || card.suit.code == 'D') ? Colors.red : Colors.black87,
+                                    fontSize: 18,
+                                  ),
+                                ),
+                              ],
                             ),
-                            if (isTrickFinished && winnerPosition == position)
-                               BoxShadow(
-                                color: accentGold.withOpacity(0.3),
-                                blurRadius: 20,
-                                spreadRadius: 4,
-                              ),
-                          ],
+                          ),
                         ),
-                       child: Column(
-                         mainAxisSize: MainAxisSize.min,
-                         children: [
-                           if (isExpanded)
-                             Padding(
-                               padding: const EdgeInsets.only(bottom: 8),
-                               child: Container(
-                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                 decoration: BoxDecoration(
-                                   color: Colors.black87,
-                                   borderRadius: BorderRadius.circular(4),
-                                   border: Border.all(color: accentGold.withOpacity(0.5)),
-                                 ),
-                                 child: Text(
-                                   playerName.split(' ').first.toUpperCase(), 
-                                   style: const TextStyle(color: accentGold, fontSize: 10, fontWeight: FontWeight.bold)
-                                 ),
-                               ),
-                             ),
-                           Transform.rotate(
-                             angle: 0, 
-                             child: PlayingCard(card: card, isFaceUp: true),
-                           ),
-                         ],
-                       ),
-                    ),
                   ),
                 ),
               );
@@ -1376,15 +1128,15 @@ Widget _buildBottomBar(String trumpSuit, Room room, int? playedCardsCount) {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Text(
-            '$suitEmoji Trump Suit: ${CardModel.getSuitName(trumpSuit)}',
-            style: const TextStyle(color: accentGold, fontSize: 13, fontWeight: FontWeight.w800, letterSpacing: 0.5),
+            '${suitEmoji} TRUMP SUIT: ${CardModel.getSuitName(trumpSuit).toUpperCase()}',
+            style: const TextStyle(color: accentGold, fontSize: 12, fontWeight: FontWeight.w900, letterSpacing: 0.8),
           ),
           const SizedBox(width: 24),
-          const Text('·', style: TextStyle(color: Colors.white24, fontSize: 18)),
+          const Text('·', style: TextStyle(color: Colors.white24, fontSize: 20)),
           const SizedBox(width: 24),
           Text(
-            'Round ${room.currentRound}  ·  Trick $displayTrick of 13',
-            style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+            'ROUND ${room.currentRound}  ·  TRICK $displayTrick OF 13',
+            style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 0.8),
           ),
         ],
       ),

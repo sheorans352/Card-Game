@@ -84,8 +84,9 @@ class SupabaseCardService extends CardService {
     // Cutter is to the LEFT of dealer (clockwise next): (dealerIndex + 1) % 4
     final int cutterIndex = (dealerIndex + 1) % 4;
     
-    // 1. Definitively clear all hands for this room (Atomic)
+    // 1. Definitively clear all hands and played cards for this room (Atomic)
     await _supabase.from('hands').delete().eq('room_id', roomId);
+    await _supabase.from('played_cards').delete().eq('room_id', roomId);
     
     // 2. Clear played cards for this room (Safety)
     await _supabase.from('played_cards').delete().eq('room_id', roomId);

@@ -143,15 +143,12 @@ class ScoreboardOverlay extends ConsumerWidget {
           final result = roundResults.firstWhere((r) => r['player_id'] == p.id, orElse: () => {});
           if (result.isEmpty) return const _Cell(text: '-');
 
-          final bid = result['bid'] ?? 0;
-          final tricks = result['tricks_won'] ?? 0;
-          final score = result['points_earned'] ?? 0;
-          final isSuccess = score > 0;
+          final score = result['points_earned'] as int;
+          final isSuccess = score >= 0;
 
           return _Cell(
-            text: isSuccess ? '$tricks/$bid' : '$score',
+            text: '$score',
             color: isSuccess ? boxGreen : boxRed,
-            subText: isSuccess ? '+5' : null,
           );
         }),
       ],
