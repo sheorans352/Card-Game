@@ -221,6 +221,7 @@ final roundResultsProvider = StreamProvider.family<List<Map<String, dynamic>>, S
 
 // === UNIFIED PREDICTIVE CARD STATE ===
 // Combines server-side cards with local optimistic plays to provide a seamless state.
+final predictivePlayedCardsProvider = Provider.family<List<Map<String, dynamic>>, String>((ref, roomId) {
   final room = ref.watch(roomMetadataByIdProvider(roomId)).value;
   if (room == null || room.status == 'shuffling' || room.status == 'bidding' || room.status == 'trump_selection') {
     return []; // FORCE CLEAR table during these phases
@@ -296,7 +297,7 @@ final predictiveTurnIdProvider = Provider.family<String?, String>((ref, roomId) 
     if (leaderIndex == -1) return players[room.turnIndex % players.length].id;
     
     // The current turn is (leaderIndex + trickSize) % 4
-    return players[(leaderIndex + trickSize) % players.length].id;
+    return players[(leaderIndex + trickSize.toInt()) % players.length].id;
   }
 });
 

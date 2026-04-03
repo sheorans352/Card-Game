@@ -382,7 +382,7 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
       final pos = _getPositionFromIndex(i);
       ref.watch(playerHandProvider(p.id)).whenData((hand) {
         final played = ref.watch(predictivePlayedCardsProvider(roomId)).where((m) => m['player_id'] == p.id).length;
-        final size = (hand.length - played).clamp(0, 52);
+        final size = (hand.length - played).clamp(0, 52).toInt();
         for (var j = 0; j < size; j++) hands.add(OpponentCardWidget(position: pos, index: j, total: size));
       });
     }
