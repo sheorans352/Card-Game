@@ -23,8 +23,8 @@ const String kPlayerNameKey = 'minus_last_player_name';
 // Helper for Provider grouping
 class RoomRound {
   final String roomId;
-  final int roundNumber;
-  RoomRound(this.roomId, this.roundNumber);
+  final int currentRound;
+  RoomRound(this.roomId, this.currentRound);
 
   @override
   bool operator ==(Object other) =>
@@ -32,10 +32,10 @@ class RoomRound {
       other is RoomRound &&
           runtimeType == other.runtimeType &&
           roomId == other.roomId &&
-          roundNumber == other.roundNumber;
+          currentRound == other.currentRound;
 
   @override
-  int get hashCode => roomId.hashCode ^ roundNumber.hashCode;
+  int get hashCode => roomId.hashCode ^ currentRound.hashCode;
 }
 
 class SessionNotifier extends StateNotifier<AsyncValue<void>> {
