@@ -233,7 +233,14 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text('ROUND ${room.currentRound ?? 1}', style: const TextStyle(color: Colors.white38, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
-                    Text('TRICK ${(playedCardsCount ~/ 4) + 1} / 13', style: const TextStyle(color: accentGold, fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 1)),
+                    Builder(
+                      builder: (context) {
+                        bool isActuallyPlaying = room.status == 'playing';
+                        int trickNumber = isActuallyPlaying ? (playedCardsCount ~/ 4) + 1 : 1;
+                        if (trickNumber > 13) trickNumber = 13; // Cap it
+                        return Text('TRICK $trickNumber / 13', style: const TextStyle(color: accentGold, fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 1));
+                      },
+                    ),
                   ],
                 ),
               ],
