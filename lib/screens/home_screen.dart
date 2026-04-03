@@ -245,11 +245,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           _buildRuleCategory('BIDDING'),
           _buildRuleItem(Icons.gavel_rounded, 'Minimum Bid', 'The minimum bid required to play is 2.'),
           _buildRuleItem(Icons.auto_awesome_rounded, 'First 5 Hands', 'Place a bid to change the trump suit during the first 5 hands.'),
-          _buildRuleItem(Icons.looks_9_rounded, 'Power Bid', 'Bid 9 or more to change the trump suit even after 23 cards have been played.'),
+          _buildRuleItem(Icons.filter_9_rounded, 'Power Bid', 'Bid 9 or more to change the trump suit even after 23 cards have been played.'),
           
           const SizedBox(height: 20),
           _buildRuleCategory('GAMEPLAY'),
-          _buildRuleItem(Icons.spades_rounded, 'Default Trump', 'SPADES is the default trump suit if no high bid is made.'),
+          _buildRuleItem(Icons.style_rounded, 'Default Trump', 'SPADES is the default trump suit if no high bid is made.'),
           _buildRuleItem(Icons.emoji_events_rounded, 'Play to Win', 'You must play your highest card to win the trick whenever possible (with exceptions).'),
           _buildRuleItem(Icons.style_rounded, 'Follow Lead', 'You must play a card of the leading suit unless you are void of that suit.'),
           _buildRuleItem(Icons.star_rounded, 'Trump Wins', 'Any trump card wins the trick unless a higher trump is played.'),
