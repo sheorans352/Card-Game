@@ -239,7 +239,7 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
                       Positioned.fill(
                         child: WinnerOverlay(
                           winnerName: players.firstWhere((p) => p.id == room.winnerId).name,
-                          onRestart: () => ref.read(roomProvider(roomCode).notifier).leaveRoom(),
+                          onRestart: () => ref.read(currentRoomCodeProvider.notifier).state = null,
                         ),
                       ),
                   ],
