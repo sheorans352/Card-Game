@@ -6,7 +6,6 @@ abstract class CardService {
   Future<void> shuffleDeck(String roomId);
   Future<void> cutDeck(String roomId, int cutPoint);
   Future<void> dealInitialFive(String roomId, List<String> playerIds);
-  Future<void> dealRemainingEight(String roomId, List<String> playerIds);
   Future<void> placeBid(String roomId, String playerId, int bid);
   Future<void> selectTrump(String roomId, String playerId, String suit);
   Future<void> playCard(String roomId, String playerId, String cardValue);

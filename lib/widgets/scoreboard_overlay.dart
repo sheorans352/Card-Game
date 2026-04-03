@@ -184,7 +184,7 @@ class ScoreboardOverlay extends ConsumerWidget {
   Map<int, List<Map<String, dynamic>>> _groupResultsByRound(List<Map<String, dynamic>> results) {
     final Map<int, List<Map<String, dynamic>>> rounds = {};
     for (var r in results) {
-      final roundNum = r['round_number'] as int;
+      final roundNum = r['current_round'] as int;
       rounds.putIfAbsent(roundNum, () => []).add(r);
     }
     return rounds;

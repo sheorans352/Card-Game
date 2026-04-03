@@ -95,8 +95,8 @@ final heartbeatProvider = StreamProvider.family<void, String>((ref, roomId) asyn
     await Future.delayed(const Duration(seconds: 3));
     // Quietly refresh the most critical data
     ref.invalidate(roomMetadataByIdProvider(roomId));
-    // We don't invalidate playedCardsProvider directly as it needs RoomRound, 
-    // but invalidating roomMetadataByIdProvider will trigger its reactive update.
+    // room_provider.dart:207 uses RoomRound, so for simplicity we just invalidate the room
+    // which then forces the dependent playedCardsProvider to update based on current_round.
     yield null;
   }
 });
@@ -205,13 +205,15 @@ final playerHandProvider = StreamProvider.family<List<Map<String, dynamic>>, Str
 });
 
 final playedCardsProvider = StreamProvider.family<List<Map<String, dynamic>>, RoomRound>((ref, rr) {
+  // Note: Supabase StreamBuilder filtering is limited for non-primary keys in some versions.
+  // We perform the final filtering in the .map() for maximum stability during migrations.
   return supabase
       .from('played_cards')
       .stream(primaryKey: ['id'])
-      .eq('room_id', rr.roomId)
-      .eq('round_number', rr.roundNumber)
+      .eq('room_id', rr.roomId) 
       .map((data) {
-        final sorted = data.map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e)).toList();
+        final filtered = data.where((e) => e['current_round'] == rr.currentRound).toList();
+        final sorted = filtered.map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e)).toList();
         sorted.sort((a, b) {
           final timeA = a['played_at'] as String;
           final timeB = b['played_at'] as String;
@@ -339,7 +341,7 @@ final playableCardsProvider = Provider.family<Set<String>, String>((ref, roomId)
   // Filter out cards already played (Optimistic + Ground Truth)
   final pendingPlays = ref.watch(pendingCardPlayProvider);
   final localPlayed = ref.watch(localPlayedCardsProvider);
-  final serverPlayed = ref.watch(playedCardsProvider(roomId)).value ?? [];
+  final serverPlayed = ref.watch(playedCardsProvider(RoomRound(roomId, room.currentRound))).value ?? [];
   final myPlayedIds = serverPlayed.where((m) => m['player_id'] == localId).map((m) => m['card_value'] as String).toSet();
   
   final cardsInHand = hand.map((c) => (c['card_value'] as String).trim().toUpperCase())

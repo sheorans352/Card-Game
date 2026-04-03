@@ -16,6 +16,7 @@ class Room {
   final int highestBid;
   final String? highestBidderId;
   final int passCount;
+  final int deckPtr;
 
   Room({
     required this.id,
@@ -33,6 +34,7 @@ class Room {
     this.highestBid = 0,
     this.highestBidderId,
     this.passCount = 0,
+    this.deckPtr = 0,
   });
 
   factory Room.fromMap(Map<String, dynamic> map) {
@@ -52,6 +54,7 @@ class Room {
       highestBid: map['highest_bid'] ?? 0,
       highestBidderId: map['highest_bidder_id'],
       passCount: map['pass_count'] ?? 0,
+      deckPtr: map['deck_ptr'] ?? 0,
     );
   }
 
@@ -72,6 +75,7 @@ class Room {
       'highest_bid': highestBid,
       'highest_bidder_id': highestBidderId,
       'pass_count': passCount,
+      'deck_ptr': deckPtr,
     };
   }
 
@@ -94,6 +98,7 @@ class Room {
     int? highestBid,
     String? highestBidderId,
     int? passCount,
+    int? deckPtr,
   }) {
     return Room(
       id: id ?? this.id,
@@ -111,6 +116,7 @@ class Room {
       highestBid: highestBid ?? this.highestBid,
       highestBidderId: highestBidderId ?? this.highestBidderId,
       passCount: passCount ?? this.passCount,
+      deckPtr: deckPtr ?? this.deckPtr,
     );
   }
 }
