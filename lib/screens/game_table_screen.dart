@@ -12,6 +12,7 @@ import '../widgets/bidding_overlay.dart';
 import '../widgets/deck_cut_overlay.dart';
 import '../widgets/scoreboard_overlay.dart';
 import '../widgets/spade_background.dart';
+import '../widgets/winner_overlay.dart';
 import '../services/audio_service.dart';
 
 const Color primaryBg = Color(0xFF0A1A2F); 
@@ -77,9 +78,20 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
 
     ref.listen<int?>(roomMetadataProvider(roomCode).select((data) => data.value?.currentRound), (prev, next) {
       if (next != null && prev != null && next > prev) {
-        // Wait for the final trick swipe animation to complete before showing results
-        Future.delayed(const Duration(milliseconds: 1200), () {
+        // Coordinated Round End Sequence:
+        // 1. All 4 cards land on table (handled by CardsLayer)
+        // 2. 1 Second later: Show scoreboard
+        Future.delayed(const Duration(milliseconds: 1000), () {
           if (mounted) setState(() => _showScoreboard = true);
+          
+          // 3. 5 Seconds later: Close scoreboard AND reset DB for next round
+          Future.delayed(const Duration(milliseconds: 5000), () {
+            if (mounted) {
+               setState(() => _showScoreboard = false);
+               // Calling reset_round_data to clear hands/played_cards and set to shuffling
+               ref.read(cardServiceProvider).resetRoundData(roomAsync.value!.id);
+            }
+          });
         });
         ref.read(localPlayedCardsProvider.notifier).state = {};
       }
@@ -221,6 +233,15 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
                           ),
                         ),
                       ),
+                      
+                    // 7. WINNER OVERLAY (Always on very top)
+                    if (room.winnerId != null)
+                      Positioned.fill(
+                        child: WinnerOverlay(
+                          winnerName: players.firstWhere((p) => p.id == room.winnerId).name,
+                          onRestart: () => ref.read(roomProvider(roomCode).notifier).leaveRoom(),
+                        ),
+                      ),
                   ],
                 ),
               );
@@ -315,30 +336,41 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
               ),
               child: Column(
                 children: [
-                  Expanded(
-                    flex: 3,
-                    child: Center(
-                      child: Container(
-                        width: 50, height: 50,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: (player.totalScore < 0 ? boxRed : (isTurn ? accentGold : Colors.white)).withOpacity(0.12),
-                          border: Border.all(color: (player.totalScore < 0 ? boxRed : (isTurn ? accentGold : Colors.white)).withOpacity(0.3), width: 1.5),
-                        ),
-                        child: Center(child: Text('${player.totalScore}', style: TextStyle(color: player.totalScore < 0 ? boxRed : Colors.white, fontSize: 18, fontWeight: FontWeight.w900))),
-                      ),
-                    ),
-                  ),
+                  const SizedBox(height: 8),
                   Text(isLocal ? 'YOU' : player.name.toUpperCase(), style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900), overflow: TextOverflow.ellipsis),
                   const Spacer(),
-                  Container(
-                    width: double.infinity, padding: const EdgeInsets.symmetric(vertical: 6),
-                    decoration: const BoxDecoration(color: Colors.black26, borderRadius: BorderRadius.vertical(bottom: Radius.circular(11))),
-                    child: Column(children: [
-                      Text('${player.tricksWon} / ${player.bid ?? 0}', style: TextStyle(color: isTurn ? accentGold : Colors.white54, fontSize: 11, fontWeight: FontWeight.bold)),
-                      const Text('tricks', style: TextStyle(color: Colors.white24, fontSize: 7, fontWeight: FontWeight.bold)),
-                    ]),
+                  
+                  // Score & Tricks Area (Vertical stacks)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        // Tricks Stack
+                        Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text('${player.tricksWon}/${player.bid ?? 0}', style: const TextStyle(color: accentGold, fontSize: 13, fontWeight: FontWeight.w900)),
+                            const Text('TRICKS', style: TextStyle(color: Colors.white24, fontSize: 7, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                          ],
+                        ),
+                        
+                        // Vertical divider
+                        Container(width: 1, height: 20, color: Colors.white10),
+
+                        // Score Stack
+                        Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text('${player.totalScore}', style: TextStyle(color: player.totalScore < 0 ? boxRed : Colors.white, fontSize: 13, fontWeight: FontWeight.w900)),
+                            const Text('SCORE', style: TextStyle(color: Colors.white24, fontSize: 7, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
+                  const SizedBox(height: 12),
                 ],
               ),
             ),
@@ -355,17 +387,26 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
     final cardService = ref.read(cardServiceProvider);
 
     try {
-      // 1. Batch 1 (4 cards each)
+      // 1. Initial Batch (5 cards each) - To Select Trump
       for (var player in orderedPlayers) {
-        await cardService.dealPlayerBatch(roomId, player.id, 4);
-        gameAudio.playCardPlay(); // Brief sound per deal
+        await cardService.dealPlayerBatch(roomId, player.id, 5);
+        gameAudio.playCardPlay(); 
         await Future.delayed(const Duration(milliseconds: 600));
       }
 
-      // 2. Pause between batches
-      await Future.delayed(const Duration(milliseconds: 1500));
+      // 2. PAUSE FOR TRUMP SELECTION
+      // The DB logic already sets status to 'bidding' after initial deal.
+      // We must wait for trump selection to be completed by the bidder.
+      // But dealInitialFive handles this, so we are and just doing the batches.
+      
+      // 3. Batch 2 (Next 4 cards each)
+      for (var player in orderedPlayers) {
+        await cardService.dealPlayerBatch(roomId, player.id, 4);
+        gameAudio.playCardPlay();
+        await Future.delayed(const Duration(milliseconds: 600));
+      }
 
-      // 3. Batch 2 (Last 4 cards each)
+      // 4. Batch 3 (Last 4 cards each)
       for (var player in orderedPlayers) {
         await cardService.dealPlayerBatch(roomId, player.id, 4);
         gameAudio.playCardPlay();
@@ -541,7 +582,13 @@ class PlayedCardWidget extends StatelessWidget {
     switch (position) { case 'bottom': offsetX = -45; offsetY = 45; break; case 'left': offsetX = -45; offsetY = -45; break; case 'top': offsetX = 45; offsetY = -45; break; case 'right': offsetX = 45; offsetY = 45; break; }
     double wX = 0, wY = 0;
     if (isTrickFinished && winnerPosition != null) {
-      switch (winnerPosition) { case 'bottom': wX = -350; wY = 450; break; case 'left': wX = -350; wY = -450; break; case 'top': wX = 350; wY = -450; break; case 'right': wX = 350; wY = 450; break; }
+      // Adjusted offsets to land more precisely on avatars in corners
+      switch (winnerPosition) { 
+        case 'bottom': wX = -100; wY = 320; break; 
+        case 'left': wX = -100; wY = -320; break; 
+        case 'top': wX = 100; wY = -320; break; 
+        case 'right': wX = 100; wY = 320; break; 
+      }
     }
     return Center(child: TweenAnimationBuilder<double>(
       tween: isTrickFinished ? Tween(begin: 0.0, end: 1.0) : Tween(begin: 0.0, end: 0.0), duration: const Duration(milliseconds: 500), curve: Curves.easeInQuint,
