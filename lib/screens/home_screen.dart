@@ -202,15 +202,90 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           (Uri.base.queryParameters['room'] == null && Uri.base.queryParameters['code'] == null))
                         _buildRejoinButton(),
 
-                      if (_isHostingTab) ...[
+                       if (_isHostingTab) ...[
                         _buildHostForm(),
                       ] else ...[
                         _buildJoinForm(),
                       ],
+
+                      const SizedBox(height: 48),
+                      _buildRulesSection(),
+                      const SizedBox(height: 40),
                     ],
                   ),
                 ),
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRulesSection() {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: cardDark.withOpacity(0.6),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.white10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: const [
+              Icon(Icons.menu_book_rounded, color: accentGold, size: 20),
+              SizedBox(width: 12),
+              Text('HOW TO PLAY', style: TextStyle(color: accentGold, fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 2)),
+            ],
+          ),
+          const SizedBox(height: 24),
+          
+          _buildRuleCategory('BIDDING'),
+          _buildRuleItem(Icons.gavel_rounded, 'Minimum Bid', 'The minimum bid required to play is 2.'),
+          _buildRuleItem(Icons.auto_awesome_rounded, 'First 5 Hands', 'Place a bid to change the trump suit during the first 5 hands.'),
+          _buildRuleItem(Icons.looks_9_rounded, 'Power Bid', 'Bid 9 or more to change the trump suit even after 23 cards have been played.'),
+          
+          const SizedBox(height: 20),
+          _buildRuleCategory('GAMEPLAY'),
+          _buildRuleItem(Icons.spades_rounded, 'Default Trump', 'SPADES is the default trump suit if no high bid is made.'),
+          _buildRuleItem(Icons.emoji_events_rounded, 'Play to Win', 'You must play your highest card to win the trick whenever possible (with exceptions).'),
+          _buildRuleItem(Icons.style_rounded, 'Follow Lead', 'You must play a card of the leading suit unless you are void of that suit.'),
+          _buildRuleItem(Icons.star_rounded, 'Trump Wins', 'Any trump card wins the trick unless a higher trump is played.'),
+          
+          const SizedBox(height: 20),
+          _buildRuleCategory('SCORING'),
+          _buildRuleItem(Icons.trending_down_rounded, 'Minus Score', 'Failing to meet your bid reduces your total score by the amount of the bid.'),
+          _buildRuleItem(Icons.military_tech_rounded, 'Victory', 'The first player to reach 31 points wins the game!'),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRuleCategory(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12, top: 4),
+      child: Text(title, style: const TextStyle(color: Colors.white24, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
+    );
+  }
+
+  Widget _buildRuleItem(IconData icon, String title, String description) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: accentGold.withOpacity(0.7), size: 16),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 4),
+                Text(description, style: const TextStyle(color: Colors.white54, fontSize: 12, height: 1.4)),
+              ],
             ),
           ),
         ],
