@@ -463,28 +463,7 @@ class SupabaseCardService extends CardService {
       return true;
     }
 
-    // No lead-suit cards in hand
-    
-    // If the player chooses to play a trump card (Ruffing)
-    if (trumpSuitEnum != null && playedCard.suit == trumpSuitEnum) {
-      // Find current best trump on table
-      CardModel? bestTrumpOnTable;
-      for (var t in currentTrick) {
-        final tc = CardModel.fromId(t['card_value'] as String);
-        if (tc.suit == trumpSuitEnum) {
-          if (bestTrumpOnTable == null || tc.rank > bestTrumpOnTable.rank) bestTrumpOnTable = tc;
-        }
-      }
-      
-      // If a trump is already played, MUST play higher if possible
-      if (bestTrumpOnTable != null) {
-        final canBeatTrump = handCards.any((c) => c.suit == trumpSuitEnum && c.rank > bestTrumpOnTable!.rank);
-        if (canBeatTrump && playedCard.rank <= bestTrumpOnTable.rank) return false;
-      }
-      return true;
-    }
-
-    // Rule: No lead suit cards in hand, and player chose to play a non-trump card (Throwaway) — always valid
+    // No lead-suit cards in hand -> Option: ANY card is valid (Trump or Throwaway)
     return true;
   }
 

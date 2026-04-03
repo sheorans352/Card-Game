@@ -355,31 +355,8 @@ final playableCardsProvider = Provider.family<Set<String>, String>((ref, roomId)
       return winners.isNotEmpty ? winners : cardsOfLeadSuit;
     }
   } else {
-    // No lead suit -> Option: Trump or Throwaway
-    final playerTrumps = cardsInHand.where((c) => CardModel.getSuit(c) == trump).toSet();
-    final playerDiscards = cardsInHand.where((c) => CardModel.getSuit(c) != trump).toSet();
-    
-    if (playerTrumps.isEmpty) return playerDiscards; // Only discards possible
-
-    // Calculate best trump on table
-    int highestTrumpRank = 0;
-    for (var m in currentTrick) {
-      final val = m['card_value'] as String;
-      if (CardModel.getSuit(val) == trump) {
-        final r = CardModel.getRankValue(val);
-        if (r > highestTrumpRank) highestTrumpRank = r;
-      }
-    }
-
-    final winningTrumps = playerTrumps.where((c) => CardModel.getRankValue(c) > highestTrumpRank).toSet();
-    
-    // If player chooses to play trump and CAN win, they MUST play a winning trump.
-    // If they CANNOT win with trump, they can still play a lower trump or any discard.
-    if (winningTrumps.isNotEmpty) {
-      return {...winningTrumps, ...playerDiscards};
-    } else {
-      return {...playerTrumps, ...playerDiscards};
-    }
+    // No lead suit -> Option: ANY card is playable (Trump or Throwaway)
+    return cardsInHand.toSet();
   }
 });
 
