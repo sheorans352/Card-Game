@@ -123,6 +123,7 @@ class Player {
   final int? bid;
   final int tricksWon;
   final int totalScore;
+  final bool isReady;
 
   Player({
     required this.id,
@@ -132,6 +133,7 @@ class Player {
     this.bid,
     this.tricksWon = 0,
     this.totalScore = 0,
+    this.isReady = false,
   });
 
   factory Player.fromMap(Map<String, dynamic> map) {
@@ -143,6 +145,7 @@ class Player {
       bid: map['bid'],
       tricksWon: map['tricks_won'] ?? 0,
       totalScore: map['total_score'] ?? 0,
+      isReady: map['is_ready'] ?? false,
     );
   }
 
@@ -155,6 +158,7 @@ class Player {
       'bid': bid,
       'tricks_won': tricksWon,
       'total_score': totalScore,
+      'is_ready': isReady,
     };
   }
 
@@ -169,6 +173,7 @@ class Player {
     int? bid,
     int? tricksWon,
     int? totalScore,
+    bool? isReady,
   }) {
     return Player(
       id: id ?? this.id,
@@ -178,6 +183,7 @@ class Player {
       bid: bid ?? this.bid,
       tricksWon: tricksWon ?? this.tricksWon,
       totalScore: totalScore ?? this.totalScore,
+      isReady: isReady ?? this.isReady,
     );
   }
 

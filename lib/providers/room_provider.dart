@@ -221,7 +221,11 @@ final roundResultsProvider = StreamProvider.family<List<Map<String, dynamic>>, S
 
 // === UNIFIED PREDICTIVE CARD STATE ===
 // Combines server-side cards with local optimistic plays to provide a seamless state.
-final predictivePlayedCardsProvider = Provider.family<List<Map<String, dynamic>>, String>((ref, roomId) {
+  final room = ref.watch(roomMetadataByIdProvider(roomId)).value;
+  if (room == null || room.status == 'shuffling' || room.status == 'bidding' || room.status == 'trump_selection') {
+    return []; // FORCE CLEAR table during these phases
+  }
+
   final serverPlayed = ref.watch(playedCardsProvider(roomId)).value ?? [];
   final localPlayed = ref.watch(localPlayedCardsProvider);
   final localId = ref.watch(localPlayerIdProvider);
@@ -417,6 +421,12 @@ final isLocalPlayerDealerProvider = Provider.family<bool, String>((ref, code) {
   
   final dealerIndexInList = room.dealerIndex % players.length;
   return players[dealerIndexInList].id == localId;
+});
+
+final allPlayersReadyProvider = Provider.family<bool, String>((ref, roomId) {
+  final players = ref.watch(playersStreamProvider(roomId)).value ?? [];
+  if (players.length < 4) return false;
+  return players.every((p) => p.isReady);
 });
 
 final lobbyServiceProvider = Provider<LobbyService>((ref) => SupabaseLobbyService());

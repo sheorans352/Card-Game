@@ -110,7 +110,13 @@ class ScoreboardOverlay extends ConsumerWidget {
                 child: Material(
                   color: Colors.transparent,
                   child: InkWell(
-                    onTap: onClose,
+                    onTap: () {
+                      final localId = ref.read(localPlayerIdProvider);
+                      if (localId != null) {
+                        ref.read(cardServiceProvider).setPlayerReady(roomId, localId);
+                      }
+                      onClose();
+                    },
                     borderRadius: BorderRadius.circular(20),
                     child: const Center(
                       child: Text('BACK TO TABLE', style: TextStyle(color: Colors.black, fontSize: 16, fontWeight: FontWeight.w900, letterSpacing: 1.5)),

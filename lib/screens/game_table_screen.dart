@@ -54,7 +54,8 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
         final localId = ref.read(localPlayerIdProvider);
         final dealerIndexInList = room.dealerIndex % players.length;
         if (players[dealerIndexInList].id == localId) {
-          if (room.status == 'shuffling' && previous?.value?.status != 'shuffling' && room.deckCutValue == null) {
+          final allReady = ref.watch(allPlayersReadyProvider(room.id));
+          if (room.status == 'shuffling' && allReady && room.deckCutValue == null) {
             gameAudio.playShuffle();
             ref.read(cardServiceProvider).shuffleDeck(room.id);
           }
@@ -64,7 +65,10 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
 
     ref.listen<int?>(roomMetadataProvider(roomCode).select((data) => data.value?.currentRound), (prev, next) {
       if (next != null && prev != null && next > prev) {
-        setState(() => _showScoreboard = true);
+        // Wait for the final trick swipe animation to complete before showing results
+        Future.delayed(const Duration(milliseconds: 1200), () {
+          if (mounted) setState(() => _showScoreboard = true);
+        });
         ref.read(localPlayedCardsProvider.notifier).state = {};
       }
     });
@@ -143,6 +147,35 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
                     _buildPlayerAvatar(rotatedPlayers[1], 'left', ref.watch(predictiveTurnIdProvider(room.id)) == rotatedPlayers[1].id, room.dealerIndex == (players.indexOf(rotatedPlayers[1])), localPlayerId),
                     _buildPlayerAvatar(rotatedPlayers[2], 'top', ref.watch(predictiveTurnIdProvider(room.id)) == rotatedPlayers[2].id, room.dealerIndex == (players.indexOf(rotatedPlayers[2])), localPlayerId),
                     _buildPlayerAvatar(rotatedPlayers[3], 'right', ref.watch(predictiveTurnIdProvider(room.id)) == rotatedPlayers[3].id, room.dealerIndex == (players.indexOf(rotatedPlayers[3])), localPlayerId),
+
+                    // 6. WAITING OVERLAY
+                    if (room.status == 'shuffling' && !ref.watch(allPlayersReadyProvider(room.id)))
+                      Center(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                          decoration: BoxDecoration(
+                            color: Colors.black87,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: accentGold.withOpacity(0.5)),
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const CircularProgressIndicator(color: accentGold, strokeWidth: 2),
+                              const SizedBox(height: 16),
+                              const Text(
+                                'WAITING FOR ALL PLAYERS',
+                                style: TextStyle(color: accentGold, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1.5),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                '${players.where((p) => p.isReady).length} / 4 READY',
+                                style: const TextStyle(color: Colors.white70, fontSize: 10),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
 
                     if (room.trumpSuit != null)
                       _buildBottomBar(room.trumpSuit!, room, playedCardsCount),
