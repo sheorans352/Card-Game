@@ -224,68 +224,93 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   Widget _buildRulesSection() {
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(28),
       decoration: BoxDecoration(
-        color: cardDark.withOpacity(0.6),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white10),
+        color: cardDark.withOpacity(0.7),
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: accentGold.withOpacity(0.2)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: const [
-              Icon(Icons.menu_book_rounded, color: accentGold, size: 20),
+              Icon(Icons.menu_book_rounded, color: accentGold, size: 24),
               SizedBox(width: 12),
-              Text('HOW TO PLAY', style: TextStyle(color: accentGold, fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 2)),
+              Text('HOW TO PLAY: MINUS', style: TextStyle(color: accentGold, fontSize: 16, fontWeight: FontWeight.w900, letterSpacing: 2)),
             ],
           ),
           const SizedBox(height: 24),
+          const Text(
+            'Minus is a strategic, 4-player trick-taking game. Your success depends on your ability to predict exactly how many hands you can win.',
+            style: TextStyle(color: Colors.white70, fontSize: 13, fontStyle: FontStyle.italic),
+          ),
           
-          _buildRuleCategory('BIDDING'),
-          _buildRuleItem(Icons.gavel_rounded, 'Minimum Bid', 'The minimum bid required to play is 2.'),
-          _buildRuleItem(Icons.auto_awesome_rounded, 'First 5 Hands', 'Place a bid to change the trump suit during the first 5 hands.'),
-          _buildRuleItem(Icons.filter_9_rounded, 'Power Bid', 'Bid 9 or more to change the trump suit even after 23 cards have been played.'),
-          
-          const SizedBox(height: 20),
-          _buildRuleCategory('GAMEPLAY'),
-          _buildRuleItem(Icons.style_rounded, 'Default Trump', 'SPADES is the default trump suit if no high bid is made.'),
-          _buildRuleItem(Icons.emoji_events_rounded, 'Play to Win', 'You must play your highest card to win the trick whenever possible (with exceptions).'),
-          _buildRuleItem(Icons.style_rounded, 'Follow Lead', 'You must play a card of the leading suit unless you are void of that suit.'),
-          _buildRuleItem(Icons.star_rounded, 'Trump Wins', 'Any trump card wins the trick unless a higher trump is played.'),
-          
-          const SizedBox(height: 20),
-          _buildRuleCategory('SCORING'),
-          _buildRuleItem(Icons.trending_down_rounded, 'Minus Score', 'Failing to meet your bid reduces your total score by the amount of the bid.'),
-          _buildRuleItem(Icons.military_tech_rounded, 'Victory', 'The first player to reach 31 points wins the game!'),
+          const SizedBox(height: 32),
+          _buildRichRuleHeader('🏆 THE OBJECTIVE'),
+          _buildRichRuleText('The goal is to be the first player to reach 31 Points.'),
+          _buildRichRuleBullet('Win your bid', 'If you win at least as many tricks as you bid, you gain those points.'),
+          _buildRichRuleBullet('Fail your bid', 'If you win fewer tricks than you bid, you lose those points (Minus).'),
+
+          const SizedBox(height: 24),
+          _buildRichRuleHeader('📦 THE 5-4-4 DEALING PHASES'),
+          _buildRichRuleText('The deck of 52 cards is dealt in three distinct stages:'),
+          _buildRichRuleBullet('Phase 1 (The First 5)', 'Every player gets 5 cards. This is where the Trump Battle happens.'),
+          _buildRichRuleBullet('Phase 2 (The Next 4)', 'Once the trump is set, 4 more cards are dealt to everyone.'),
+          _buildRichRuleBullet('Phase 3 (The Final 4)', 'The last 4 cards are dealt. Everyone now has a full hand of 13 cards.'),
+
+          const SizedBox(height: 24),
+          _buildRichRuleHeader('⚖️ STRATEGIC BIDDING'),
+          _buildRichRuleBullet('Phase 1 (Priority Bidding)', 'You can Bid 5 or more to "Lock" the Trump suit once you get your first 5 cards. If you lock the suit, your bid is final.'),
+          _buildRichRuleBullet('Phase 2 (Final Call)', 'After all 13 cards are dealt, everyone else submits their final bid (2–13).'),
+          _buildRichRuleBullet('The 9+ Override', 'If no one bid 5+ in Phase 1, the default Trump is Spades. However, a player can still change the Trump, but only if they bid 9 or more.'),
+
+          const SizedBox(height: 24),
+          _buildRichRuleHeader('⚔️ GAMEPLAY: "MUST-WIN" RULES'),
+          _buildRichRuleText('The person who set the Trump (or the person who cut the deck if no trump was set) leads the first card.'),
+          _buildRichRuleBullet('Follow Suit', 'You must play a card of the same suit as the lead card.'),
+          _buildRichRuleBullet('The Power Rule', 'If you have a card in the lead suit that is higher than the current winner on the table, you MUST play it. No hiding high cards!'),
+          _buildRichRuleBullet('Cutting with Trump', 'If void of a suit, you can play a Trump. If a Trump was already played, you must play a higher Trump if possible.'),
+          _buildRichRuleBullet('Throwing Away', 'If you have no lead suit and no trumps, you can play any card.'),
         ],
       ),
     );
   }
 
-  Widget _buildRuleCategory(String title) {
+  Widget _buildRichRuleHeader(String title) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12, top: 4),
-      child: Text(title, style: const TextStyle(color: Colors.white24, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Text(title, style: const TextStyle(color: accentGold, fontSize: 13, fontWeight: FontWeight.w900, letterSpacing: 1)),
     );
   }
 
-  Widget _buildRuleItem(IconData icon, String title, String description) {
+  Widget _buildRichRuleText(String text) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Text(text, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
+    );
+  }
+
+  Widget _buildRichRuleBullet(String label, String description) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12, left: 4),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: accentGold.withOpacity(0.7), size: 16),
+          const Padding(
+            padding: EdgeInsets.only(top: 6),
+            child: Icon(Icons.circle, color: accentGold, size: 6),
+          ),
           const SizedBox(width: 12),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 4),
-                Text(description, style: const TextStyle(color: Colors.white54, fontSize: 12, height: 1.4)),
-              ],
+            child: RichText(
+              text: TextSpan(
+                style: const TextStyle(color: Colors.white70, fontSize: 12, height: 1.5),
+                children: [
+                  TextSpan(text: '$label: ', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  TextSpan(text: description),
+                ],
+              ),
             ),
           ),
         ],
