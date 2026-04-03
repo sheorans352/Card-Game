@@ -11,6 +11,8 @@ abstract class CardService {
   Future<void> selectTrump(String roomId, String playerId, String suit);
   Future<void> playCard(String roomId, String playerId, String cardValue);
   Future<void> setPlayerReady(String roomId, String playerId);
+  Future<void> dealPlayerBatch(String roomId, String playerId, int count);
+  Future<void> finishDealing(String roomId);
   Future<bool> validateMove(String roomId, String playerId, String cardValue, List<Map<String, dynamic>> currentTrick, List<String> playerHand, String? trumpSuit);
 }
 
@@ -110,6 +112,22 @@ class SupabaseCardService extends CardService {
       'p_room_id': roomId,
       'p_player_id': playerId,
       'p_card_value': cardValue,
+    });
+  }
+
+  @override
+  Future<void> dealPlayerBatch(String roomId, String playerId, int count) async {
+    await _supabase.rpc('deal_player_batch', params: {
+      'p_room_id': roomId,
+      'p_player_id': playerId,
+      'p_count': count,
+    });
+  }
+
+  @override
+  Future<void> finishDealing(String roomId) async {
+    await _supabase.rpc('finish_dealing', params: {
+      'p_room_id': roomId,
     });
   }
 

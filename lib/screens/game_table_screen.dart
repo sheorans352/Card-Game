@@ -38,6 +38,7 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
   };
 
   bool _showScoreboard = false;
+  bool _isDealingBatch = false; // Prevents duplicate deal loops
 
   @override
   Widget build(BuildContext context) {
@@ -58,6 +59,17 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
           if (room.status == 'shuffling' && allReady && room.deckCutValue == null) {
             gameAudio.playShuffle();
             ref.read(cardServiceProvider).shuffleDeck(room.id);
+          }
+
+          // Sequential Dealing coordination (Dealer only)
+          if (room.status == 'dealing_phase_2') {
+            if (players[dealerIndexInList].id == localId && !_isDealingBatch) {
+              _isDealingBatch = true;
+              _handleSequentialDeal(room.id, players, room.dealerIndex);
+            }
+          } else {
+            // Reset flag when we move out of dealing phase
+            _isDealingBatch = false;
           }
         }
       });
@@ -335,6 +347,37 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _handleSequentialDeal(String roomId, List<Player> players, int dealerIndex) async {
+    final cutterIndex = (dealerIndex + 1) % 4;
+    final orderedPlayers = List.generate(4, (i) => players[(cutterIndex + i) % 4]);
+    final cardService = ref.read(cardServiceProvider);
+
+    try {
+      // 1. Batch 1 (4 cards each)
+      for (var player in orderedPlayers) {
+        await cardService.dealPlayerBatch(roomId, player.id, 4);
+        gameAudio.playCardPlay(); // Brief sound per deal
+        await Future.delayed(const Duration(milliseconds: 600));
+      }
+
+      // 2. Pause between batches
+      await Future.delayed(const Duration(milliseconds: 1500));
+
+      // 3. Batch 2 (Last 4 cards each)
+      for (var player in orderedPlayers) {
+        await cardService.dealPlayerBatch(roomId, player.id, 4);
+        gameAudio.playCardPlay();
+        await Future.delayed(const Duration(milliseconds: 600));
+      }
+
+      // 4. Finalize
+      await cardService.finishDealing(roomId);
+    } catch (e) {
+      debugPrint('Error during sequential deal: $e');
+      _isDealingBatch = false; // Allow retry on error
+    }
   }
 
   Alignment _getAlignmentFromPosition(String pos) {
