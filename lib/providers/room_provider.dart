@@ -20,6 +20,24 @@ const String kRoomCodeKey = 'minus_last_room_code';
 const String kPlayerIdKey = 'minus_last_player_id';
 const String kPlayerNameKey = 'minus_last_player_name';
 
+// Helper for Provider grouping
+class RoomRound {
+  final String roomId;
+  final int roundNumber;
+  RoomRound(this.roomId, this.roundNumber);
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is RoomRound &&
+          runtimeType == other.runtimeType &&
+          roomId == other.roomId &&
+          roundNumber == other.roundNumber;
+
+  @override
+  int get hashCode => roomId.hashCode ^ roundNumber.hashCode;
+}
+
 class SessionNotifier extends StateNotifier<AsyncValue<void>> {
   SessionNotifier(this.ref) : super(const AsyncValue.data(null)) {
     _init();
@@ -77,7 +95,8 @@ final heartbeatProvider = StreamProvider.family<void, String>((ref, roomId) asyn
     await Future.delayed(const Duration(seconds: 3));
     // Quietly refresh the most critical data
     ref.invalidate(roomMetadataByIdProvider(roomId));
-    ref.invalidate(playedCardsProvider(roomId));
+    // We don't invalidate playedCardsProvider directly as it needs RoomRound, 
+    // but invalidating roomMetadataByIdProvider will trigger its reactive update.
     yield null;
   }
 });
@@ -185,11 +204,12 @@ final playerHandProvider = StreamProvider.family<List<Map<String, dynamic>>, Str
       });
 });
 
-final playedCardsProvider = StreamProvider.family<List<Map<String, dynamic>>, String>((ref, roomId) {
+final playedCardsProvider = StreamProvider.family<List<Map<String, dynamic>>, RoomRound>((ref, rr) {
   return supabase
       .from('played_cards')
       .stream(primaryKey: ['id'])
-      .eq('room_id', roomId)
+      .eq('room_id', rr.roomId)
+      .eq('round_number', rr.roundNumber)
       .map((data) {
         final sorted = data.map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e)).toList();
         sorted.sort((a, b) {
@@ -223,11 +243,11 @@ final roundResultsProvider = StreamProvider.family<List<Map<String, dynamic>>, S
 // Combines server-side cards with local optimistic plays to provide a seamless state.
 final predictivePlayedCardsProvider = Provider.family<List<Map<String, dynamic>>, String>((ref, roomId) {
   final room = ref.watch(roomMetadataByIdProvider(roomId)).value;
-  if (room == null || room.status == 'shuffling' || room.status == 'bidding' || room.status == 'trump_selection') {
+  if (room == null || room.status == 'shuffling' || room.status == 'bidding' || room.status == 'trump_selection' || room.status == 'dealing') {
     return []; // FORCE CLEAR table during these phases
   }
 
-  final serverPlayed = ref.watch(playedCardsProvider(roomId)).value ?? [];
+  final serverPlayed = ref.watch(playedCardsProvider(RoomRound(roomId, room.currentRound))).value ?? [];
   final localPlayed = ref.watch(localPlayedCardsProvider);
   final localId = ref.watch(localPlayerIdProvider);
 
