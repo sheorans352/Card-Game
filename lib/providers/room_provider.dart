@@ -154,7 +154,7 @@ final playersStreamProvider = StreamProvider.family<List<Player>, String>((ref, 
 
 final playerHandProvider = StreamProvider.family<List<Map<String, dynamic>>, String>((ref, playerId) {
   return supabase
-      .from('hands')
+      .from('player_hands')
       .stream(primaryKey: ['id'])
       .eq('player_id', playerId)
       .map((data) {

@@ -103,7 +103,7 @@ class SupabaseCardService extends CardService {
         'player_id': orderedPlayers[i],
         'card_value': c,
       }).toList();
-      await _supabase.from('hands').insert(hand);
+      await _supabase.from('player_hands').insert(hand);
       await Future.delayed(const Duration(milliseconds: 400));
     }
   }
@@ -289,7 +289,7 @@ class SupabaseCardService extends CardService {
 
 
     // Check how many cards are already dealt to distinguish Phase 1 vs Scenario B override
-    final handsResponse = await _supabase.from('hands').select('id').eq('room_id', roomId);
+    final handsResponse = await _supabase.from('player_hands').select('id').eq('room_id', roomId);
     final handsDealt = (handsResponse as List).length;
 
     if (handsDealt < 52) {
