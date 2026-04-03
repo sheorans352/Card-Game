@@ -1,12 +1,12 @@
 {
-    "name": "card_game",
-    "short_name": "card_game",
+    "name": "Minus Card Game",
+    "short_name": "Minus",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
-    "orientation": "portrait-primary",
+    "background_color": "#0A1221",
+    "theme_color": "#0A1221",
+    "description": "Strategic Minus Card Game.",
+    "orientation": "portrait",
     "prefer_related_applications": false,
     "icons": [
         {
