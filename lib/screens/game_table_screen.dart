@@ -93,7 +93,10 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
         Future.delayed(const Duration(milliseconds: 1000), () {
           if (mounted) setState(() => _showScoreboard = true);
         });
+        
+        // CRITICAL: Clear all pessimistic/optimistic hand state for the next round
         ref.read(localPlayedCardsProvider.notifier).state = {};
+        ref.read(pendingCardPlayProvider.notifier).state = {};
       }
     });
 
