@@ -172,21 +172,23 @@ final playersStreamProvider = StreamProvider.family<List<Player>, String>((ref, 
 });
 
 class PlayerRound {
+  final String roomId;
   final String playerId;
   final int round;
-  PlayerRound(this.playerId, this.round);
+  PlayerRound(this.roomId, this.playerId, this.round);
 
   @override
-  bool operator ==(Object other) => identical(this, other) || other is PlayerRound && runtimeType == other.runtimeType && playerId == other.playerId && round == other.round;
+  bool operator ==(Object other) => identical(this, other) || other is PlayerRound && runtimeType == other.runtimeType && roomId == other.roomId && playerId == other.playerId && round == other.round;
   
   @override
-  int get hashCode => playerId.hashCode ^ round.hashCode;
+  int get hashCode => roomId.hashCode ^ playerId.hashCode ^ round.hashCode;
 }
 
 final playerHandProvider = StreamProvider.family<List<Map<String, dynamic>>, PlayerRound>((ref, pr) {
   return supabase
       .from('hands')
       .stream(primaryKey: ['id'])
+      .eq('room_id', pr.roomId)
       .eq('player_id', pr.playerId)
       .map((data) {
         final hand = data
@@ -346,7 +348,7 @@ final playableCardsProvider = Provider.family<Set<String>, String>((ref, roomId)
   final players = ref.watch(playersStreamProvider(room.id)).value ?? [];
   if (players.isEmpty) return {};
 
-  final hand = ref.watch(playerHandProvider(PlayerRound(localId, room.currentRound))).value ?? [];
+  final hand = ref.watch(playerHandProvider(PlayerRound(room.id, localId, room.currentRound))).value ?? [];
   final cards = ref.watch(predictivePlayedCardsProvider(roomId));
   
   // === TURN CHECK (Predictive) ===
