@@ -64,33 +64,27 @@ class _BiddingOverlayState extends ConsumerState<BiddingOverlay> {
 
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: const BorderRadius.vertical(top: Radius.circular(40)),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-          decoration: BoxDecoration(
-            color: Colors.black.withOpacity(0.85),
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
-            border: Border.all(color: Colors.white.withOpacity(0.1), width: 1),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.4),
-                blurRadius: 30,
-                spreadRadius: 10,
-              ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
+    return Container(
+      width: MediaQuery.of(context).size.width * 0.9,
+      margin: const EdgeInsets.symmetric(horizontal: 20),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(28),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.85),
+              borderRadius: BorderRadius.circular(28),
+              border: Border.all(color: Colors.white.withOpacity(0.12), width: 1),
+              boxShadow: [
+                BoxShadow(color: Colors.black.withOpacity(0.5), blurRadius: 40, spreadRadius: 10),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
             children: [
-              // Pull Handle
-              Container(
-                width: 40, height: 4, 
-                decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)),
-              ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 8),
               // Title
               Text(
                 widget.isRoundTwo

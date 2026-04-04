@@ -207,16 +207,19 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
                     if ((room.currentPhase == 'bidding' || room.currentPhase == 'bidding_2' || room.currentPhase == 'trump_selection') &&
                         ref.watch(isLocalPlayerTurnProvider(room.code)))
                       Align(
-                        alignment: Alignment.bottomCenter,
-                        child: BiddingOverlay(
-                          isRoundTwo: room.currentPhase == 'bidding_2',
-                          currentHighBid: room.highestBid,
-                          trumpSuit: room.trumpSuit ?? 'S',
-                          isTrumpSelection: room.currentPhase == 'trump_selection',
-                          isScenarioB: room.currentPhase == 'bidding_2' && room.highestBidderId == null,
-                          onBidSubmitted: (score) => ref.read(cardServiceProvider).placeBid(room.id, localPlayerId, score),
-                          onTrumpSelected: (suit) => ref.read(cardServiceProvider).selectTrump(room.id, localPlayerId, suit.name.toUpperCase().substring(0, 1)),
-                          onPass: () => ref.read(cardServiceProvider).placeBid(room.id, localPlayerId, 0),
+                        alignment: Alignment.topCenter,
+                        child: Padding(
+                          padding: const EdgeInsets.only(top: 100),
+                          child: BiddingOverlay(
+                            isRoundTwo: room.currentPhase == 'bidding_2',
+                            currentHighBid: room.highestBid,
+                            trumpSuit: room.trumpSuit ?? 'S',
+                            isTrumpSelection: room.currentPhase == 'trump_selection',
+                            isScenarioB: room.currentPhase == 'bidding_2' && room.highestBidderId == null,
+                            onBidSubmitted: (score) => ref.read(cardServiceProvider).placeBid(room.id, localPlayerId, score),
+                            onTrumpSelected: (suit) => ref.read(cardServiceProvider).selectTrump(room.id, localPlayerId, suit.name.toUpperCase().substring(0, 1)),
+                            onPass: () => ref.read(cardServiceProvider).placeBid(room.id, localPlayerId, 0),
+                          ),
                         ),
                       ),
 
