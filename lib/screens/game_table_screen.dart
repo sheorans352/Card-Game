@@ -137,9 +137,13 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
                       top: MediaQuery.of(context).padding.top + 5,
                       right: 8,
                       child: GestureDetector(
-                        onTap: () => setState(() => _showScoreboard = true),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        onTap: (room.status == 'shuffling' || room.status == 'cutting' || room.status.startsWith('dealing')) 
+                          ? null 
+                          : () => setState(() => _showScoreboard = true),
+                        child: Opacity(
+                          opacity: (room.status == 'shuffling' || room.status == 'cutting' || room.status.startsWith('dealing')) ? 0.3 : 1.0,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                           decoration: BoxDecoration(
                             color: Colors.black45,
                             borderRadius: BorderRadius.circular(12),
@@ -239,7 +243,12 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
                           child: Container(
                             color: Colors.black87,
                             padding: const EdgeInsets.only(top: 80),
-                            child: ScoreboardOverlay(roomId: room.id, players: players, onClose: () => setState(() => _showScoreboard = false)),
+                            child: ScoreboardOverlay(
+                              roomId: room.id, 
+                              players: players, 
+                              isSummary: room.status == 'summary' || room.status == 'game_over',
+                              onClose: () => setState(() => _showScoreboard = false)
+                            ),
                           ),
                         ),
                       ),
@@ -306,20 +315,18 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
                     ),
                   ),
 
-                // Center Info
-                Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text('ROUND ${room.currentRound ?? 1}', style: const TextStyle(color: Colors.white38, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
-                    Builder(
-                      builder: (context) {
-                        bool isActuallyPlaying = room.status == 'playing';
-                        int trickNumber = isActuallyPlaying ? (playedCardsCount ~/ 4) + 1 : 1;
-                        if (trickNumber > 13) trickNumber = 13; // Cap it
-                        return Text('TRICK $trickNumber / 13', style: const TextStyle(color: accentGold, fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 1));
-                      },
-                    ),
-                  ],
+                // Center Info (Turn Indicator)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      if (room.status == 'playing' || room.status == 'bidding' || room.status == 'bidding_2' || room.status == 'trump_selection')
+                        _buildTurnBanner(ref, room, players)
+                      else
+                        Text('ROUND ${room.currentRound ?? 1}', style: const TextStyle(color: Colors.white38, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -616,6 +623,42 @@ class PlayedCardWidget extends StatelessWidget {
       builder: (context, val, child) => Transform.translate(offset: Offset(offsetX + (wX * val), offsetY + (wY * val)), child: Opacity(opacity: 1.0 - (val * 0.8), child: Container(width: 80, height: 100, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10), border: isTrickFinished && winnerPosition == position ? Border.all(color: accentGold, width: 4) : Border.all(color: Colors.white, width: 1), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.4), blurRadius: 10, offset: const Offset(2, 4))]), child: Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Text(card.value, style: TextStyle(color: (card.suit.code == 'H' || card.suit.code == 'D') ? Colors.red : Colors.black87, fontSize: 24, fontWeight: FontWeight.w900)), Text(CardModel.getSuitEmoji(card.suit.code), style: TextStyle(color: (card.suit.code == 'H' || card.suit.code == 'D') ? Colors.red : Colors.black87, fontSize: 18))]))))),
     ));
   }
+}
+
+Widget _buildTurnBanner(WidgetRef ref, Room room, List<Player> players) {
+  final turnId = ref.watch(predictiveTurnIdProvider(room.id));
+  final localPlayerId = ref.watch(localPlayerIdProvider);
+  final isLocalTurn = turnId == localPlayerId;
+  final turnPlayer = players.firstWhere((p) => p.id == turnId, orElse: () => players[0]);
+
+  return Container(
+    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+    decoration: BoxDecoration(
+      color: isLocalTurn ? accentGold : Colors.white10,
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: isLocalTurn ? Colors.white : Colors.white10, width: 0.5),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (isLocalTurn) ...[
+          const Icon(Icons.star, color: Colors.black, size: 10),
+          const SizedBox(width: 6),
+          const Text('YOUR TURN', style: TextStyle(color: Colors.black, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 0.5)),
+        ] else ...[
+          SizedBox(
+            width: 8, height: 8,
+            child: CircularProgressIndicator(strokeWidth: 1.5, color: Colors.white.withOpacity(0.5)),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            'WAITING FOR ${turnPlayer.name.toUpperCase()}',
+            style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+          ),
+        ],
+      ],
+    ),
+  );
 }
 
 Widget _buildBottomBar(String trumpSuit, Room room, int? playedCardsCount) {

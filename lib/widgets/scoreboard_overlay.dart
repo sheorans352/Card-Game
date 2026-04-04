@@ -7,12 +7,14 @@ class ScoreboardOverlay extends ConsumerWidget {
   final String roomId;
   final List<dynamic> players;
   final VoidCallback onClose;
+  final bool isSummary;
 
   const ScoreboardOverlay({
     super.key,
     required this.roomId,
     required this.players,
     required this.onClose,
+    this.isSummary = false,
   });
 
   static const Color accentGold = Color(0xFFFFD700);
@@ -111,15 +113,20 @@ class ScoreboardOverlay extends ConsumerWidget {
                   color: Colors.transparent,
                   child: InkWell(
                     onTap: () {
-                      final localId = ref.read(localPlayerIdProvider);
-                      if (localId != null) {
-                        ref.read(cardServiceProvider).setPlayerReady(roomId, localId);
+                      if (isSummary) {
+                        final localId = ref.read(localPlayerIdProvider);
+                        if (localId != null) {
+                          ref.read(cardServiceProvider).setPlayerReady(roomId, localId);
+                        }
                       }
                       onClose();
                     },
                     borderRadius: BorderRadius.circular(20),
-                    child: const Center(
-                      child: Text('BACK TO TABLE', style: TextStyle(color: Colors.black, fontSize: 16, fontWeight: FontWeight.w900, letterSpacing: 1.5)),
+                    child: Center(
+                      child: Text(
+                        isSummary ? 'READY FOR NEXT ROUND' : 'CLOSE SCOREBOARD', 
+                        style: const TextStyle(color: Colors.black, fontSize: 16, fontWeight: FontWeight.w900, letterSpacing: 1.5)
+                      ),
                     ),
                   ),
                 ),
