@@ -149,7 +149,7 @@ class ScoreboardOverlay extends ConsumerWidget {
           final result = roundResults.firstWhere((r) => r['player_id'] == p.id, orElse: () => {});
           if (result.isEmpty) return const _Cell(text: '-');
 
-          final score = result['points_earned'] as int;
+          final score = (result['points_earned'] as num).toInt();
           final isSuccess = score >= 0;
 
           return _Cell(
@@ -169,7 +169,7 @@ class ScoreboardOverlay extends ConsumerWidget {
         ...players.map((p) {
           final total = allResults
               .where((r) => r['player_id'] == p.id)
-              .fold(0, (sum, item) => sum + (item['points_earned'] as int));
+              .fold(0, (sum, item) => sum + (item['points_earned'] as num).toInt());
           
           return _Cell(
             text: '$total', 
@@ -184,7 +184,7 @@ class ScoreboardOverlay extends ConsumerWidget {
   Map<int, List<Map<String, dynamic>>> _groupResultsByRound(List<Map<String, dynamic>> results) {
     final Map<int, List<Map<String, dynamic>>> rounds = {};
     for (var r in results) {
-      final roundNum = r['round_number'] as int;
+      final roundNum = (r['round_number'] as num).toInt();
       rounds.putIfAbsent(roundNum, () => []).add(r);
     }
     return rounds;
