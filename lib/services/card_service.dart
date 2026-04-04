@@ -183,20 +183,17 @@ class SupabaseCardService extends CardService {
       // Rule 1: Must follow lead suit
       if (playedCard.suit != leadSuit) return false;
 
-      // Must-beat rule: ONLY if NO Trump is on the table
-      if (!isTrumpOnTable) {
-        CardModel? currentBestLead;
-        for (var t in currentTrick) {
-          final tc = CardModel.fromId(t['card_value'] as String);
-          if (tc.suit == leadSuit) {
-            if (currentBestLead == null || tc.rank > currentBestLead.rank) currentBestLead = tc;
-          }
+      CardModel? currentBestLead;
+      for (var t in currentTrick) {
+        final tc = CardModel.fromId(t['card_value'] as String);
+        if (tc.suit == leadSuit) {
+          if (currentBestLead == null || tc.rank > currentBestLead.rank) currentBestLead = tc;
         }
-        // If player can beat the best lead card, they MUST
-        if (currentBestLead != null) {
-          final canBeat = handCards.any((c) => c.suit == leadSuit && c.rank > currentBestLead!.rank);
-          if (canBeat && playedCard.rank <= currentBestLead.rank) return false;
-        }
+      }
+      // If player can beat the best lead card, they MUST
+      if (currentBestLead != null) {
+        final canBeat = handCards.any((c) => c.suit == leadSuit && c.rank > currentBestLead!.rank);
+        if (canBeat && playedCard.rank <= currentBestLead.rank) return false;
       }
       return true;
     }
