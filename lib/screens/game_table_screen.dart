@@ -144,18 +144,19 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
                           opacity: (room.status == 'shuffling' || room.status == 'cutting' || room.status.startsWith('dealing')) ? 0.3 : 1.0,
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: Colors.black45,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: accentGold.withOpacity(0.35)),
-                          ),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: const [
-                              Icon(Icons.leaderboard_rounded, color: accentGold, size: 20),
-                              SizedBox(height: 2),
-                              Text('SCORE', style: TextStyle(color: accentGold, fontSize: 8, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
-                            ],
+                            decoration: BoxDecoration(
+                              color: Colors.black45,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: accentGold.withOpacity(0.35)),
+                            ),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: const [
+                                Icon(Icons.leaderboard_rounded, color: accentGold, size: 20),
+                                SizedBox(height: 2),
+                                Text('SCORE', style: TextStyle(color: accentGold, fontSize: 8, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                              ],
+                            ),
                           ),
                         ),
                       ),
