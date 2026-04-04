@@ -150,7 +150,7 @@ class SupabaseCardService extends CardService {
 
   @override
   Future<void> resetRoundData(String roomId) async {
-    await _supabase.rpc('reset_round_data', params: {
+    await _supabase.rpc('end_round', params: {
       'p_room_id': roomId,
     });
   }
