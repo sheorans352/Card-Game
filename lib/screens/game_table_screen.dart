@@ -217,7 +217,7 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
                             isTrumpSelection: room.currentPhase == 'trump_selection',
                             isScenarioB: room.currentPhase == 'bidding_2' && room.highestBidderId == null,
                             onBidSubmitted: (score) => ref.read(cardServiceProvider).placeBid(room.id, localPlayerId, score),
-                            onTrumpSelected: (suit) => ref.read(cardServiceProvider).selectTrump(room.id, localPlayerId, suit.name.toUpperCase().substring(0, 1)),
+                            onTrumpSelected: (suit) => ref.read(cardServiceProvider).selectTrump(room.id, localPlayerId, suit.code),
                             onPass: () => ref.read(cardServiceProvider).placeBid(room.id, localPlayerId, 0),
                           ),
                         ),
@@ -395,19 +395,10 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
     final cardService = ref.read(cardServiceProvider);
 
     try {
-      // 1. Initial Batch (5 cards each) - To Select Trump
-      for (var player in orderedPlayers) {
-        await cardService.dealPlayerBatch(roomId, player.id, 5);
-        gameAudio.playCardPlay(); 
-        await Future.delayed(const Duration(milliseconds: 600));
-      }
+      // Phase 1 (5 cards) is already in DB immediately.
+      // Wait for trump selection -> status changes to 'dealing_phase_2', triggering this.
 
-      // 2. PAUSE FOR TRUMP SELECTION
-      // The DB logic already sets status to 'bidding' after initial deal.
-      // We must wait for trump selection to be completed by the bidder.
-      // But dealInitialFive handles this, so we are and just doing the batches.
-      
-      // 3. Batch 2 (Next 4 cards each)
+      // 1. Batch 2 (Next 4 cards each)
       for (var player in orderedPlayers) {
         await cardService.dealPlayerBatch(roomId, player.id, 4);
         gameAudio.playCardPlay();

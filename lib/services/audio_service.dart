@@ -28,6 +28,7 @@ class AudioService {
       await _sfxPlayer.play(AssetSource(assetPath));
     } catch (e) {
       debugPrint('Error playing SFX: $e');
+      // Intentionally swallowing the error to ensure game logic does not stall
     }
   }
 

@@ -168,13 +168,14 @@ class _BiddingOverlayState extends ConsumerState<BiddingOverlay> {
                   children: Suit.values.map((suit) {
                     final isSelected = _selectedTrump == suit;
                     return GestureDetector(
+                      behavior: HitTestBehavior.opaque,
                       onTap: () {
                         gameAudio.playBiddingTick();
                         setState(() => _selectedTrump = suit);
                       },
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 300),
-                        padding: const EdgeInsets.all(12),
+                        padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
                           color: isSelected ? Colors.amber.withOpacity(0.3) : Colors.white.withOpacity(0.05),
                           shape: BoxShape.circle,
@@ -182,7 +183,7 @@ class _BiddingOverlayState extends ConsumerState<BiddingOverlay> {
                         ),
                         child: Text(
                           _getSuitEmoji(suit),
-                          style: const TextStyle(fontSize: 24),
+                          style: const TextStyle(fontSize: 28),
                         ),
                       ),
                     );
