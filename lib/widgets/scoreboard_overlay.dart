@@ -84,7 +84,7 @@ class ScoreboardOverlay extends ConsumerWidget {
                           // Header Row (Names)
                           _buildHeaderRow(),
                           // Round Rows
-                          ...rounds.entries.map((e) => _buildRoundRow(e.key, e.value)),
+                          ...rounds.entries.map((e) => _buildRoundRow(e.key, e.value, results)),
                           // Total Row
                           _buildTotalRow(),
                         ],
@@ -141,7 +141,7 @@ class ScoreboardOverlay extends ConsumerWidget {
     );
   }
 
-  TableRow _buildRoundRow(int roundNum, List<Map<String, dynamic>> roundResults) {
+  TableRow _buildRoundRow(int roundNum, List<Map<String, dynamic>> roundResults, List<Map<String, dynamic>> allResults) {
     return TableRow(
       children: [
         _Cell(text: '#$roundNum', isLabel: true),
@@ -152,8 +152,14 @@ class ScoreboardOverlay extends ConsumerWidget {
           final score = (result['points_earned'] as num).toInt();
           final isSuccess = score >= 0;
 
+          // Calculate running total up to this round
+          final runningTotal = allResults
+              .where((r) => r['player_id'] == p.id && (r['round_number'] as num).toInt() <= roundNum)
+              .fold(0, (sum, item) => sum + (item['points_earned'] as num).toInt());
+
           return _Cell(
-            text: '$score',
+            text: '${score > 0 ? "+" : ""}$score',
+            subText: '[$runningTotal]',
             color: isSuccess ? boxGreen : boxRed,
           );
         }),
