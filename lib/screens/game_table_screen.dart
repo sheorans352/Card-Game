@@ -63,10 +63,15 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
           }
 
           // Sequential Dealing coordination (Dealer only)
-          if (room.status == 'dealing_phase_2') {
+          if (room.status == 'dealing_phase_1') {
             if (players[dealerIndexInList].id == localId && !_isDealingBatch) {
               _isDealingBatch = true;
-              _handleSequentialDeal(room.id, players, room.dealerIndex);
+              _handlePhase1Deal(room.id, players, room.dealerIndex);
+            }
+          } else if (room.status == 'dealing_phase_2') {
+            if (players[dealerIndexInList].id == localId && !_isDealingBatch) {
+              _isDealingBatch = true;
+              _handlePhase2Deal(room.id, players, room.dealerIndex);
             }
           } else {
             // Reset flag when we move out of dealing phase
@@ -223,7 +228,8 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
                         ),
                       ),
 
-                    if (room.currentPhase == 'bidding_2' && room.highestBidderId == localPlayerId)
+                    if ((room.currentPhase == 'bidding' || room.currentPhase == 'bidding_2' || room.currentPhase == 'trump_selection') &&
+                        !ref.watch(isLocalPlayerTurnProvider(room.code)))
                        _buildBiddingWaitingOverlay(players, room, 'to make their Call...'),
 
                     if (room.currentPhase == 'cutting') const DeckCutOverlay(),
@@ -389,15 +395,33 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
     );
   }
 
-  Future<void> _handleSequentialDeal(String roomId, List<Player> players, int dealerIndex) async {
+  Future<void> _handlePhase1Deal(String roomId, List<Player> players, int dealerIndex) async {
     final cutterIndex = (dealerIndex + 1) % 4;
     final orderedPlayers = List.generate(4, (i) => players[(cutterIndex + i) % 4]);
     final cardService = ref.read(cardServiceProvider);
 
     try {
-      // Phase 1 (5 cards) is already in DB immediately.
-      // Wait for trump selection -> status changes to 'dealing_phase_2', triggering this.
+      // Phase 1 (5 cards visually dealt out sequentially)
+      for (var player in orderedPlayers) {
+        await cardService.dealPlayerBatch(roomId, player.id, 5);
+        gameAudio.playCardPlay();
+        await Future.delayed(const Duration(milliseconds: 600));
+      }
+      
+      // Move to bidding phase
+      await cardService.finishPhase1Dealing(roomId);
+    } catch (e) {
+      debugPrint('Error during phase 1 deal: $e');
+      _isDealingBatch = false; // Allow retry on error
+    }
+  }
 
+  Future<void> _handlePhase2Deal(String roomId, List<Player> players, int dealerIndex) async {
+    final cutterIndex = (dealerIndex + 1) % 4;
+    final orderedPlayers = List.generate(4, (i) => players[(cutterIndex + i) % 4]);
+    final cardService = ref.read(cardServiceProvider);
+
+    try {
       // 1. Batch 2 (Next 4 cards each)
       for (var player in orderedPlayers) {
         await cardService.dealPlayerBatch(roomId, player.id, 4);
@@ -405,17 +429,17 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
         await Future.delayed(const Duration(milliseconds: 600));
       }
 
-      // 4. Batch 3 (Last 4 cards each)
+      // 2. Batch 3 (Last 4 cards each)
       for (var player in orderedPlayers) {
         await cardService.dealPlayerBatch(roomId, player.id, 4);
         gameAudio.playCardPlay();
         await Future.delayed(const Duration(milliseconds: 600));
       }
 
-      // 4. Finalize
+      // 3. Finalize
       await cardService.finishDealing(roomId);
     } catch (e) {
-      debugPrint('Error during sequential deal: $e');
+      debugPrint('Error during phase 2 deal: $e');
       _isDealingBatch = false; // Allow retry on error
     }
   }
