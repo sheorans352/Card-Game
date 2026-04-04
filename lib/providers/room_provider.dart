@@ -260,7 +260,7 @@ final roundResultsProvider = StreamProvider.family<List<Map<String, dynamic>>, S
 // Combines server-side cards with local optimistic plays to provide a seamless state.
 final predictivePlayedCardsProvider = Provider.family<List<Map<String, dynamic>>, String>((ref, roomId) {
   final room = ref.watch(roomMetadataByIdProvider(roomId)).value;
-  if (room == null || room.status == 'shuffling' || room.status == 'bidding' || room.status == 'trump_selection' || room.status == 'dealing') {
+  if (room == null || room.status == 'shuffling' || room.status == 'bidding' || room.status == 'trump_selection' || (room.status?.startsWith('dealing') ?? false)) {
     return []; // FORCE CLEAR table during these phases
   }
 
