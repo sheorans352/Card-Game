@@ -94,7 +94,7 @@ class _BiddingOverlayState extends ConsumerState<BiddingOverlay> {
               ),
 
               // Trump badge — shown in Round 2
-              if (widget.isRoundTwo && widget.trumpSuit != null) ...[
+              if (widget.isRoundTwo) ...[
                 const SizedBox(height: 8),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -106,10 +106,10 @@ class _BiddingOverlayState extends ConsumerState<BiddingOverlay> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(_getTrumpEmoji(widget.trumpSuit!), style: const TextStyle(fontSize: 18)),
+                      Text(widget.trumpSuit != null ? _getTrumpEmoji(widget.trumpSuit!) : '🃏', style: const TextStyle(fontSize: 18)),
                       const SizedBox(width: 8),
                       Text(
-                        'Trump: ${_getTrumpName(widget.trumpSuit!)}',
+                        'Trump: ${widget.trumpSuit != null ? _getTrumpName(widget.trumpSuit!) : "NONE (Default: Spades)"}',
                         style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.bold, fontSize: 13),
                       ),
                     ],
@@ -122,6 +122,24 @@ class _BiddingOverlayState extends ConsumerState<BiddingOverlay> {
                 const SizedBox(height: 6),
                 Text('Bid 9+ to override Trump suit',
                   style: TextStyle(color: Colors.white.withOpacity(0.45), fontSize: 11, fontStyle: FontStyle.italic)),
+              ],
+
+              // NEW: Instructional Text for Auction Phase (Phase 1 OR 9+ Override)
+              if ((!widget.isRoundTwo || widget.currentHighBid >= 9) && !widget.isTrumpSelection) ...[
+                const SizedBox(height: 12),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Text(
+                    'This bid is to set the trump suit.\nYou can pass it to keep the Trump Spades.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.amber.withOpacity(0.9),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      height: 1.4,
+                    ),
+                  ),
+                ),
               ],
               const SizedBox(height: 16),
               
