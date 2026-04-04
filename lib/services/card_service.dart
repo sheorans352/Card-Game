@@ -1,5 +1,6 @@
 import '../models/card_model.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'dart:math' as math;
 
 abstract class CardService {
   List<CardModel> generateDeck();
@@ -39,14 +40,50 @@ class SupabaseCardService extends CardService {
 
   @override
   Future<void> shuffleDeck(String roomId) async {
-    final deck = generateDeck()..shuffle();
-    final deckStrings = deck.map((c) => '${c.value}${c.suit.toString().split('.').last[0].toUpperCase()}').toList();
+    // 1. Generate a fresh deck pool (A-K for all 4 suits)
+    final freshDeckPool = generateDeck().map((c) => c.id).toList();
+
+    // 2. Fetch the "Discard Pile" from the previous round (if any)
+    final response = await _supabase.from('rooms').select('discard_pile').eq('id', roomId).single();
+    final List<String> discardPile = List<String>.from(response['discard_pile'] ?? []);
+
+    final secureRandom = math.Random.secure();
+
+    // 3. THE CASINO WASH (Initial Scramble)
+    // If we have a discard pile, scramble it individually before adding to the main deck pool
+    if (discardPile.isNotEmpty) {
+      _fisherYatesShuffle(discardPile, secureRandom);
+    }
+
+    // 4. PREPARE THE FULL 52-CARD DECK
+    // Use cards from the discard pile first, and fill in the rest from the fresh pool
+    // (This ensures we always have 52 unique cards, even in Round 1)
+    final Map<String, bool> seenInDiscard = {for (var c in discardPile) c: true};
+    final List<String> remainingCards = freshDeckPool.where((c) => !seenInDiscard.containsKey(c)).toList();
     
+    final List<String> fullDeck = [...discardPile, ...remainingCards];
+
+    // 5. THE MAIN SHUFFLE (Mathematically Perfect Fisher-Yates)
+    _fisherYatesShuffle(fullDeck, secureRandom);
+
+    // 6. Push to Server and advance to Cutting phase
     await _supabase.from('rooms').update({
-      'shuffled_deck': deckStrings,
+      'shuffled_deck': fullDeck,
       'status': 'cutting',
       'current_phase': 'cutting',
+      'discard_pile': [], // Reset the discard pile as it's now back in the main deck
+      'deck_cut_value': null,
     }).eq('id', roomId);
+  }
+
+  // Fisher-Yates Shuffle Algorithm (The Industry Standard for Card Randomization)
+  void _fisherYatesShuffle(List<String> list, math.Random random) {
+    for (int i = list.length - 1; i > 0; i--) {
+      final j = random.nextInt(i + 1);
+      final temp = list[i];
+      list[i] = list[j];
+      list[j] = temp;
+    }
   }
 
   @override

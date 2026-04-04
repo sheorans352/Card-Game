@@ -181,7 +181,7 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
                     _buildPlayerAvatar(rotatedPlayers[3], 'right', ref.watch(predictiveTurnIdProvider(room.id)) == rotatedPlayers[3].id, room.dealerIndex == (players.indexOf(rotatedPlayers[3])), localPlayerId),
 
                     // 6. WAITING OVERLAY
-                    if (room.status == 'shuffling' && !ref.watch(allPlayersReadyProvider(room.id)))
+                    if (room.status == 'shuffling')
                       Center(
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
@@ -195,15 +195,18 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
                             children: [
                               const CircularProgressIndicator(color: accentGold, strokeWidth: 2),
                               const SizedBox(height: 16),
-                              const Text(
-                                'WAITING FOR ALL PLAYERS',
-                                style: TextStyle(color: accentGold, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1.5),
+                              Text(
+                                ref.watch(allPlayersReadyProvider(room.id)) 
+                                  ? 'DEALER IS SHUFFLING (CASINO WASH)' 
+                                  : 'WAITING FOR ALL PLAYERS',
+                                style: const TextStyle(color: accentGold, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1.5),
                               ),
                               const SizedBox(height: 4),
-                              Text(
-                                '${players.where((p) => p.isReady).length} / 4 READY',
-                                style: const TextStyle(color: Colors.white70, fontSize: 10),
-                              ),
+                              if (!ref.watch(allPlayersReadyProvider(room.id)))
+                                Text(
+                                  '${players.where((p) => p.isReady).length} / 4 READY',
+                                  style: const TextStyle(color: Colors.white70, fontSize: 10),
+                                ),
                             ],
                           ),
                         ),
