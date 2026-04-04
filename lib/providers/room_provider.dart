@@ -171,13 +171,28 @@ final playersStreamProvider = StreamProvider.family<List<Player>, String>((ref, 
       });
 });
 
-final playerHandProvider = StreamProvider.family<List<Map<String, dynamic>>, String>((ref, playerId) {
+class PlayerRound {
+  final String playerId;
+  final int round;
+  PlayerRound(this.playerId, this.round);
+
+  @override
+  bool operator ==(Object other) => identical(this, other) || other is PlayerRound && runtimeType == other.runtimeType && playerId == other.playerId && round == other.round;
+  
+  @override
+  int get hashCode => playerId.hashCode ^ round.hashCode;
+}
+
+final playerHandProvider = StreamProvider.family<List<Map<String, dynamic>>, PlayerRound>((ref, pr) {
   return supabase
       .from('hands')
       .stream(primaryKey: ['id'])
-      .eq('player_id', playerId)
+      .eq('player_id', pr.playerId)
       .map((data) {
-        final hand = data.map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e)).toList();
+        final hand = data
+            .where((e) => e['round_number'] == pr.round)
+            .map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e))
+            .toList();
         
         // Arrange cards in descending order by grouping them by suits
         const suitOrder = {'S': 0, 'H': 1, 'D': 2, 'C': 3};
@@ -331,7 +346,7 @@ final playableCardsProvider = Provider.family<Set<String>, String>((ref, roomId)
   final players = ref.watch(playersStreamProvider(room.id)).value ?? [];
   if (players.isEmpty) return {};
 
-  final hand = ref.watch(playerHandProvider(localId)).value ?? [];
+  final hand = ref.watch(playerHandProvider(PlayerRound(localId, room.currentRound))).value ?? [];
   final cards = ref.watch(predictivePlayedCardsProvider(roomId));
   
   // === TURN CHECK (Predictive) ===

@@ -111,7 +111,7 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
 
               final predictivePlayedCards = ref.watch(predictivePlayedCardsProvider(room.id));
               final playedCardsCount = predictivePlayedCards.length;
-              final localHandAsync = ref.watch(playerHandProvider(localPlayerId));
+              final localHandAsync = ref.watch(playerHandProvider(PlayerRound(localPlayerId, room.currentRound)));
               final myPlayedIds = predictivePlayedCards.where((m) => m['player_id'] == localPlayerId).map((m) => m['card_value'] as String).toSet();
               final pendingPlays = ref.watch(pendingCardPlayProvider);
               final localPlayed = ref.watch(localPlayedCardsProvider);
@@ -155,7 +155,7 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
                     ),
 
                     // 3. HANDS (Tucked Behind)
-                    ..._buildPlayerHands(ref, localHandAsync, myPlayedIds, pendingPlays, localPlayed, room.id, rotatedPlayers, localPlayerId),
+                    ..._buildPlayerHands(ref, localHandAsync, myPlayedIds, pendingPlays, localPlayed, room.id, rotatedPlayers, localPlayerId, room.currentRound),
 
                     // 4. TRICK LAYER
                     CardsLayer(
@@ -459,7 +459,7 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
     }
   }
 
-  List<Widget> _buildPlayerHands(WidgetRef ref, AsyncValue<List<Map<String, dynamic>>> localHandAsync, Set<String> myPlayedIds, Set<String> pendingPlays, Set<String> localPlayed, String roomId, List<Player> rotatedPlayers, String localPlayerId) {
+  List<Widget> _buildPlayerHands(WidgetRef ref, AsyncValue<List<Map<String, dynamic>>> localHandAsync, Set<String> myPlayedIds, Set<String> pendingPlays, Set<String> localPlayed, String roomId, List<Player> rotatedPlayers, String localPlayerId, int currentRound) {
     List<Widget> hands = [];
     localHandAsync.whenData((hand) {
       final playableIds = ref.watch(playableCardsProvider(roomId));
@@ -482,7 +482,7 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
     for (var i = 1; i < 4; i++) {
       final p = rotatedPlayers[i];
       final pos = _getPositionFromIndex(i);
-      ref.watch(playerHandProvider(p.id)).whenData((hand) {
+      ref.watch(playerHandProvider(PlayerRound(p.id, currentRound))).whenData((hand) {
         final played = ref.watch(predictivePlayedCardsProvider(roomId)).where((m) => m['player_id'] == p.id).length;
         final size = (hand.length - played).clamp(0, 52).toInt();
         for (var j = 0; j < size; j++) hands.add(OpponentCardWidget(position: pos, index: j, total: size));
