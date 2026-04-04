@@ -189,10 +189,9 @@ final playerHandProvider = StreamProvider.family<List<Map<String, dynamic>>, Pla
       .from('hands')
       .stream(primaryKey: ['id'])
       .eq('room_id', pr.roomId)
-      .eq('player_id', pr.playerId)
       .map((data) {
         final hand = data
-            .where((e) => e['round_number'] == pr.round)
+            .where((e) => e['player_id'] == pr.playerId && e['round_number'] == pr.round)
             .map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e))
             .toList();
         
