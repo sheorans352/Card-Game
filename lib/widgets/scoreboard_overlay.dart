@@ -86,7 +86,7 @@ class ScoreboardOverlay extends ConsumerWidget {
                           // Round Rows
                           ...rounds.entries.map((e) => _buildRoundRow(e.key, e.value)),
                           // Total Row
-                          _buildTotalRow(results),
+                          _buildTotalRow(),
                         ],
                       ),
                     ),
@@ -161,15 +161,13 @@ class ScoreboardOverlay extends ConsumerWidget {
     );
   }
 
-  TableRow _buildTotalRow(List<Map<String, dynamic>> allResults) {
+  TableRow _buildTotalRow() {
     return TableRow(
       decoration: BoxDecoration(color: accentGold.withOpacity(0.05)),
       children: [
         const _Cell(text: 'TOTAL', isLabel: true, color: accentGold),
         ...players.map((p) {
-          final total = allResults
-              .where((r) => r['player_id'] == p.id)
-              .fold(0, (sum, item) => sum + (item['points_earned'] as num).toInt());
+          final total = p.totalScore;
           
           return _Cell(
             text: '$total', 
@@ -187,7 +185,14 @@ class ScoreboardOverlay extends ConsumerWidget {
       final roundNum = (r['round_number'] as num).toInt();
       rounds.putIfAbsent(roundNum, () => []).add(r);
     }
-    return rounds;
+    
+    // Sort rounds numerically
+    final sortedKeys = rounds.keys.toList()..sort();
+    final Map<int, List<Map<String, dynamic>>> sortedRounds = {};
+    for (var k in sortedKeys) {
+      sortedRounds[k] = rounds[k]!;
+    }
+    return sortedRounds;
   }
 }
 

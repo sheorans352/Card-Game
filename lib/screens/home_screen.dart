@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'dart:html' as html;
 import '../providers/room_provider.dart';
 import '../widgets/spade_background.dart';
 import 'lobby_screen.dart';
@@ -119,6 +120,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       if (next != null && next != _codeController.text) {
         _codeController.text = next;
         setState(() { _isHostingTab = false; });
+        
+        // Sync URL for Web
+        if (kIsWeb) {
+          final uri = Uri.base;
+          final newUri = uri.replace(queryParameters: {
+            ...uri.queryParameters,
+            'code': next,
+          });
+          html.window.history.replaceState(null, '', '#${newUri.path}${newUri.query.isNotEmpty ? '?' + newUri.query : ''}');
+        }
       }
     });
 
