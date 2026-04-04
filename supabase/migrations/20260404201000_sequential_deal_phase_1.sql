@@ -34,7 +34,7 @@ BEGIN
         turn_index = (v_dealer_idx + 1) % 4
     WHERE id = p_room_id;
     
-    UPDATE players SET bid = NULL, trump_bid_passed = FALSE, tricks_won = 0, round_score = 0 WHERE room_id = p_room_id;
+    UPDATE players SET bid = NULL, trump_bid_passed = FALSE, tricks_won = 0 WHERE room_id = p_room_id;
 END;
 $function$;
 
