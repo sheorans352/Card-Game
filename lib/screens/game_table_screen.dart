@@ -57,6 +57,12 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
         final dealerIndexInList = room.dealerIndex % players.length;
         if (players[dealerIndexInList].id == localId) {
           final allReady = ref.watch(allPlayersReadyProvider(room.id));
+          
+          // Dealer resets round into shuffling once everyone has manually viewed the scoreboard
+          if (room.status == 'summary' && allReady) {
+            ref.read(cardServiceProvider).resetRoundData(room.id);
+          }
+
           if (room.status == 'shuffling' && allReady && room.deckCutValue == null) {
             gameAudio.playShuffle();
             ref.read(cardServiceProvider).shuffleDeck(room.id);
@@ -81,22 +87,11 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
       });
     });
 
-    ref.listen<int?>(roomMetadataProvider(roomCode).select((data) => data.value?.currentRound), (prev, next) {
-      if (next != null && prev != null && next > prev) {
-        // Coordinated Round End Sequence:
-        // 1. All 4 cards land on table (handled by CardsLayer)
-        // 2. 1 Second later: Show scoreboard
+    ref.listen<String?>(roomMetadataProvider(roomCode).select((data) => data.value?.status), (prev, next) {
+      if (next == 'summary' && prev != 'summary') {
+        // Automatically pop up scoreboard when room hits summary state
         Future.delayed(const Duration(milliseconds: 1000), () {
           if (mounted) setState(() => _showScoreboard = true);
-          
-          // 3. 5 Seconds later: Close scoreboard AND reset DB for next round
-          Future.delayed(const Duration(milliseconds: 5000), () {
-            if (mounted) {
-               setState(() => _showScoreboard = false);
-               // Calling reset_round_data to clear hands/played_cards and set to shuffling
-               ref.read(cardServiceProvider).resetRoundData(roomAsync.value!.id);
-            }
-          });
         });
         ref.read(localPlayedCardsProvider.notifier).state = {};
       }
