@@ -232,7 +232,7 @@ class _BiddingOverlayState extends ConsumerState<BiddingOverlay> {
           ),
         ),
       ),
-    );
+    ),);
   }
 
   Widget _buildBidControl(IconData icon, VoidCallback onPressed) {
