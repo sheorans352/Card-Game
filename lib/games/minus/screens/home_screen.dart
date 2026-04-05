@@ -121,14 +121,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       if (next != null && next != _codeController.text) {
         _codeController.text = next;
         setState(() { _isHostingTab = false; });
-        
-        // Sync URL for Web
         if (kIsWeb) {
           final uri = Uri.base;
-          final newUri = uri.replace(queryParameters: {
-            ...uri.queryParameters,
-            'code': next,
-          });
+          final newUri = uri.replace(queryParameters: {...uri.queryParameters, 'code': next});
           html.window.history.replaceState(null, '', '#${newUri.path}${newUri.query.isNotEmpty ? '?' + newUri.query : ''}');
         }
       }
@@ -138,56 +133,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       backgroundColor: primaryBg,
       body: Stack(
         children: [
-          // Subtle radial gradient background
+          // 1. Background
           Container(
             decoration: const BoxDecoration(
               gradient: RadialGradient(
                 center: Alignment.center,
                 radius: 1.5,
-                colors: [
-                  Color(0xFF15331B),
-                  primaryBg,
-                ],
+                colors: [Color(0xFF15331B), primaryBg],
               ),
             ),
           ),
-          // ── BACK TO HUB BUTTON ─────────────────────────────────────────
-          Positioned(
-            top: 0, left: 0, right: 0,
-            child: SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.only(left: 12, top: 8),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: GestureDetector(
-                    onTap: () => context.go('/'),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                      decoration: BoxDecoration(
-                        color: Colors.black45,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: accentGold.withOpacity(0.25)),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: const [
-                          Icon(Icons.arrow_back_ios_new_rounded, color: accentGold, size: 12),
-                          SizedBox(width: 6),
-                          Text('GAMES HUB',
-                              style: TextStyle(
-                                color: accentGold,
-                                fontSize: 10,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: 1.5,
-                              )),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
+
+          // 2. Scrollable content
           SafeArea(
             child: SingleChildScrollView(
               padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 40),
@@ -196,25 +153,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   constraints: const BoxConstraints(maxWidth: 400),
                   child: Column(
                     children: [
-                      const Text(
-                        'MINUS',
-                        style: TextStyle(
-                          fontSize: 64,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 2,
-                          color: accentGold,
-                          fontFamily: 'Serif', // Use default serif if custom not available
-                        ),
-                      ),
-                      const Text(
-                        'TRICK-TAKING CARD GAME',
-                        style: TextStyle(
-                          fontSize: 12,
-                          letterSpacing: 4,
-                          color: Colors.white54,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
+                      const SizedBox(height: 32), // space below back button
+                      const Text('MINUS', style: TextStyle(fontSize: 64, fontWeight: FontWeight.w900, letterSpacing: 2, color: accentGold, fontFamily: 'Serif')),
+                      const Text('TRICK-TAKING CARD GAME', style: TextStyle(fontSize: 12, letterSpacing: 4, color: Colors.white54, fontWeight: FontWeight.w500)),
                       const SizedBox(height: 24),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -229,34 +170,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         ],
                       ),
                       const SizedBox(height: 48),
-                      
-                      // Tab Switcher
                       Container(
                         padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(
-                          color: Colors.black26,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Row(
-                          children: [
-                            _buildTabButton('Host Game', _isHostingTab, () => setState(() => _isHostingTab = true)),
-                            _buildTabButton('Join Game', !_isHostingTab, () => setState(() => _isHostingTab = false)),
-                          ],
-                        ),
+                        decoration: BoxDecoration(color: Colors.black26, borderRadius: BorderRadius.circular(12)),
+                        child: Row(children: [
+                          _buildTabButton('Host Game', _isHostingTab, () => setState(() => _isHostingTab = true)),
+                          _buildTabButton('Join Game', !_isHostingTab, () => setState(() => _isHostingTab = false)),
+                        ]),
                       ),
                       const SizedBox(height: 32),
-
-                      if (ref.watch(currentRoomCodeProvider) != null && 
-                          ref.watch(localPlayerIdProvider) != null && 
+                      if (ref.watch(currentRoomCodeProvider) != null &&
+                          ref.watch(localPlayerIdProvider) != null &&
                           (Uri.base.queryParameters['room'] == null && Uri.base.queryParameters['code'] == null))
                         _buildRejoinButton(),
-
-                       if (_isHostingTab) ...[
-                        _buildHostForm(),
-                      ] else ...[
-                        _buildJoinForm(),
-                      ],
-
+                      if (_isHostingTab) ...[_buildHostForm()] else ...[_buildJoinForm()],
                       const SizedBox(height: 48),
                       _buildRulesSection(),
                       const SizedBox(height: 40),
@@ -266,10 +193,43 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ),
             ),
           ),
+
+          // 3. Back button — LAST in Stack so it's rendered on top and receives taps
+          Positioned(
+            top: 0, left: 0, right: 0,
+            child: SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.only(left: 12, top: 8),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: GestureDetector(
+                    onTap: () => context.go('/'),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                      decoration: BoxDecoration(
+                        color: Colors.black54,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: accentGold.withOpacity(0.35)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: const [
+                          Icon(Icons.arrow_back_ios_new_rounded, color: accentGold, size: 12),
+                          SizedBox(width: 6),
+                          Text('GAMES HUB', style: TextStyle(color: accentGold, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1.5)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
+
 
   Widget _buildRulesSection() {
     return Container(
