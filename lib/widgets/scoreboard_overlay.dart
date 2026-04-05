@@ -161,25 +161,19 @@ class ScoreboardOverlay extends ConsumerWidget {
           final score = (result['points_earned'] as num).toInt();
           final bid = (result['bid'] as num?)?.toInt() ?? 0;
 
-          // Calculate cumulative running total up to this round
-          final runningTotal = allResults
-              .where((r) => r['player_id'] == p.id && (r['round_number'] as num).toInt() <= roundNum)
-              .fold(0, (sum, item) => sum + (item['points_earned'] as num).toInt());
-
           // Determine display label and color:
           //   score > 0  → green  "+N"
           //   score < 0  → red    "-N"
-          //   score == 0 → white  "+0" (passed, or exactly met 0-bid edge-case)
+          //   score == 0 → neutral white (passed / 0 earned)
           final label = score > 0 ? '+$score' : '$score';
           final Color cellColor = score > 0
               ? boxGreen
               : score < 0
                   ? boxRed
-                  : Colors.white54; // neutral for +0 (passed)
+                  : Colors.white54;
 
           return _Cell(
             text: label,
-            subText: '[$runningTotal]',
             color: cellColor,
           );
         }),
