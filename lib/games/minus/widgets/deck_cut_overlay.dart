@@ -1,7 +1,7 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../providers/room_provider.dart';
-import '../services/audio_service.dart';
+import '../../../games/minus/providers/room_provider.dart';
+import '../../../shared/services/audio_service.dart';
 
 class DeckCutOverlay extends ConsumerStatefulWidget {
   const DeckCutOverlay({super.key});

@@ -1,10 +1,10 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
-import '../providers/room_provider.dart';
-import '../models/game_models.dart';
-import '../widgets/spade_background.dart';
+import '../../../games/minus/providers/room_provider.dart';
+import '../../../games/minus/models/game_models.dart';
+import '../../../games/minus/widgets/spade_background.dart';
 import 'game_table_screen.dart';
 
 class LobbyScreen extends ConsumerWidget {

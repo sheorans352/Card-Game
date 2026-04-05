@@ -1,7 +1,7 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../models/card_model.dart';
-import '../services/audio_service.dart';
+import '../../../games/minus/models/card_model.dart';
+import '../../../shared/services/audio_service.dart';
 import 'dart:ui';
 
 class BiddingOverlay extends ConsumerStatefulWidget {

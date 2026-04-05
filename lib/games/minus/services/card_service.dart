@@ -1,4 +1,4 @@
-import '../models/card_model.dart';
+﻿import '../../../games/minus/models/card_model.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:math' as math;
 

@@ -1,7 +1,7 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:ui';
-import '../providers/room_provider.dart';
+import '../../../games/minus/providers/room_provider.dart';
 
 class ScoreboardOverlay extends ConsumerWidget {
   final String roomId;

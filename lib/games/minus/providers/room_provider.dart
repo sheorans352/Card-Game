@@ -1,14 +1,14 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../models/game_models.dart';
-import '../models/card_model.dart';
-import '../services/lobby_service.dart';
+import '../../../games/minus/models/game_models.dart';
+import '../../../games/minus/models/card_model.dart';
+import '../../../games/minus/services/lobby_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../services/card_service.dart';
-import '../config/env_config.dart';
+import '../../../games/minus/services/card_service.dart';
+import '../../../shared/config/env_config.dart';
 
 SupabaseClient get supabase => Supabase.instance.client;
 

@@ -1,9 +1,9 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:html' as html;
-import '../providers/room_provider.dart';
-import '../widgets/spade_background.dart';
+import '../../../games/minus/providers/room_provider.dart';
+import '../../../games/minus/widgets/spade_background.dart';
 import 'lobby_screen.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {

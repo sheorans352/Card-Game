@@ -1,4 +1,4 @@
-enum Suit {
+﻿enum Suit {
   spades('S'),
   hearts('H'),
   diamonds('D'),
