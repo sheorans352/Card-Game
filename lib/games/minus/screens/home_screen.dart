@@ -1,6 +1,7 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'dart:html' as html;
 import '../../../games/minus/providers/room_provider.dart';
 import '../../../games/minus/widgets/spade_background.dart';
@@ -147,6 +148,43 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   Color(0xFF15331B),
                   primaryBg,
                 ],
+              ),
+            ),
+          ),
+          // ── BACK TO HUB BUTTON ─────────────────────────────────────────
+          Positioned(
+            top: 0, left: 0, right: 0,
+            child: SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.only(left: 12, top: 8),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: GestureDetector(
+                    onTap: () => context.go('/'),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                      decoration: BoxDecoration(
+                        color: Colors.black45,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: accentGold.withOpacity(0.25)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: const [
+                          Icon(Icons.arrow_back_ios_new_rounded, color: accentGold, size: 12),
+                          SizedBox(width: 6),
+                          Text('GAMES HUB',
+                              style: TextStyle(
+                                color: accentGold,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 1.5,
+                              )),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
               ),
             ),
           ),
