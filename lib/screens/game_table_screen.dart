@@ -480,17 +480,24 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
       final visible = hand.where((h) => !pendingPlays.contains(h['card_value']) && !localPlayed.contains(h['card_value']) && !myPlayedIds.contains(h['card_value'])).toList();
       for (var i = 0; i < visible.length; i++) {
         final id = (visible[i]['card_value'] as String).trim().toUpperCase();
-        hands.add(HandCardWidget(card: CardModel.fromId(id), index: i, total: visible.length, isPlayable: playableIds.contains(id), onTap: () async {
-          if (!playableIds.contains(id)) { gameAudio.playInvalidMove(); return; }
-          gameAudio.playCardPlay();
-          ref.read(pendingCardPlayProvider.notifier).update((s) => {...s, id});
-          ref.read(localPlayedCardsProvider.notifier).update((s) => {...s, id});
-          try { await ref.read(cardServiceProvider).playCard(roomId, localPlayerId, id); }
-          catch (e) {
-            ref.read(pendingCardPlayProvider.notifier).update((s) => s.where((v) => v != id).toSet());
-            ref.read(localPlayedCardsProvider.notifier).update((s) => s.where((v) => v != id).toSet());
-          }
-        }));
+        hands.add(HandCardWidget(
+          key: ValueKey(id), // CRITICAL: allows Flutter to reuse existing cards and only animate new arrivals
+          card: CardModel.fromId(id),
+          index: i,
+          total: visible.length,
+          isPlayable: playableIds.contains(id),
+          onTap: () async {
+            if (!playableIds.contains(id)) { gameAudio.playInvalidMove(); return; }
+            gameAudio.playCardPlay();
+            ref.read(pendingCardPlayProvider.notifier).update((s) => {...s, id});
+            ref.read(localPlayedCardsProvider.notifier).update((s) => {...s, id});
+            try { await ref.read(cardServiceProvider).playCard(roomId, localPlayerId, id); }
+            catch (e) {
+              ref.read(pendingCardPlayProvider.notifier).update((s) => s.where((v) => v != id).toSet());
+              ref.read(localPlayedCardsProvider.notifier).update((s) => s.where((v) => v != id).toSet());
+            }
+          },
+        ));
       }
     });
     for (var i = 1; i < 4; i++) {
@@ -573,17 +580,98 @@ class CardsLayer extends ConsumerWidget {
   }
 }
 
-class HandCardWidget extends StatelessWidget {
-  final CardModel card; final int index; final int total; final bool isPlayable; final VoidCallback? onTap;
-  const HandCardWidget({super.key, required this.card, required this.index, required this.total, required this.isPlayable, this.onTap});
+class HandCardWidget extends StatefulWidget {
+  final CardModel card;
+  final int index;
+  final int total;
+  final bool isPlayable;
+  final VoidCallback? onTap;
+
+  const HandCardWidget({
+    super.key,
+    required this.card,
+    required this.index,
+    required this.total,
+    required this.isPlayable,
+    this.onTap,
+  });
+
+  @override
+  State<HandCardWidget> createState() => _HandCardWidgetState();
+}
+
+class _HandCardWidgetState extends State<HandCardWidget> with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final Animation<double> _progress;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 480),
+    );
+    _progress = CurvedAnimation(parent: _ctrl, curve: Curves.easeOutCubic);
+
+    // Stagger each card in the batch by its position index for a cascade effect
+    final staggerDelay = (widget.index % 5) * 65;
+    Future.delayed(Duration(milliseconds: staggerDelay), () {
+      if (mounted) _ctrl.forward();
+    });
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
-    final fanOffset = (index - (total - 1) / 2) * 22.0;
-    final rotation = (index - (total - 1) / 2) * 0.08;
-    return Align(alignment: Alignment.bottomCenter, child: TweenAnimationBuilder<double>(
-      tween: Tween(begin: 0.0, end: 1.0), duration: Duration(milliseconds: 600 + (index * 100)), curve: Curves.easeOutBack,
-      builder: (context, value, child) => Transform.translate(offset: Offset(fanOffset * value, -85 - (1 - value) * 400), child: Transform.rotate(angle: rotation * value, child: GestureDetector(onTap: onTap, child: Opacity(opacity: isPlayable ? 1.0 : 0.6, child: PlayingCard(card: card, isFaceUp: true, isPlayable: isPlayable, width: 70, height: 105))))),
-    ));
+    // Final resting position in the fan
+    final fanX = (widget.index - (widget.total - 1) / 2.0) * 22.0;
+    final fanAngle = (widget.index - (widget.total - 1) / 2.0) * 0.08;
+    const fanY = -85.0;
+
+    return Align(
+      alignment: Alignment.bottomCenter,
+      child: AnimatedBuilder(
+        animation: _progress,
+        builder: (context, child) {
+          final t = _progress.value;
+          // At t=0: card is above screen (deck area), no rotation, transparent
+          // At t=1: card is at its fan position, rotated, fully visible
+          final currentX = fanX * t;
+          final currentY = fanY - (1.0 - t) * 380.0; // slides from -465 → -85
+          final currentAngle = fanAngle * t;
+          final opacity = (t * 2.5).clamp(0.0, 1.0); // fades in quickly
+
+          return Opacity(
+            opacity: opacity,
+            child: Transform.translate(
+              offset: Offset(currentX, currentY),
+              child: Transform.rotate(
+                angle: currentAngle,
+                child: child,
+              ),
+            ),
+          );
+        },
+        child: GestureDetector(
+          onTap: widget.onTap,
+          child: Opacity(
+            opacity: widget.isPlayable ? 1.0 : 0.6,
+            child: PlayingCard(
+              card: widget.card,
+              isFaceUp: true,
+              isPlayable: widget.isPlayable,
+              width: 70,
+              height: 105,
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 
