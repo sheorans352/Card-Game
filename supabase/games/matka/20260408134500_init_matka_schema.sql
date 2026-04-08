@@ -67,3 +67,10 @@ ALTER TABLE matka.rounds ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Staging: Allow all operations on matka.rooms" ON matka.rooms FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Staging: Allow all operations on matka.players" ON matka.players FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Staging: Allow all operations on matka.rounds" ON matka.rounds FOR ALL USING (true) WITH CHECK (true);
+
+-- 7. Schema Permissions
+GRANT USAGE ON SCHEMA matka TO anon, authenticated, service_role;
+GRANT ALL ON ALL TABLES IN SCHEMA matka TO anon, authenticated, service_role;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA matka TO anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA matka GRANT ALL ON TABLES TO anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA matka GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;

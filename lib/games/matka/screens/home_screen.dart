@@ -94,15 +94,7 @@ class _MatkaHomeScreenState extends ConsumerState<MatkaHomeScreen> {
                         ),
                       ),
                       const SizedBox(height: 8),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: ['🃏', '💰', '🎰', '💰', '🃏']
-                            .map((e) => Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6),
-                                  child: Text(e, style: const TextStyle(fontSize: 20)),
-                                ))
-                            .toList(),
-                      ),
+                      // Removed decorative emojis
                       const SizedBox(height: 40),
 
                       // Tab selector
@@ -412,13 +404,13 @@ class _MatkaHomeScreenState extends ConsumerState<MatkaHomeScreen> {
               style: TextStyle(color: _gold, fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 2)),
         ]),
         const SizedBox(height: 20),
-        _rule('🏦 THE POT', 'Everyone antes each round. That\'s your shared prize pool.'),
-        _rule('🃏 THE PILLARS', 'Two cards are dealt face-up. The gap between them is your "spread."'),
-        _rule('🏆 WIN', 'Bet any amount ≤ pot. If the 3rd card falls strictly between your two pillars, you win that amount from the pot.'),
-        _rule('❌ LOSS', 'If the 3rd card is outside your pillars, your bet is added to the pot.'),
-        _rule('🚫 POST', 'If the 3rd card exactly matches one of your pillars, you pay DOUBLE your bet into the pot.'),
-        _rule('⏭ PASS', 'If the spread is too tight, pass. New pillars are dealt for the next player.'),
-        _rule('🔄 RESHUFFLE', 'When the shoe runs out, the host reshuffles (and can optionally add more decks).'),
+        _rule('THE POT', 'Everyone antes each round. That\'s your shared prize pool.'),
+        _rule('THE PILLARS', 'Two cards are dealt face-up. The gap between them is your "spread."'),
+        _rule('WIN', 'Bet any amount ≤ pot. If the 3rd card falls strictly between your two pillars, you win that amount from the pot.'),
+        _rule('LOSS', 'If the 3rd card is outside your pillars, your bet is added to the pot.'),
+        _rule('POST', 'If the 3rd card exactly matches one of your pillars, you pay DOUBLE your bet into the pot.'),
+        _rule('PASS', 'If the spread is too tight, pass. New pillars are dealt for the next player.'),
+        _rule('RESHUFFLE', 'When the shoe runs out, the host reshuffles (and can optionally add more decks).'),
       ]),
     );
   }
