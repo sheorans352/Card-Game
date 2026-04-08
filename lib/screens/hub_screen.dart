@@ -84,7 +84,8 @@ class _HubScreenState extends State<HubScreen> with SingleTickerProviderStateMix
                   symbols: '🎰',
                   gradient: const [Color(0xFF1A0D2B), Color(0xFF12091C)],
                   accentColor: const Color(0xFF9B59B6),
-                  isLive: false,
+                  isLive: true,
+                  onTap: () => context.go('/matka'),
                   shimmerCtrl: _shimmerCtrl,
                 ),
                 _GameCard(

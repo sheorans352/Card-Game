@@ -1,6 +1,7 @@
 import 'package:go_router/go_router.dart';
 import 'screens/hub_screen.dart';
 import 'games/minus/screens/home_screen.dart';
+import 'games/matka/screens/home_screen.dart';
 
 final appRouter = GoRouter(
   initialLocation: '/',
@@ -12,6 +13,10 @@ final appRouter = GoRouter(
     GoRoute(
       path: '/minus',
       builder: (context, state) => const HomeScreen(),
+    ),
+    GoRoute(
+      path: '/matka',
+      builder: (context, state) => const MatkaHomeScreen(),
     ),
   ],
 );
