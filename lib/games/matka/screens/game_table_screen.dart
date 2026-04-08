@@ -372,7 +372,9 @@ class _MatkaGameTableScreenState extends ConsumerState<MatkaGameTableScreen> wit
   }
 
   Widget _buildShufflingView(MatkaRoom room, bool isHost, List<MatkaPlayer> players) {
-    bool isEmpty = room.leftPillar == null && room.rightPillar == null; // Simple heuristic for initial shuffle or empty shoe
+    bool isEmpty = (room.leftPillar == null || room.leftPillar == '') && 
+                   (room.rightPillar == null || room.rightPillar == '');
+    bool isInitial = room.roundNumber <= 1; // Round 1 is dedicated to initial setup
 
     return Center(
       child: Container(
@@ -391,7 +393,7 @@ class _MatkaGameTableScreenState extends ConsumerState<MatkaGameTableScreen> wit
             ),
             const SizedBox(height: 24),
             Text(
-              isEmpty ? 'PREPARING FIRST DEAL...' : 'SHOE EMPTY - RESHUFFLING...',
+              (isEmpty || isInitial) ? 'PREPARING FIRST DEAL...' : 'SHOE EMPTY - RESHUFFLING...',
               style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 13, letterSpacing: 2),
               textAlign: TextAlign.center,
             ),

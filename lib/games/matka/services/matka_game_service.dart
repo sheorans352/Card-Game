@@ -209,9 +209,9 @@ class MatkaGameService {
     final host = await _db.from('matka_players').select().eq('room_id', room.id).eq('is_host', true).single();
 
     await _db.rpc('matka_reshuffle', params: {
-      'rid': room.id,
-      'pid': host['id'],
-      'new_decks': count,
+      'p_rid': room.id,
+      'p_pid': host['id'],
+      'p_new_decks': count,
     });
   }
 
