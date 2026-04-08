@@ -26,9 +26,15 @@ class _HubScreenState extends State<HubScreen> with SingleTickerProviderStateMix
       if (!mounted) return;
       final state = GoRouterState.of(context);
       final code = state.uri.queryParameters['code'] ?? state.uri.queryParameters['room'];
+      final gameType = state.uri.queryParameters['game'];
+
       if (code != null && code.isNotEmpty) {
-        // Default to Minus for now as requested, but could be smarter in future
-        context.go('/minus?code=$code');
+        if (gameType == 'matka') {
+          context.go('/matka?code=$code');
+        } else {
+          // Default to Minus (or add 'game=minus' check if needed)
+          context.go('/minus?code=$code');
+        }
       }
     });
   }

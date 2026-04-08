@@ -94,7 +94,9 @@ class MatkaLobbyScreen extends ConsumerWidget {
         const SizedBox(height: 8),
         GestureDetector(
           onTap: () {
-            Share.share('Join my Matka game! Code: ${room.code}');
+            final baseUrl = Uri.base.toString().split('?').first.split('#').first;
+            final shareUrl = '$baseUrl#/?code=${room.code}&game=matka';
+            Share.share('Join my Matka game!\n\n$shareUrl');
           },
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
