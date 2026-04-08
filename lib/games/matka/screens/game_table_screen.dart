@@ -94,8 +94,8 @@ class _MatkaGameTableScreenState extends ConsumerState<MatkaGameTableScreen> wit
                           const Spacer(),
                           _buildTable(room, activePlayer, isMyTurn),
                           const Spacer(),
-                          if (room.status == 'shuffling' && me.isHost)
-                            _buildShufflingView(room)
+                          if (room.status == 'shuffling')
+                            _buildShufflingView(room, me.isHost)
                           else if (isMyTurn && room.status == 'betting')
                             _buildBettingControls(room, me, players)
                           else if (room.status == 'round_result')
@@ -371,41 +371,67 @@ class _MatkaGameTableScreenState extends ConsumerState<MatkaGameTableScreen> wit
     );
   }
 
-  Widget _buildShufflingView(MatkaRoom room) {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      margin: const EdgeInsets.symmetric(horizontal: 20),
-      decoration: BoxDecoration(
-        color: _cardDark,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: _purple.withOpacity(0.5)),
-      ),
-      child: Column(
-        children: [
-          const Icon(Icons.style_rounded, color: _purple, size: 48),
-          const SizedBox(height: 16),
-          const Text('SHOE EMPTY', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
-          const SizedBox(height: 8),
-          const Text('Host can add more decks now', style: TextStyle(color: Colors.white38, fontSize: 12)),
-          const SizedBox(height: 24),
-          Row(
-            children: [1, 2, 3, 4].map((d) => Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: ElevatedButton(
-                  onPressed: () => ref.read(matkaGameServiceProvider).reshuffleShoe(room, newDeckCount: d),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: d == room.deckCount ? _purple : Colors.white.withOpacity(0.05),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
+  Widget _buildShufflingView(MatkaRoom room, bool isHost) {
+    bool isEmpty = room.leftPillar == null && room.rightPillar == null; // Simple heuristic for initial shuffle or empty shoe
+
+    return Center(
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        margin: const EdgeInsets.symmetric(horizontal: 20),
+        decoration: BoxDecoration(
+          color: _cardDark,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: _purple.withOpacity(0.5)),
+        ),
+        child: Column(
+          children: [
+            const SizedBox(
+              width: 40, height: 40,
+              child: CircularProgressIndicator(color: _purple, strokeWidth: 3),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              isEmpty ? 'PREPARING FIRST DEAL...' : 'SHOE EMPTY - RESHUFFLING...',
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 13, letterSpacing: 2),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            const Text('CARDS ARE BEING RANDOMIZED', style: TextStyle(color: Colors.white38, fontSize: 10, letterSpacing: 1)),
+            
+            if (isHost && !isEmpty) ...[
+              const SizedBox(height: 24),
+              const Text('Add more decks to continue:', style: TextStyle(color: _purple, fontSize: 10, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 12),
+              Row(
+                children: [1, 2, 3, 4].map((d) => Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: ElevatedButton(
+                      onPressed: () => ref.read(matkaGameServiceProvider).reshuffleShoe(room, newDeckCount: d),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: d == room.deckCount ? _purple : Colors.white.withOpacity(0.05),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                      child: Text('$d', style: const TextStyle(fontWeight: FontWeight.bold)),
+                    ),
                   ),
-                  child: Text('$d', style: const TextStyle(fontWeight: FontWeight.bold)),
-                ),
+                )).toList(),
               ),
-            )).toList(),
-          ),
-          const SizedBox(height: 16),
-          const Text('CHOOSING DECKS WILL RESHUFFLE THE FULL SHOE', style: TextStyle(color: _purple, fontSize: 8, fontWeight: FontWeight.w900)),
-        ],
+            ] else if (isHost && isEmpty) ...[
+              const SizedBox(height: 32),
+              ElevatedButton(
+                onPressed: () => ref.read(matkaGameServiceProvider).dealPillars(room),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _purple,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: const Text('DEAL CARDS', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }

@@ -340,12 +340,24 @@ class _MatkaHomeScreenState extends ConsumerState<MatkaHomeScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('ROOM RULES',
-              style: TextStyle(color: _purple, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 2)),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('ANTE', style: TextStyle(color: _purple, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 2)),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(color: _purple.withOpacity(0.2), borderRadius: BorderRadius.circular(4)),
+                child: const Text('REQUIRED', style: TextStyle(color: _purple, fontSize: 8, fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text('${r.anteAmount} Chips',
+              style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900)),
+          const SizedBox(height: 16),
+          const Divider(color: Colors.white10),
           const SizedBox(height: 12),
-          _previewRow('Ante', '${r.anteAmount} Chips'),
-          _previewRow('Step', 'x${r.betMultiple}'),
-          _previewRow('Decks', '${r.deckCount} (${r.totalShoeSize} cards)'),
+          _previewRow('Shoe Size', '${r.deckCount} Decks (${r.totalShoeSize} cards)'),
         ],
       ),
     );

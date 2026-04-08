@@ -80,7 +80,7 @@ class MatkaPlayingCard extends StatelessWidget {
                           fontWeight: FontWeight.bold,
                           height: 1.1)),
                   Text(card.suitSymbol,
-                      style: TextStyle(color: color, fontSize: width * 0.18, height: 1)),
+                      style: TextStyle(color: color, fontSize: width * 0.18, height: 1, fontFamily: 'sans-serif')),
                 ],
               ),
             ),
@@ -89,7 +89,7 @@ class MatkaPlayingCard extends StatelessWidget {
               child: Text(
                 card.suitSymbol,
                 style: TextStyle(
-                    color: color.withOpacity(0.5), fontSize: width * 0.55),
+                    color: color.withOpacity(0.5), fontSize: width * 0.55, fontFamily: 'sans-serif'),
               ),
             ),
             // Bottom-right rank + suit (rotated)
@@ -107,7 +107,7 @@ class MatkaPlayingCard extends StatelessWidget {
                             fontWeight: FontWeight.bold,
                             height: 1.1)),
                     Text(card.suitSymbol,
-                        style: TextStyle(color: color, fontSize: width * 0.18, height: 1)),
+                        style: TextStyle(color: color, fontSize: width * 0.18, height: 1, fontFamily: 'sans-serif')),
                   ],
                 ),
               ),
