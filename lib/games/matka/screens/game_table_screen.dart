@@ -333,7 +333,7 @@ class _MatkaGameTableScreenState extends ConsumerState<MatkaGameTableScreen> wit
           const SizedBox(width: 12),
           Text(
             text,
-            style: TextStyle(color: color, fontSize: 24, fontWeight: FontWeight.black, letterSpacing: 1),
+            style: TextStyle(color: color, fontSize: 24, fontWeight: FontWeight.w900, letterSpacing: 1),
           ),
         ],
       ),
