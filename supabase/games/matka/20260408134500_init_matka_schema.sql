@@ -208,3 +208,20 @@ BEGIN
   WHERE id = rid;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 8. ENABLE REALTIME
+-- This is critical for Flutter's .stream() to receive updates when players join or game state changes.
+-- We rebuild the publication to ensure it exists and has these tables.
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime') THEN
+    CREATE PUBLICATION supabase_realtime;
+  END IF;
+  
+  ALTER PUBLICATION supabase_realtime ADD TABLE 
+    public.matka_rooms, 
+    public.matka_players, 
+    public.matka_rounds;
+EXCEPTION
+  WHEN duplicate_object THEN NULL; -- Table already in publication
+END $$;
