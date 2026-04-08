@@ -96,7 +96,11 @@ class MatkaLobbyScreen extends ConsumerWidget {
           onTap: () {
             final baseUrl = Uri.base.toString().split('?').first.split('#').first;
             final shareUrl = '$baseUrl#/?code=${room.code}&game=matka';
-            Share.share('Join my Matka game!\n\n$shareUrl');
+            final text = 'Join my Matka game!\n\n'
+                'Ante: ${room.anteAmount}\n'
+                'Bet Step: x${room.betMultiple}\n\n'
+                'Link: $shareUrl';
+            Share.share(text);
           },
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
@@ -125,8 +129,8 @@ class MatkaLobbyScreen extends ConsumerWidget {
         ),
         const SizedBox(height: 12),
         Text(
-          'Deck Count: ${room.deckCount}  •  Ante: ${room.anteAmount}',
-          style: const TextStyle(color: Colors.white38, fontSize: 12),
+          'Ante: ${room.anteAmount}  •  Step: x${room.betMultiple}  •  Decks: ${room.deckCount}',
+          style: const TextStyle(color: Colors.white38, fontSize: 11, fontWeight: FontWeight.bold),
         ),
       ],
     );

@@ -20,7 +20,9 @@ class _MatkaHomeScreenState extends ConsumerState<MatkaHomeScreen> {
   bool _isHosting = true;
   int _deckCount = 1;
   int _anteAmount = 100;
+  int _betMultiple = 10;
   bool _loading = false;
+  MatkaRoom? _previewRoom;
 
   static const _bg = Color(0xFF100820);
   static const _purple = Color(0xFF9B59B6);
@@ -35,6 +37,29 @@ class _MatkaHomeScreenState extends ConsumerState<MatkaHomeScreen> {
       if (name != null) _nameCtrl.text = name;
       _checkInitialSession();
     });
+
+    _codeCtrl.addListener(_onCodeChanged);
+  }
+
+  void _onCodeChanged() async {
+    final code = _codeCtrl.text.trim();
+    if (code.length == 6) {
+      try {
+        final data = await Supabase.instance.client
+            .from('matka_rooms')
+            .select()
+            .eq('code', code.toUpperCase())
+            .maybeSingle();
+
+        if (data != null && mounted) {
+          setState(() => _previewRoom = MatkaRoom.fromMap(data));
+        }
+      } catch (_) {
+        if (mounted) setState(() => _previewRoom = null);
+      }
+    } else {
+      if (_previewRoom != null) setState(() => _previewRoom = null);
+    }
   }
 
   void _checkInitialSession() {
@@ -246,31 +271,22 @@ class _MatkaHomeScreenState extends ConsumerState<MatkaHomeScreen> {
             style: const TextStyle(color: Colors.white38, fontSize: 11)),
 
         const SizedBox(height: 24),
-        _label('ANTE AMOUNT PER ROUND'),
+        _label('BETTING MULTIPLE (STEP)'),
         const SizedBox(height: 10),
         Wrap(
           spacing: 8,
-          runSpacing: 8,
-          children: [5, 10, 20, 50, 100, 200, 500, 1000].map((v) {
-            final sel = v == _anteAmount;
+          children: [5, 10, 20, 50, 100].map((v) {
+            final sel = v == _betMultiple;
             return ChoiceChip(
-              label: Text('$v'),
+              label: Text('x$v'),
               selected: sel,
-              onSelected: (_) => setState(() => _anteAmount = v),
+              onSelected: (_) => setState(() => _betMultiple = v),
               selectedColor: _purple.withOpacity(0.3),
               backgroundColor: Colors.white.withOpacity(0.05),
-              labelStyle: TextStyle(
-                  color: sel ? _purple : Colors.white54,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12),
+              labelStyle: TextStyle(color: sel ? _purple : Colors.white54, fontWeight: FontWeight.bold),
               side: BorderSide(color: sel ? _purple : Colors.white12),
             );
           }).toList(),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          'Each player tracks net gain/loss. Ante starts the pot.',
-          style: TextStyle(color: Colors.white24, fontSize: 10, fontStyle: FontStyle.italic),
         ),
 
         const SizedBox(height: 28),
@@ -303,10 +319,46 @@ class _MatkaHomeScreenState extends ConsumerState<MatkaHomeScreen> {
         const SizedBox(height: 10),
         _field(_nameCtrl, 'Enter your name...'),
         const SizedBox(height: 24),
+        if (_previewRoom != null) _buildRoomPreview(),
+        const SizedBox(height: 24),
         _primaryButton('Join Room', _loading ? null : _joinGame),
       ]),
     );
   }
+
+  Widget _buildRoomPreview() {
+    final r = _previewRoom!;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: _purple.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: _purple.withOpacity(0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('ROOM RULES',
+              style: TextStyle(color: _purple, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 2)),
+          const SizedBox(height: 12),
+          _previewRow('Ante', '${r.anteAmount} Chips'),
+          _previewRow('Step', 'x${r.betMultiple}'),
+          _previewRow('Decks', '${r.deckCount} (${r.totalShoeSize} cards)'),
+        ],
+      ),
+    );
+  }
+
+  Widget _previewRow(String label, String val) => Padding(
+        padding: const EdgeInsets.only(bottom: 6),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(label, style: const TextStyle(color: Colors.white38, fontSize: 12)),
+            Text(val, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+          ],
+        ),
+      );
 
   Widget _label(String t) => Text(t,
       style: const TextStyle(
@@ -357,7 +409,10 @@ class _MatkaHomeScreenState extends ConsumerState<MatkaHomeScreen> {
     setState(() => _loading = true);
     try {
       final result = await ref.read(matkaLobbyServiceProvider).createRoom(
-        name: name, deckCount: _deckCount, anteAmount: _anteAmount,
+        name: name,
+        deckCount: _deckCount,
+        anteAmount: _anteAmount,
+        betMultiple: _betMultiple,
       );
       await ref.read(matkaSessionProvider.notifier)
           .save(result['roomCode']!, result['playerId']!, name);

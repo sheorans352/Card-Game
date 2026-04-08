@@ -12,6 +12,7 @@ abstract class MatkaLobbyService {
     required String name,
     required int deckCount,
     required int anteAmount,
+    required int betMultiple,
   });
   Future<Map<String, String>?> joinRoom(String code, String name);
   Future<void> setReady(String playerId, bool ready);
@@ -23,6 +24,7 @@ class SupabaseMatkaLobbyService implements MatkaLobbyService {
     required String name,
     required int deckCount,
     required int anteAmount,
+    required int betMultiple,
   }) async {
     final shoe = MatkaCard.shuffled(MatkaCard.buildShoe(deckCount));
     final code = _genCode();
@@ -33,6 +35,7 @@ class SupabaseMatkaLobbyService implements MatkaLobbyService {
       'host_id': null,
       'deck_count': deckCount,
       'ante_amount': anteAmount,
+      'bet_multiple': betMultiple,
       'pot_amount': 0,
       'current_player_index': 0,
       'round_number': 1,

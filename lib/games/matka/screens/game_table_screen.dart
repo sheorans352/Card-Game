@@ -22,7 +22,9 @@ class _MatkaGameTableScreenState extends ConsumerState<MatkaGameTableScreen> wit
   final _betCtrl = TextEditingController();
   late AnimationController _revealCtrl;
   bool _isAnimating = false;
-  int _selectedMultiple = 10; // Default multiple
+  int? _selectedMultipleOverride;
+  String? _lastEvent;
+  bool _showEvent = false;
 
   static const _bg = Color(0xFF100820);
   static const _purple = Color(0xFF9B59B6);
@@ -59,6 +61,15 @@ class _MatkaGameTableScreenState extends ConsumerState<MatkaGameTableScreen> wit
             Future.microtask(() => Navigator.of(context).popUntil((route) => route.isFirst));
           }
 
+          // Update last event based on room changes
+          if (room.middleCard != null && !_showEvent) {
+             final prevPIndex = (room.currentPlayerIndex > 0) ? (room.currentPlayerIndex - 1) : (playersAsync.value?.length ?? 1) - 1;
+             final pName = (playersAsync.value != null && playersAsync.value!.isNotEmpty) 
+                ? playersAsync.value![prevPIndex % playersAsync.value!.length].name 
+                : 'Someone';
+             _triggerEvent('$pName bet ${room.currentBet}!');
+          }
+
           return playersAsync.when(
             data: (players) {
               final me = players.firstWhere((p) => p.id == localId, orElse: () => players.first);
@@ -73,23 +84,28 @@ class _MatkaGameTableScreenState extends ConsumerState<MatkaGameTableScreen> wit
                   ),
                 ),
                 child: SafeArea(
-                  child: Column(
+                  child: Stack(
                     children: [
-                      _buildTopBar(room),
-                      const SizedBox(height: 16),
-                      _buildPlayersRow(players, room.currentPlayerIndex, localId),
-                      const Spacer(),
-                      _buildTable(room, activePlayer, isMyTurn),
-                      const Spacer(),
-                      if (room.status == 'shuffling' && me.isHost)
-                        _buildShufflingView(room)
-                      else if (isMyTurn && room.status == 'betting')
-                        _buildBettingControls(room, me, players)
-                      else if (room.status == 'round_result')
-                        _buildResultOverlay(room, activePlayer)
-                      else
-                        _buildWaitingIndicator(activePlayer),
-                      const SizedBox(height: 24),
+                      Column(
+                        children: [
+                          _buildTopBar(room),
+                          const SizedBox(height: 16),
+                          _buildPlayersRow(players, room.currentPlayerIndex, localId),
+                          const Spacer(),
+                          _buildTable(room, activePlayer, isMyTurn),
+                          const Spacer(),
+                          if (room.status == 'shuffling' && me.isHost)
+                            _buildShufflingView(room)
+                          else if (isMyTurn && room.status == 'betting')
+                            _buildBettingControls(room, me, players)
+                          else if (room.status == 'round_result')
+                            _buildResultOverlay(room, activePlayer)
+                          else
+                            _buildWaitingIndicator(activePlayer),
+                          const SizedBox(height: 24),
+                        ],
+                      ),
+                      if (_showEvent) _buildNotificationBanner(),
                     ],
                   ),
                 ),
@@ -154,33 +170,25 @@ class _MatkaGameTableScreenState extends ConsumerState<MatkaGameTableScreen> wit
 
     return Column(
       children: [
-        if (p1 != null && p2 != null)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 24),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-              decoration: BoxDecoration(
-                color: _purple.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: _purple.withOpacity(0.3)),
-              ),
-              child: Text(
-                'SPREAD: $spread ${spread == 1 ? 'CARD' : 'CARDS'}',
-                style: const TextStyle(color: _purple, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1),
-              ),
-            ),
-          ),
+        // Removed Spread count display as requested
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             // Left Pillar
             MatkaPlayingCard(cardId: room.leftPillar, width: 85, height: 120, elevated: true),
             const SizedBox(width: 24),
-            // Middle Card (or placeholder)
-            if (room.status == 'round_result' || room.middleCard != null)
-              MatkaPlayingCard(cardId: room.middleCard, width: 90, height: 125, elevated: true)
-            else
-              _buildMiddlePlaceholder(isMyTurn),
+            // Middle Card with Reveal Animation
+            SizedBox(
+              width: 90,
+              height: 125,
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 600),
+                transitionBuilder: (child, anim) => ScaleTransition(scale: anim, child: FadeTransition(opacity: anim, child: child)),
+                child: (room.status == 'round_result' || room.middleCard != null)
+                  ? MatkaPlayingCard(key: ValueKey(room.middleCard), cardId: room.middleCard, width: 90, height: 125, elevated: true)
+                  : _buildMiddlePlaceholder(isMyTurn),
+              ),
+            ),
             const SizedBox(width: 24),
             // Right Pillar
             MatkaPlayingCard(cardId: room.rightPillar, width: 85, height: 120, elevated: true),
@@ -239,12 +247,18 @@ class _MatkaGameTableScreenState extends ConsumerState<MatkaGameTableScreen> wit
                 ),
               ),
               const SizedBox(width: 8),
-              _buildAddSubButton(Icons.remove_rounded, () => _adjustBet(-_selectedMultiple)),
-              _buildAddSubButton(Icons.add_rounded, () => _adjustBet(_selectedMultiple)),
+              _buildAddSubButton(Icons.remove_rounded, () => _adjustBet(-( _selectedMultipleOverride ?? room.betMultiple ))),
+              _buildAddSubButton(Icons.add_rounded, () => _adjustBet( _selectedMultipleOverride ?? room.betMultiple )),
               const SizedBox(width: 8),
-              TextButton(
+              ElevatedButton(
                 onPressed: () => _betCtrl.text = room.potAmount.toString(),
-                child: const Text('MAX', style: TextStyle(color: _gold, fontWeight: FontWeight.bold)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _gold,
+                  foregroundColor: Colors.black,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  minimumSize: const Size(60, 48),
+                ),
+                child: const Text('POT', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 12)),
               ),
             ],
           ),
@@ -456,14 +470,55 @@ class _MatkaGameTableScreenState extends ConsumerState<MatkaGameTableScreen> wit
       return;
     }
     if (amount > room.potAmount) {
-      _showError('Cannot bet more than the pot');
+      _showError('Cannot bet more than the pot (${room.potAmount})');
       return;
     }
 
-    setState(() => _isAnimating = true);
+    setState(() {
+      _isAnimating = true;
+      _triggerEvent('YOU PLACED A BET OF $amount!');
+    });
+    
     _betCtrl.clear();
     await ref.read(matkaGameServiceProvider).placeBet(room, me, players, amount);
     setState(() => _isAnimating = false);
+  }
+
+  void _triggerEvent(String msg) {
+    setState(() {
+      _lastEvent = msg;
+      _showEvent = true;
+    });
+    Future.delayed(const Duration(seconds: 4), () {
+      if (mounted) setState(() => _showEvent = false);
+    });
+  }
+
+  Widget _buildNotificationBanner() {
+    return Positioned(
+      top: 10, left: 20, right: 20,
+      child: AnimatedOpacity(
+        duration: const Duration(milliseconds: 300),
+        opacity: _showEvent ? 1 : 0,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          decoration: BoxDecoration(
+            color: _gold,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [BoxShadow(color: Colors.black45, blurRadius: 10)],
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.flash_on_rounded, color: Colors.black, size: 20),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(_lastEvent ?? '', style: const TextStyle(color: Colors.black, fontWeight: FontWeight.w900, fontSize: 13)),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   void _onPass(MatkaRoom room, MatkaPlayer me, List<MatkaPlayer> players) async {

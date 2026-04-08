@@ -32,6 +32,8 @@ CREATE TABLE public.matka_rooms (
   middle_card text,
   current_bet integer,
   round_number integer NOT NULL DEFAULT 1,
+  bet_multiple integer NOT NULL DEFAULT 10,
+  min_bet integer NOT NULL DEFAULT 10,
   created_at timestamptz DEFAULT now()
 );
 
@@ -164,15 +166,21 @@ BEGIN
   SELECT * INTO r FROM public.matka_rooms WHERE id = rid FOR UPDATE;
   SELECT * INTO s FROM public.matka_shoes WHERE room_id = rid FOR UPDATE;
 
-  -- 2. Draw card
+  -- 2. Validation
+  IF bet < r.min_bet THEN
+    RAISE EXCEPTION 'Bet amount is below minimum (%)', r.min_bet;
+  END IF;
+  IF bet > r.pot_amount THEN
+    RAISE EXCEPTION 'Bet amount exceeds pot (%)', r.pot_amount;
+  END IF;
+
+  -- 3. Draw card
   middle_card := s.shoe[s.shoe_ptr + 1];
   
-  -- 3. Update hidden shoe ptr
+  -- 4. Update hidden shoe ptr
   UPDATE public.matka_shoes SET shoe_ptr = shoe_ptr + 1 WHERE room_id = rid;
 
-  -- 4. Update room middle card (client will see it now)
-  -- Note: We don't advance the turn here; the client logic or another RPC handles result evaluation for now.
-  -- To make it 100% secure, result evaluation should also be in RPC, but let's start here.
+  -- 5. Update room middle card (client will see it now)
   UPDATE public.matka_rooms SET 
     middle_card = middle_card,
     current_bet = bet,

@@ -16,6 +16,7 @@ class MatkaRoom {
   final String? middleCard;
   final int? currentBet;
   final int roundNumber;
+  final int betMultiple;
   final DateTime createdAt;
 
   const MatkaRoom({
@@ -33,6 +34,7 @@ class MatkaRoom {
     this.middleCard,
     this.currentBet,
     required this.roundNumber,
+    required this.betMultiple,
     required this.createdAt,
   });
 
@@ -54,6 +56,7 @@ class MatkaRoom {
         middleCard: m['middle_card'],
         currentBet: m['current_bet'],
         roundNumber: m['round_number'] ?? 1,
+        betMultiple: m['bet_multiple'] ?? 10,
         createdAt:
             DateTime.tryParse(m['created_at'] ?? '') ?? DateTime.now(),
       );

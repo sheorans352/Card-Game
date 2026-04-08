@@ -57,7 +57,7 @@ class MatkaPlayingCard extends StatelessWidget {
   }
 
   Widget _buildFace(MatkaCard card) {
-    final color = card.isRed ? const Color(0xFFE53935) : Colors.white;
+    final color = card.isRed ? const Color(0xFFE53935) : const Color(0xFF1A1A1A);
     final bgColor = Colors.white;
 
     return ClipRRect(
