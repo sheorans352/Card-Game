@@ -91,6 +91,7 @@ class MatkaRoom {
     String? middleCard,
     int? currentBet,
     int? roundNumber,
+    int? betMultiple,
     bool clearPillars = false,
     bool clearMiddle = false,
     bool clearBet = false,
@@ -110,7 +111,8 @@ class MatkaRoom {
         middleCard: clearMiddle ? null : (middleCard ?? this.middleCard),
         currentBet: clearBet ? null : (currentBet ?? this.currentBet),
         roundNumber: roundNumber ?? this.roundNumber,
-        createdAt: createdAt,
+        betMultiple: betMultiple ?? this.betMultiple,
+        createdAt: createdAt ?? this.createdAt,
       );
 }
 

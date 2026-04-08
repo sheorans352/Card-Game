@@ -416,14 +416,14 @@ class _MatkaGameTableScreenState extends ConsumerState<MatkaGameTableScreen> wit
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [5, 10, 20, 50, 100].map((m) {
-          final isSelected = _selectedMultiple == m;
+          final isSelected = (_selectedMultipleOverride ?? room.betMultiple) == m;
           return Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4),
             child: ChoiceChip(
               label: Text('x$m'),
               selected: isSelected,
               onSelected: (val) {
-                if (val) setState(() => _selectedMultiple = m);
+                if (val) setState(() => _selectedMultipleOverride = m);
               },
               selectedColor: _gold.withOpacity(0.2),
               backgroundColor: Colors.white.withOpacity(0.05),
