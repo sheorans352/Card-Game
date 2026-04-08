@@ -420,7 +420,7 @@ class _MatkaGameTableScreenState extends ConsumerState<MatkaGameTableScreen> wit
             ] else if (isHost && isEmpty) ...[
               const SizedBox(height: 32),
               ElevatedButton(
-                onPressed: () => ref.read(matkaGameServiceProvider).dealPillars(room),
+                onPressed: () => ref.read(matkaGameServiceProvider).dealPillars(room, players),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: _purple,
                   foregroundColor: Colors.white,

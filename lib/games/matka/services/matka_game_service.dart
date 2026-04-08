@@ -27,6 +27,15 @@ class MatkaGameService {
       'pid': host.id,
     });
   }
+  // ─────────────────────────────────────────────────────────────────────────
+  // DEAL PILLARS (host only)
+  // ─────────────────────────────────────────────────────────────────────────
+  Future<void> dealPillars(MatkaRoom room, List<MatkaPlayer> players) async {
+    // This is essentially advancing the turn or starting the very first round.
+    // If we're at the very start (no pillars), we don't need to advance index,
+    // we just need to draw.
+    await _advanceTurn(room, players);
+  }
 
   // ─────────────────────────────────────────────────────────────────────────
   // PLACE BET (active player)
