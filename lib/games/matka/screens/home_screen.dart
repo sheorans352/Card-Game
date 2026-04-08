@@ -33,7 +33,19 @@ class _MatkaHomeScreenState extends ConsumerState<MatkaHomeScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final name = ref.read(matkaPlayerNameProvider);
       if (name != null) _nameCtrl.text = name;
+      _checkInitialSession();
     });
+  }
+
+  void _checkInitialSession() {
+    final state = GoRouterState.of(context);
+    final urlCode = state.uri.queryParameters['room'] ?? state.uri.queryParameters['code'];
+    if (urlCode != null && urlCode.isNotEmpty) {
+      setState(() {
+        _codeCtrl.text = urlCode;
+        _isHosting = false;
+      });
+    }
   }
 
   @override

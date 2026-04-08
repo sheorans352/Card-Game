@@ -20,6 +20,17 @@ class _HubScreenState extends State<HubScreen> with SingleTickerProviderStateMix
     super.initState();
     _shimmerCtrl = AnimationController(vsync: this, duration: const Duration(seconds: 3))
       ..repeat();
+
+    // Deep link redirection: If 'code' is present in URL, redirect to Minus
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final state = GoRouterState.of(context);
+      final code = state.uri.queryParameters['code'] ?? state.uri.queryParameters['room'];
+      if (code != null && code.isNotEmpty) {
+        // Default to Minus for now as requested, but could be smarter in future
+        context.go('/minus?code=$code');
+      }
+    });
   }
 
   @override

@@ -9,6 +9,7 @@
 //   Shuffling: handled by RPC when shoe is depleted
 
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../models/card_model.dart';
 import '../models/matka_models.dart';
 
 SupabaseClient get _db => Supabase.instance.client;
