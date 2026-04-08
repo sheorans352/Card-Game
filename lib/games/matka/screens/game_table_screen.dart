@@ -263,7 +263,7 @@ class _MatkaGameTableScreenState extends ConsumerState<MatkaGameTableScreen> wit
             ],
           ),
           const SizedBox(height: 16),
-          _buildMultipleSelector(),
+          _buildMultipleSelector(room),
           const SizedBox(height: 20),
           Row(
             children: [
@@ -410,7 +410,7 @@ class _MatkaGameTableScreenState extends ConsumerState<MatkaGameTableScreen> wit
     );
   }
 
-  Widget _buildMultipleSelector() {
+  Widget _buildMultipleSelector(MatkaRoom room) {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Row(
