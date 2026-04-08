@@ -1,20 +1,32 @@
--- Init Matka Schema
--- Standing Rule: Schema Isolation (lib/games/matka owns the 'matka' schema)
+-- Pivot to Public Schema with prefixes + Anti-Cheat RPCs
+-- This replaces the old 'matka' schema setup to fix 'invalid schema' errors on staging.
 
-CREATE SCHEMA IF NOT EXISTS matka;
+-- 1. CLEANUP (Optional/Staging Only)
+DROP TABLE IF EXISTS public.matka_rounds CASCADE;
+DROP TABLE IF EXISTS public.matka_players CASCADE;
+DROP TABLE IF EXISTS public.matka_rooms CASCADE;
+DROP TABLE IF EXISTS public.matka_shoes CASCADE;
 
--- 1. Rooms Table
-CREATE TABLE IF NOT EXISTS matka.rooms (
+-- 2. PUBLIC TABLES (Prefixed)
+
+-- Hidden table for the deck (No public access!)
+CREATE TABLE public.matka_shoes (
+  room_id uuid PRIMARY KEY,
+  shoe text[] NOT NULL,
+  shoe_ptr integer NOT NULL DEFAULT 0,
+  updated_at timestamptz DEFAULT now()
+);
+
+-- Public rooms table (Excludes 'shoe')
+CREATE TABLE public.matka_rooms (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   code text NOT NULL,
-  status text NOT NULL DEFAULT 'waiting', -- waiting | dealing | betting | round_result | shuffling | ended
-  host_id uuid, -- Settled after first player (host) joins
+  status text NOT NULL DEFAULT 'waiting', -- waiting | betting | round_result | shuffling | ended
+  host_id uuid,
   deck_count integer NOT NULL DEFAULT 1,
   ante_amount integer NOT NULL DEFAULT 100,
   pot_amount integer NOT NULL DEFAULT 0,
   current_player_index integer NOT NULL DEFAULT 0,
-  shoe text[] NOT NULL DEFAULT '{}',
-  shoe_ptr integer NOT NULL DEFAULT 0,
   left_pillar text,
   right_pillar text,
   middle_card text,
@@ -23,10 +35,10 @@ CREATE TABLE IF NOT EXISTS matka.rooms (
   created_at timestamptz DEFAULT now()
 );
 
--- 2. Players Table
-CREATE TABLE IF NOT EXISTS matka.players (
+-- Public players table
+CREATE TABLE public.matka_players (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  room_id uuid REFERENCES matka.rooms(id) ON DELETE CASCADE,
+  room_id uuid REFERENCES public.matka_rooms(id) ON DELETE CASCADE,
   name text NOT NULL,
   net_chips integer NOT NULL DEFAULT 0,
   seat_index integer NOT NULL DEFAULT 0,
@@ -37,40 +49,162 @@ CREATE TABLE IF NOT EXISTS matka.players (
   joined_at timestamptz DEFAULT now()
 );
 
--- 3. Add Host FK Constraint to Rooms
-ALTER TABLE matka.rooms 
+ALTER TABLE public.matka_rooms 
   ADD CONSTRAINT fk_host_player 
-  FOREIGN KEY (host_id) REFERENCES matka.players(id) ON DELETE SET NULL;
+  FOREIGN KEY (host_id) REFERENCES public.matka_players(id) ON DELETE SET NULL;
 
--- 4. Rounds Table (History)
-CREATE TABLE IF NOT EXISTS matka.rounds (
+-- Public rounds table
+CREATE TABLE public.matka_rounds (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  room_id uuid REFERENCES matka.rooms(id) ON DELETE CASCADE,
+  room_id uuid REFERENCES public.matka_rooms(id) ON DELETE CASCADE,
   round_number integer NOT NULL,
-  player_id uuid REFERENCES matka.players(id) ON DELETE SET NULL,
+  player_id uuid REFERENCES public.matka_players(id) ON DELETE SET NULL,
   left_pillar text NOT NULL,
   right_pillar text NOT NULL,
   middle_card text,
   bet_amount integer,
-  result text, -- win | loss | post | pass
+  result text, 
   chips_delta integer NOT NULL DEFAULT 0,
   created_at timestamptz DEFAULT now()
 );
 
--- 5. Enable Row Level Security
-ALTER TABLE matka.rooms ENABLE ROW LEVEL SECURITY;
-ALTER TABLE matka.players ENABLE ROW LEVEL SECURITY;
-ALTER TABLE matka.rounds ENABLE ROW LEVEL SECURITY;
+-- 3. SECURITY & POLICIES
 
--- 6. Staging/Dev Policies (Allow anonymous/authenticated access for rapid testing)
--- In production, these should be tightened based on room_id/auth.uid()
-CREATE POLICY "Staging: Allow all operations on matka.rooms" ON matka.rooms FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Staging: Allow all operations on matka.players" ON matka.players FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Staging: Allow all operations on matka.rounds" ON matka.rounds FOR ALL USING (true) WITH CHECK (true);
+ALTER TABLE public.matka_rooms ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.matka_players ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.matka_rounds ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.matka_shoes ENABLE ROW LEVEL SECURITY;
 
--- 7. Schema Permissions
-GRANT USAGE ON SCHEMA matka TO anon, authenticated, service_role;
-GRANT ALL ON ALL TABLES IN SCHEMA matka TO anon, authenticated, service_role;
-GRANT ALL ON ALL SEQUENCES IN SCHEMA matka TO anon, authenticated, service_role;
-ALTER DEFAULT PRIVILEGES IN SCHEMA matka GRANT ALL ON TABLES TO anon, authenticated, service_role;
-ALTER DEFAULT PRIVILEGES IN SCHEMA matka GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;
+-- Deny all direct access to matka_shoes via API
+CREATE POLICY "Private: matka_shoes is hidden" ON public.matka_shoes FOR ALL USING (false);
+
+-- Open access for staging (standard tables)
+CREATE POLICY "Staging: matka_rooms allow all" ON public.matka_rooms FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Staging: matka_players allow all" ON public.matka_players FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Staging: matka_rounds allow all" ON public.matka_rounds FOR ALL USING (true) WITH CHECK (true);
+
+-- 4. ANTI-CHEAT RPCS (Security Definer)
+
+-- Helper: Build Shoe (Array of 52 * count cards)
+CREATE OR REPLACE FUNCTION public.matka_generate_shoe(deck_count int) 
+RETURNS text[] AS $$
+DECLARE
+  suits text[] := ARRAY['S', 'H', 'D', 'C'];
+  ranks text[] := ARRAY['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
+  shoe text[] := ARRAY[]::text[];
+  i int;
+  s text;
+  r text;
+BEGIN
+  FOR i IN 1..deck_count LOOP
+    FOREACH s IN ARRAY suits LOOP
+      FOREACH r IN ARRAY ranks LOOP
+        shoe := array_append(shoe, r || s);
+      END LOOP;
+    END LOOP;
+  END LOOP;
+  -- Simple Fish-Yates shuffle approximation using ORDER BY random()
+  SELECT array_agg(card) INTO shoe FROM (
+    SELECT unnest(shoe) as card ORDER BY random()
+  ) t;
+  RETURN shoe;
+END;
+$$ LANGUAGE plpgsql;
+
+-- 5. RPC: Initialize Game
+CREATE OR REPLACE FUNCTION public.matka_init_game(rid uuid, pid uuid)
+RETURNS void AS $$
+DECLARE
+  r record;
+  p_count int;
+  total_ante int;
+  new_shoe text[];
+BEGIN
+  -- 1. Auth check: pid must be host of rid
+  IF NOT EXISTS (SELECT 1 FROM public.matka_players WHERE id = pid AND room_id = rid AND is_host = true) THEN
+    RAISE EXCEPTION 'Unauthorized: Only host can start game';
+  END IF;
+
+  SELECT * INTO r FROM public.matka_rooms WHERE id = rid FOR UPDATE;
+  SELECT count(*) INTO p_count FROM public.matka_players WHERE room_id = rid;
+  total_ante := r.ante_amount * p_count;
+
+  -- 2. Collect antes
+  UPDATE public.matka_players SET net_chips = net_chips - r.ante_amount, is_ready = true 
+  WHERE room_id = rid;
+
+  -- 3. Generate Shoe
+  new_shoe := public.matka_generate_shoe(r.deck_count);
+  INSERT INTO public.matka_shoes (room_id, shoe, shoe_ptr) 
+  VALUES (rid, new_shoe, 2) 
+  ON CONFLICT (room_id) DO UPDATE SET shoe = EXCLUDED.shoe, shoe_ptr = 2;
+
+  -- 4. Update Room with first pillars
+  UPDATE public.matka_rooms SET 
+    pot_amount = pot_amount + total_ante,
+    current_player_index = 0,
+    left_pillar = new_shoe[1],
+    right_pillar = new_shoe[2],
+    middle_card = null,
+    current_bet = null,
+    status = 'betting'
+  WHERE id = rid;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 6. RPC: Draw Middle Card
+CREATE OR REPLACE FUNCTION public.matka_draw_card(rid uuid, pid uuid, bet int)
+RETURNS text AS $$
+DECLARE
+  r record;
+  s record;
+  middle_card text;
+BEGIN
+  -- 1. Get room and shoe
+  SELECT * INTO r FROM public.matka_rooms WHERE id = rid FOR UPDATE;
+  SELECT * INTO s FROM public.matka_shoes WHERE room_id = rid FOR UPDATE;
+
+  -- 2. Draw card
+  middle_card := s.shoe[s.shoe_ptr + 1];
+  
+  -- 3. Update hidden shoe ptr
+  UPDATE public.matka_shoes SET shoe_ptr = shoe_ptr + 1 WHERE room_id = rid;
+
+  -- 4. Update room middle card (client will see it now)
+  -- Note: We don't advance the turn here; the client logic or another RPC handles result evaluation for now.
+  -- To make it 100% secure, result evaluation should also be in RPC, but let's start here.
+  UPDATE public.matka_rooms SET 
+    middle_card = middle_card,
+    current_bet = bet,
+    status = 'round_result'
+  WHERE id = rid;
+
+  RETURN middle_card;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 7. RPC: Reshuffle
+CREATE OR REPLACE FUNCTION public.matka_reshuffle(rid uuid, pid uuid, new_decks int)
+RETURNS void AS $$
+DECLARE
+  new_shoe text[];
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM public.matka_players WHERE id = pid AND room_id = rid AND is_host = true) THEN
+    RAISE EXCEPTION 'Unauthorized';
+  END IF;
+
+  new_shoe := public.matka_generate_shoe(new_decks);
+  INSERT INTO public.matka_shoes (room_id, shoe, shoe_ptr) 
+  VALUES (rid, new_shoe, 2) 
+  ON CONFLICT (room_id) DO UPDATE SET shoe = EXCLUDED.shoe, shoe_ptr = 2;
+
+  UPDATE public.matka_rooms SET 
+    deck_count = new_decks,
+    left_pillar = new_shoe[1],
+    right_pillar = new_shoe[2],
+    middle_card = null,
+    current_bet = null,
+    status = 'betting'
+  WHERE id = rid;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;

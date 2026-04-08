@@ -27,7 +27,7 @@ class SupabaseMatkaLobbyService implements MatkaLobbyService {
     final shoe = MatkaCard.shuffled(MatkaCard.buildShoe(deckCount));
     final code = _genCode();
 
-    final roomRow = await _db.schema('matka').from('rooms').insert({
+    final roomRow = await _db.from('matka_rooms').insert({
       'code': code,
       'status': 'waiting',
       'host_id': null,
@@ -35,12 +35,10 @@ class SupabaseMatkaLobbyService implements MatkaLobbyService {
       'ante_amount': anteAmount,
       'pot_amount': 0,
       'current_player_index': 0,
-      'shoe': shoe,
-      'shoe_ptr': 0,
       'round_number': 1,
     }).select().single();
 
-    final playerRow = await _db.schema('matka').from('players').insert({
+    final playerRow = await _db.from('matka_players').insert({
       'room_id': roomRow['id'],
       'name': name.trim(),
       'net_chips': 0,
@@ -50,8 +48,7 @@ class SupabaseMatkaLobbyService implements MatkaLobbyService {
     }).select().single();
 
     await _db
-        .schema('matka')
-        .from('rooms')
+        .from('matka_rooms')
         .update({'host_id': playerRow['id']})
         .eq('id', roomRow['id']);
 
@@ -65,8 +62,7 @@ class SupabaseMatkaLobbyService implements MatkaLobbyService {
   @override
   Future<Map<String, String>?> joinRoom(String code, String name) async {
     final rooms = await _db
-        .schema('matka')
-        .from('rooms')
+        .from('matka_rooms')
         .select()
         .eq('code', code.trim().toUpperCase())
         .eq('status', 'waiting')
@@ -76,8 +72,7 @@ class SupabaseMatkaLobbyService implements MatkaLobbyService {
     final room = rooms.first;
 
     final existing = await _db
-        .schema('matka')
-        .from('players')
+        .from('matka_players')
         .select('id')
         .eq('room_id', room['id']);
     if (existing.length >= 8) return null;
@@ -101,8 +96,7 @@ class SupabaseMatkaLobbyService implements MatkaLobbyService {
   @override
   Future<void> setReady(String playerId, bool ready) async {
     await _db
-        .schema('matka')
-        .from('players')
+        .from('matka_players')
         .update({'is_ready': ready})
         .eq('id', playerId);
   }

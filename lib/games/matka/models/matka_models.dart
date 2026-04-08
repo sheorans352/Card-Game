@@ -10,7 +10,6 @@ class MatkaRoom {
   final int anteAmount;
   final int potAmount;
   final int currentPlayerIndex;
-  final List<String> shoe;
   final int shoePtr;
   final String? leftPillar;
   final String? rightPillar;
@@ -28,7 +27,6 @@ class MatkaRoom {
     required this.anteAmount,
     required this.potAmount,
     required this.currentPlayerIndex,
-    required this.shoe,
     required this.shoePtr,
     this.leftPillar,
     this.rightPillar,
@@ -38,8 +36,8 @@ class MatkaRoom {
     required this.createdAt,
   });
 
-  int get cardsRemaining => shoe.length - shoePtr;
-  int get totalShoeSize => shoe.length;
+  int get cardsRemaining => (deckCount * 52) - shoePtr;
+  int get totalShoeSize => deckCount * 52;
 
   factory MatkaRoom.fromMap(Map<String, dynamic> m) => MatkaRoom(
         id: m['id'],
@@ -50,7 +48,6 @@ class MatkaRoom {
         anteAmount: m['ante_amount'] ?? 100,
         potAmount: m['pot_amount'] ?? 0,
         currentPlayerIndex: m['current_player_index'] ?? 0,
-        shoe: List<String>.from(m['shoe'] ?? []),
         shoePtr: m['shoe_ptr'] ?? 0,
         leftPillar: m['left_pillar'],
         rightPillar: m['right_pillar'],
@@ -70,7 +67,6 @@ class MatkaRoom {
         'ante_amount': anteAmount,
         'pot_amount': potAmount,
         'current_player_index': currentPlayerIndex,
-        'shoe': shoe,
         'shoe_ptr': shoePtr,
         'left_pillar': leftPillar,
         'right_pillar': rightPillar,
@@ -86,7 +82,6 @@ class MatkaRoom {
     int? anteAmount,
     int? potAmount,
     int? currentPlayerIndex,
-    List<String>? shoe,
     int? shoePtr,
     String? leftPillar,
     String? rightPillar,
@@ -106,7 +101,6 @@ class MatkaRoom {
         anteAmount: anteAmount ?? this.anteAmount,
         potAmount: potAmount ?? this.potAmount,
         currentPlayerIndex: currentPlayerIndex ?? this.currentPlayerIndex,
-        shoe: shoe ?? this.shoe,
         shoePtr: shoePtr ?? this.shoePtr,
         leftPillar: clearPillars ? null : (leftPillar ?? this.leftPillar),
         rightPillar: clearPillars ? null : (rightPillar ?? this.rightPillar),

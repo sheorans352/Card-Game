@@ -69,8 +69,7 @@ final matkaSessionProvider = StateNotifierProvider<MatkaSessionNotifier, void>(
 final matkaRoomByCodeProvider =
     StreamProvider.family<MatkaRoom?, String>((ref, code) {
   return _db
-      .schema('matka')
-      .from('rooms')
+      .from('matka_rooms')
       .stream(primaryKey: ['id'])
       .eq('code', code)
       .map<MatkaRoom?>((rows) =>
@@ -85,8 +84,7 @@ final matkaRoomByCodeProvider =
 final matkaRoomByIdProvider =
     StreamProvider.family<MatkaRoom?, String>((ref, id) {
   return _db
-      .schema('matka')
-      .from('rooms')
+      .from('matka_rooms')
       .stream(primaryKey: ['id'])
       .eq('id', id)
       .map<MatkaRoom?>((rows) =>
@@ -101,8 +99,7 @@ final matkaRoomByIdProvider =
 final matkaPlayersProvider =
     StreamProvider.family<List<MatkaPlayer>, String>((ref, roomId) {
   return _db
-      .schema('matka')
-      .from('players')
+      .from('matka_players')
       .stream(primaryKey: ['id'])
       .eq('room_id', roomId)
       .map((rows) {
@@ -122,8 +119,7 @@ final matkaPlayersProvider =
 final matkaRoundsProvider =
     StreamProvider.family<List<MatkaRound>, String>((ref, roomId) {
   return _db
-      .schema('matka')
-      .from('rounds')
+      .from('matka_rounds')
       .stream(primaryKey: ['id'])
       .eq('room_id', roomId)
       .map((rows) {
