@@ -95,7 +95,7 @@ class _MatkaGameTableScreenState extends ConsumerState<MatkaGameTableScreen> wit
                           _buildTable(room, activePlayer, isMyTurn),
                           const Spacer(),
                           if (room.status == 'shuffling')
-                            _buildShufflingView(room, me.isHost)
+                            _buildShufflingView(room, me.isHost, players)
                           else if (isMyTurn && room.status == 'betting')
                             _buildBettingControls(room, me, players)
                           else if (room.status == 'round_result')
@@ -371,7 +371,7 @@ class _MatkaGameTableScreenState extends ConsumerState<MatkaGameTableScreen> wit
     );
   }
 
-  Widget _buildShufflingView(MatkaRoom room, bool isHost) {
+  Widget _buildShufflingView(MatkaRoom room, bool isHost, List<MatkaPlayer> players) {
     bool isEmpty = room.leftPillar == null && room.rightPillar == null; // Simple heuristic for initial shuffle or empty shoe
 
     return Center(
