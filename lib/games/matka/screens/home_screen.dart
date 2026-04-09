@@ -276,7 +276,7 @@ class _MatkaHomeScreenState extends ConsumerState<MatkaHomeScreen> {
         const SizedBox(height: 10),
         Wrap(
           spacing: 8,
-          children: [100, 500, 1000, 2500, 5000].map((v) {
+          children: [5, 10, 20, 50, 100, 200, 500, 1000].map((v) {
             final sel = v == _anteAmount;
             return ChoiceChip(
               label: Text('$v'),

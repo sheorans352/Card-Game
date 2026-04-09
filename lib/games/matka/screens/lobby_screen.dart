@@ -201,7 +201,7 @@ class MatkaLobbyScreen extends ConsumerWidget {
   }
 
   Widget _buildFooter(BuildContext context, WidgetRef ref, room, List<MatkaPlayer> players, bool isHost, MatkaPlayer? localPlayer) {
-    final allReady = players.length >= 2 && players.every((p) => p.isReady);
+    final allReady = players.length >= 1 && players.every((p) => p.isReady);
     
     return Column(
       children: [
@@ -215,7 +215,7 @@ class MatkaLobbyScreen extends ConsumerWidget {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             ),
             child: Text(
-              allReady ? 'START GAME' : 'WAITING FOR PLAYERS (Min 2)',
+              allReady ? 'START GAME' : 'WAITING FOR READY STATUS',
               style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 2),
             ),
           )
@@ -250,6 +250,14 @@ class MatkaLobbyScreen extends ConsumerWidget {
   }
 
   Future<void> _startGame(WidgetRef ref, room, List<MatkaPlayer> players) async {
-    await ref.read(matkaGameServiceProvider).startGame(room, players);
+    try {
+      await ref.read(matkaGameServiceProvider).startGame(room, players);
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to start: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
   }
 }
