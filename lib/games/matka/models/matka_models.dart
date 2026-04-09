@@ -17,6 +17,7 @@ class MatkaRoom {
   final int? currentBet;
   final int roundNumber;
   final int betMultiple;
+  final String? lastEventMsg;
   final DateTime createdAt;
 
   const MatkaRoom({
@@ -35,6 +36,7 @@ class MatkaRoom {
     this.currentBet,
     required this.roundNumber,
     required this.betMultiple,
+    this.lastEventMsg,
     required this.createdAt,
   });
 
@@ -57,6 +59,7 @@ class MatkaRoom {
         currentBet: m['current_bet'],
         roundNumber: m['round_number'] ?? 1,
         betMultiple: m['bet_multiple'] ?? 10,
+        lastEventMsg: m['last_event_msg'],
         createdAt:
             DateTime.tryParse(m['created_at'] ?? '') ?? DateTime.now(),
       );
@@ -112,6 +115,7 @@ class MatkaRoom {
         currentBet: clearBet ? null : (currentBet ?? this.currentBet),
         roundNumber: roundNumber ?? this.roundNumber,
         betMultiple: betMultiple ?? this.betMultiple,
+        lastEventMsg: lastEventMsg ?? this.lastEventMsg,
         createdAt: createdAt ?? this.createdAt,
       );
 }

@@ -20,6 +20,7 @@ class MatkaGameTableScreen extends ConsumerStatefulWidget {
 
 class _MatkaGameTableScreenState extends ConsumerState<MatkaGameTableScreen> with SingleTickerProviderStateMixin {
   final _betCtrl = TextEditingController();
+  final _playerScrollCtrl = ScrollController();
   late AnimationController _revealCtrl;
   bool _isAnimating = false;
   int? _selectedMultipleOverride;
@@ -41,7 +42,21 @@ class _MatkaGameTableScreenState extends ConsumerState<MatkaGameTableScreen> wit
   void dispose() {
     _betCtrl.dispose();
     _revealCtrl.dispose();
+    _playerScrollCtrl.dispose();
     super.dispose();
+  }
+
+  void _scrollToActivePlayer(int index, int total) {
+    if (!_playerScrollCtrl.hasClients) return;
+    const itemWidth = 100.0;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final target = (index * itemWidth) - (screenWidth / 2) + (itemWidth / 2);
+    
+    _playerScrollCtrl.animateTo(
+      target.clamp(0.0, _playerScrollCtrl.position.maxScrollExtent),
+      duration: const Duration(milliseconds: 500),
+      curve: Curves.easeInOut,
+    );
   }
 
   @override
@@ -91,6 +106,8 @@ class _MatkaGameTableScreenState extends ConsumerState<MatkaGameTableScreen> wit
                           _buildTopBar(room),
                           const SizedBox(height: 16),
                           _buildPlayersRow(players, room.currentPlayerIndex, localId),
+                          const Spacer(),
+                          _buildGameEventNotification(room),
                           const Spacer(),
                           _buildTable(room, activePlayer, isMyTurn),
                           const Spacer(),
@@ -145,18 +162,27 @@ class _MatkaGameTableScreenState extends ConsumerState<MatkaGameTableScreen> wit
   }
 
   Widget _buildPlayersRow(List<MatkaPlayer> players, int currentIndex, String? localId) {
+    // Auto-scroll to center active player
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scrollToActivePlayer(currentIndex % players.length, players.length);
+    });
+
     return SizedBox(
       height: 90,
       child: ListView.builder(
+        controller: _playerScrollCtrl,
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 14),
         itemCount: players.length,
         itemBuilder: (context, index) {
           final p = players[index];
-          return MatkaPlayerSeat(
-            player: p,
-            isActive: index == (currentIndex % players.length),
-            isLocalPlayer: p.id == localId,
+          return Container(
+            width: 100, // Fixed width for scroll calculation
+            child: MatkaPlayerSeat(
+              player: p,
+              isActive: index == (currentIndex % players.length),
+              isLocalPlayer: p.id == localId,
+            ),
           );
         },
       ),
@@ -544,6 +570,50 @@ class _MatkaGameTableScreenState extends ConsumerState<MatkaGameTableScreen> wit
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGameEventNotification(MatkaRoom room) {
+    final msg = room.lastEventMsg;
+    if (msg == null || msg.isEmpty) return const SizedBox.shrink();
+
+    return Center(
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 40, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: _gold.withOpacity(0.2)),
+        ),
+        child: Text(
+          msg,
+          textAlign: TextAlign.center,
+          style: const TextStyle(color: _gold, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGameEventNotification(MatkaRoom room) {
+    final msg = room.lastEventMsg;
+    if (msg == null || msg.isEmpty) return const SizedBox.shrink();
+
+    return Center(
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 40, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: _gold.withOpacity(0.2)),
+        ),
+        child: Text(
+          msg,
+          textAlign: TextAlign.center,
+          style: const TextStyle(color: _gold, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.5),
         ),
       ),
     );

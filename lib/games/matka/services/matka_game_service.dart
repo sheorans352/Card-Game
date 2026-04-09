@@ -196,6 +196,7 @@ class MatkaGameService {
         'current_player_index': nextIndex,
         'pot_amount': newPot,
         'round_number': newRound,
+        'last_event_msg': (newPot == totalAnte && players.length > 0) ? 'Pot Empty! All players paid ${room.anteAmount} ante.' : null,
       }).eq('id', room.id);
     } catch (e) {
       // If deal fails (no cards), go to shuffling

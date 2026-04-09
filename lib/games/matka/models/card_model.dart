@@ -19,7 +19,7 @@ enum MatkaCardSuit {
 }
 
 /// A single playing card in the Matka game.
-/// Ace is HIGH (rank 14).  Ranks: 2–14.
+/// Ace is LOW (rank 1).  Ranks: 1–13.
 class MatkaCard {
   final MatkaCardSuit suit;
   final String value; // '2'–'10', 'J', 'Q', 'K', 'A'
@@ -38,7 +38,7 @@ class MatkaCard {
   static int rankFromValue(String v) {
     switch (v.trim().toUpperCase()) {
       case 'A':
-        return 14;
+        return 1;
       case 'K':
         return 13;
       case 'Q':
