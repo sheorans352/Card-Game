@@ -207,7 +207,7 @@ class MatkaLobbyScreen extends ConsumerWidget {
       children: [
         if (isHost)
           ElevatedButton(
-            onPressed: allReady ? () => _startGame(ref, room, players) : null,
+            onPressed: allReady ? () => _startGame(context, ref, room, players) : null,
             style: ElevatedButton.styleFrom(
               backgroundColor: _purple,
               disabledBackgroundColor: Colors.white.withOpacity(0.05),
@@ -249,7 +249,7 @@ class MatkaLobbyScreen extends ConsumerWidget {
     );
   }
 
-  Future<void> _startGame(WidgetRef ref, room, List<MatkaPlayer> players) async {
+  Future<void> _startGame(BuildContext context, WidgetRef ref, room, List<MatkaPlayer> players) async {
     try {
       await ref.read(matkaGameServiceProvider).startGame(room, players);
     } catch (e) {
