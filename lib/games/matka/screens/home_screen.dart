@@ -27,7 +27,16 @@ class _MatkaHomeScreenState extends ConsumerState<MatkaHomeScreen> {
     if (widget.prefilledCode != null) {
       _codeCtrl.text = widget.prefilledCode!;
     }
+    
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final name = ref.read(matkaPlayerNameProvider);
+      if (name != null) _nameCtrl.text = name;
+      _checkInitialSession();
+    });
+
+    _codeCtrl.addListener(_onCodeChanged);
   }
+
   bool _isHosting = true;
   int _deckCount = 1;
   int _anteAmount = 100;
@@ -39,18 +48,6 @@ class _MatkaHomeScreenState extends ConsumerState<MatkaHomeScreen> {
   static const _purple = Color(0xFF9B59B6);
   static const _gold = Color(0xFFFFD700);
   static const _card = Color(0xFF1A0D2B);
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final name = ref.read(matkaPlayerNameProvider);
-      if (name != null) _nameCtrl.text = name;
-      _checkInitialSession();
-    });
-
-    _codeCtrl.addListener(_onCodeChanged);
-  }
 
   void _onCodeChanged() async {
     final code = _codeCtrl.text.trim();
