@@ -56,7 +56,7 @@ class MatkaGameService {
         'bet': betAmount,
       });
 
-      // 2. Client-side evaluation for history record (SQL also updates status to 'round_result')
+      // 2. Client-side evaluation for history record 
       final p1 = MatkaCard.fromId(room.leftPillar!);
       final p2 = MatkaCard.fromId(room.rightPillar!);
       final middle = MatkaCard.fromId(middleId);
@@ -88,7 +88,7 @@ class MatkaGameService {
 
       final resultStr = result.name;
 
-      // 3. Update player balance & last action
+      // 3. Update player balance (Room status was updated to 'round_result' by RPC)
       await _db.from('matka_players').update({
         'net_chips': newNet,
         'last_action': resultStr,
@@ -108,16 +108,19 @@ class MatkaGameService {
         'chips_delta': chipsDelta,
       });
 
-      // 5. Update room pot (status already set by RPC)
+      // 5. Update room pot explicitly to trigger stream refresh if needed
       await _db.from('matka_rooms').update({
         'pot_amount': newPot,
       }).eq('id', room.id);
 
-      // 6. Auto-advance after brief display
-      await Future.delayed(const Duration(seconds: 3));
+      // 6. Pause for reveal visibility
+      await Future.delayed(const Duration(seconds: 4));
+
+      // 7. Auto-advance to next player
       await _advanceTurn(room.copyWith(
         potAmount: newPot,
         status: 'round_result',
+        middleCard: middleId,
       ), allPlayers);
     } catch (e) {
       if (e.toString().contains('PGRST116')) {
