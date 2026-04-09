@@ -10,7 +10,8 @@ import '../providers/matka_provider.dart';
 import 'lobby_screen.dart';
 
 class MatkaHomeScreen extends ConsumerStatefulWidget {
-  const MatkaHomeScreen({super.key});
+  final String? prefilledCode;
+  const MatkaHomeScreen({super.key, this.prefilledCode});
 
   @override
   ConsumerState<MatkaHomeScreen> createState() => _MatkaHomeScreenState();
@@ -19,6 +20,14 @@ class MatkaHomeScreen extends ConsumerStatefulWidget {
 class _MatkaHomeScreenState extends ConsumerState<MatkaHomeScreen> {
   final _nameCtrl = TextEditingController();
   final _codeCtrl = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.prefilledCode != null) {
+      _codeCtrl.text = widget.prefilledCode!;
+    }
+  }
   bool _isHosting = true;
   int _deckCount = 1;
   int _anteAmount = 100;
@@ -449,9 +458,7 @@ class _MatkaHomeScreenState extends ConsumerState<MatkaHomeScreen> {
       await ref.read(matkaSessionProvider.notifier)
           .save(result['roomCode']!, result['playerId']!, name);
       if (mounted) {
-        Navigator.of(context).push(MaterialPageRoute(
-          builder: (_) => MatkaLobbyScreen(roomId: result['roomId']!),
-        ));
+        context.go('/matka/lobby/${result['roomId']}');
       }
     } catch (e) {
       _err('Failed to create room: $e');
@@ -472,9 +479,7 @@ class _MatkaHomeScreenState extends ConsumerState<MatkaHomeScreen> {
       await ref.read(matkaSessionProvider.notifier)
           .save(result['roomCode']!, result['playerId']!, name);
       if (mounted) {
-        Navigator.of(context).push(MaterialPageRoute(
-          builder: (_) => MatkaLobbyScreen(roomId: result['roomId']!),
-        ));
+        context.go('/matka/lobby/${result['roomId']}');
       }
     } catch (e) {
       _err('Failed to join: $e');

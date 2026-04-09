@@ -24,6 +24,14 @@ class MatkaLobbyScreen extends ConsumerWidget {
     final playersAsync = ref.watch(matkaPlayersProvider(roomId));
     final isHost = ref.watch(isMatkaHostProvider(roomId));
     final localPlayer = ref.watch(localMatkaPlayerProvider(roomId));
+    final isLoaded = ref.watch(matkaSessionLoadedProvider);
+
+    if (!isLoaded) {
+      return const Scaffold(
+        backgroundColor: _bg,
+        body: Center(child: CircularProgressIndicator(color: _purple)),
+      );
+    }
 
     return Scaffold(
       backgroundColor: _bg,
@@ -44,9 +52,7 @@ class MatkaLobbyScreen extends ConsumerWidget {
               
               if (room.status == 'betting' || room.status == 'round_result' || room.status == 'shuffling') {
                 Future.microtask(() {
-                  Navigator.of(context).pushReplacement(
-                    MaterialPageRoute(builder: (_) => MatkaGameTableScreen(roomId: roomId)),
-                  );
+                  context.go('/matka/table/$roomId');
                 });
               }
 
@@ -241,7 +247,7 @@ class MatkaLobbyScreen extends ConsumerWidget {
         TextButton(
           onPressed: () {
             ref.read(matkaSessionProvider.notifier).clear();
-            Navigator.of(context).pop();
+            context.go('/matka');
           },
           child: const Text('Leave Room', style: TextStyle(color: Colors.white38)),
         ),

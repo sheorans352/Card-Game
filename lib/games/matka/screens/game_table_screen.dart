@@ -65,6 +65,14 @@ class _MatkaGameTableScreenState extends ConsumerState<MatkaGameTableScreen> wit
     final playersAsync = ref.watch(matkaPlayersProvider(widget.roomId));
     final isMyTurn = ref.watch(isMyMatkaTurnProvider(widget.roomId));
     final localId = ref.watch(matkaPlayerIdProvider);
+    final isLoaded = ref.watch(matkaSessionLoadedProvider);
+
+    if (!isLoaded) {
+      return const Scaffold(
+        backgroundColor: _bg,
+        body: Center(child: CircularProgressIndicator(color: _purple)),
+      );
+    }
 
     return Scaffold(
       backgroundColor: _bg,
@@ -620,7 +628,7 @@ class _MatkaGameTableScreenState extends ConsumerState<MatkaGameTableScreen> wit
             onPressed: () {
               Navigator.pop(c);
               ref.read(matkaSessionProvider.notifier).clear();
-              Navigator.of(context).popUntil((route) => route.isFirst);
+              context.go('/matka');
             },
             child: const Text('YES, QUIT', style: TextStyle(color: _gold, fontWeight: FontWeight.bold)),
           ),

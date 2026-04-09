@@ -19,6 +19,7 @@ const _kPlayerName = 'matka_player_name';
 final matkaRoomCodeProvider = StateProvider<String?>((ref) => null);
 final matkaPlayerIdProvider = StateProvider<String?>((ref) => null);
 final matkaPlayerNameProvider = StateProvider<String?>((ref) => null);
+final matkaSessionLoadedProvider = StateProvider<bool>((ref) => false);
 
 // ── Session persistence ───────────────────────────────────────────────────
 class MatkaSessionNotifier extends StateNotifier<void> {
@@ -36,6 +37,7 @@ class MatkaSessionNotifier extends StateNotifier<void> {
     if (code != null) ref.read(matkaRoomCodeProvider.notifier).state = code;
     if (pid != null) ref.read(matkaPlayerIdProvider.notifier).state = pid;
     if (name != null) ref.read(matkaPlayerNameProvider.notifier).state = name;
+    ref.read(matkaSessionLoadedProvider.notifier).state = true;
   }
 
   Future<void> save(String code, String playerId, String name) async {
