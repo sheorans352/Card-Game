@@ -165,8 +165,8 @@ class MatkaGameService {
     int newPot = room.potAmount;
     int newRound = room.roundNumber;
 
-    if (isNewRound) {
-      newRound = room.roundNumber + 1;
+    // Take Ante ONLY if pot is empty (someone just won the full pot)
+    if (newPot == 0) {
       final totalAnte = room.anteAmount * players.length;
       final freshPlayers = await _db.from('matka_players').select().eq('room_id', room.id);
       for (final p in freshPlayers) {
@@ -174,7 +174,11 @@ class MatkaGameService {
           'net_chips': (p['net_chips'] as int) - room.anteAmount,
         }).eq('id', p['id']);
       }
-      newPot += totalAnte;
+      newPot = totalAnte; // Reset pot to just the ante
+    }
+
+    if (isNewRound) {
+      newRound = room.roundNumber + 1;
     }
 
     // Call Secure RPC to deal pillars for the next player
