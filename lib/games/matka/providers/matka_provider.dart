@@ -66,9 +66,7 @@ class MatkaSessionNotifier extends StateNotifier<void> {
   }
 }
 
-final matkaSessionProvider = StateNotifierProvider<MatkaSessionNotifier, void>(
-  (ref) => MatkaSessionNotifier(ref),
-);
+final matkaSessionProvider = StateNotifierProvider<MatkaSessionNotifier, void>((ref) => MatkaSessionNotifier(ref));
 
 // ── Supabase streams ──────────────────────────────────────────────────────
 

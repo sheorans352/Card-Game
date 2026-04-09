@@ -1,8 +1,9 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'router.dart';
 import 'games/minus/providers/room_provider.dart';
+import 'games/matka/providers/matka_provider.dart';
 import 'shared/config/env_config.dart';
 import 'shared/services/audio_service.dart';
 
@@ -26,6 +27,7 @@ class MyApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     // Start session initialization immediately
     ref.read(sessionProvider);
+    ref.read(matkaSessionProvider);
 
     return MaterialApp.router(
       debugShowCheckedModeBanner: false,
