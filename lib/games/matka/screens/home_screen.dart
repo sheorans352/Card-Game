@@ -272,6 +272,24 @@ class _MatkaHomeScreenState extends ConsumerState<MatkaHomeScreen> {
         Text('${_deckCount * 52} cards in shoe',
             style: const TextStyle(color: Colors.white38, fontSize: 11)),
 
+        _label('ANTE AMOUNT'),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 8,
+          children: [100, 500, 1000, 2500, 5000].map((v) {
+            final sel = v == _anteAmount;
+            return ChoiceChip(
+              label: Text('$v'),
+              selected: sel,
+              onSelected: (_) => setState(() => _anteAmount = v),
+              selectedColor: _purple.withOpacity(0.3),
+              backgroundColor: Colors.white.withOpacity(0.05),
+              labelStyle: TextStyle(color: sel ? _purple : Colors.white54, fontWeight: FontWeight.bold),
+              side: BorderSide(color: sel ? _purple : Colors.white12),
+            );
+          }).toList(),
+        ),
+
         const SizedBox(height: 24),
         _label('BETTING MULTIPLE (STEP)'),
         const SizedBox(height: 10),
