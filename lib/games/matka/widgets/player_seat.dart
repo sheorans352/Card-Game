@@ -75,11 +75,6 @@ class MatkaPlayerSeat extends StatelessWidget {
               fontWeight: FontWeight.w900,
             ),
           ),
-          // Last action badge
-          if (player.lastAction != null) ...[
-            const SizedBox(height: 4),
-            _actionBadge(player.lastAction!),
-          ],
         ],
       ),
     );
