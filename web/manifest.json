@@ -1,11 +1,11 @@
 {
-    "name": "Minus Card Game",
-    "short_name": "Minus",
+    "name": "Zindagi Ek Jua",
+    "short_name": "Zindagi Jua",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0A1221",
     "theme_color": "#0A1221",
-    "description": "Traditional card game bringing the community together. Join the local baithak, strategically bid for trumps, and win with your circle.",
+    "description": "A premium collection of traditional card games. Join the table and play with friends.",
     "orientation": "portrait",
     "prefer_related_applications": false,
     "icons": [
