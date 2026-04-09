@@ -597,28 +597,6 @@ class _MatkaGameTableScreenState extends ConsumerState<MatkaGameTableScreen> wit
     );
   }
 
-  Widget _buildGameEventNotification(MatkaRoom room) {
-    final msg = room.lastEventMsg;
-    if (msg == null || msg.isEmpty) return const SizedBox.shrink();
-
-    return Center(
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 40, vertical: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.05),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: _gold.withOpacity(0.2)),
-        ),
-        child: Text(
-          msg,
-          textAlign: TextAlign.center,
-          style: const TextStyle(color: _gold, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.5),
-        ),
-      ),
-    );
-  }
-
   void _onPass(MatkaRoom room, MatkaPlayer me, List<MatkaPlayer> players) async {
     setState(() => _isAnimating = true);
     await ref.read(matkaGameServiceProvider).passTurn(room, me, players);

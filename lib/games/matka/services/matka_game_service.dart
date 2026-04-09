@@ -168,9 +168,10 @@ class MatkaGameService {
     int newPot = room.potAmount;
     int newRound = room.roundNumber;
 
+    final totalAnte = room.anteAmount * players.length;
+
     // Take Ante ONLY if pot is empty (someone just won the full pot)
     if (newPot == 0) {
-      final totalAnte = room.anteAmount * players.length;
       final freshPlayers = await _db.from('matka_players').select().eq('room_id', room.id);
       for (final p in freshPlayers) {
         await _db.from('matka_players').update({
