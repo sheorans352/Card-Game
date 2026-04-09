@@ -82,7 +82,7 @@ class _MatkaGameTableScreenState extends ConsumerState<MatkaGameTableScreen> wit
           if (room == null) return const Center(child: Text('Room closed', style: TextStyle(color: Colors.white)));
           
           if (room.status == 'ended') {
-            Future.microtask(() => Navigator.of(context).popUntil((route) => route.isFirst));
+            Future.microtask(() => context.go('/matka'));
           }
 
           // Update last event based on room changes
@@ -137,7 +137,16 @@ class _MatkaGameTableScreenState extends ConsumerState<MatkaGameTableScreen> wit
                 ),
               );
             },
-            loading: () => const Center(child: CircularProgressIndicator(color: _purple)),
+            loading: () => const Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircularProgressIndicator(color: _purple),
+                  SizedBox(height: 16),
+                  Text('Loading players...', style: TextStyle(color: Colors.white60)),
+                ],
+              ),
+            ),
             error: (e, s) => Center(child: Text('Error: $e')),
           );
         },

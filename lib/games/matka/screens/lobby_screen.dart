@@ -67,7 +67,16 @@ class MatkaLobbyScreen extends ConsumerWidget {
                       Expanded(
                         child: playersAsync.when(
                           data: (players) => _buildPlayerList(players, localPlayer),
-                          loading: () => const Center(child: CircularProgressIndicator(color: _purple)),
+                          loading: () => const Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                CircularProgressIndicator(color: _purple),
+                                SizedBox(height: 16),
+                                Text('Loading players...', style: TextStyle(color: Colors.white60)),
+                              ],
+                            ),
+                          ),
                           error: (e, s) => Center(child: Text('Error: $e', style: const TextStyle(color: Colors.red))),
                         ),
                       ),
@@ -78,7 +87,16 @@ class MatkaLobbyScreen extends ConsumerWidget {
                 ),
               );
             },
-            loading: () => const Center(child: CircularProgressIndicator(color: _purple)),
+            loading: () => const Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                   CircularProgressIndicator(color: _purple),
+                   SizedBox(height: 16),
+                   Text('Syncing room data...', style: TextStyle(color: Colors.white60, fontSize: 12)),
+                ],
+              ),
+            ),
             error: (e, s) => Center(child: Text('Error: $e', style: const TextStyle(color: Colors.red))),
           ),
         ],

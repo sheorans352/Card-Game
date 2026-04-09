@@ -30,14 +30,19 @@ class MatkaSessionNotifier extends StateNotifier<void> {
   final Ref ref;
 
   Future<void> _init() async {
-    final prefs = await SharedPreferences.getInstance();
-    final code = prefs.getString(_kRoomCode);
-    final pid = prefs.getString(_kPlayerId);
-    final name = prefs.getString(_kPlayerName);
-    if (code != null) ref.read(matkaRoomCodeProvider.notifier).state = code;
-    if (pid != null) ref.read(matkaPlayerIdProvider.notifier).state = pid;
-    if (name != null) ref.read(matkaPlayerNameProvider.notifier).state = name;
-    ref.read(matkaSessionLoadedProvider.notifier).state = true;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final code = prefs.getString(_kRoomCode);
+      final pid = prefs.getString(_kPlayerId);
+      final name = prefs.getString(_kPlayerName);
+      if (code != null) ref.read(matkaRoomCodeProvider.notifier).state = code;
+      if (pid != null) ref.read(matkaPlayerIdProvider.notifier).state = pid;
+      if (name != null) ref.read(matkaPlayerNameProvider.notifier).state = name;
+    } catch (e) {
+      debugPrint('MatkaSession Init Error: $e');
+    } finally {
+      ref.read(matkaSessionLoadedProvider.notifier).state = true;
+    }
   }
 
   Future<void> save(String code, String playerId, String name) async {
