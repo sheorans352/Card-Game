@@ -279,30 +279,33 @@ class _MatkaGameTableScreenState extends ConsumerState<MatkaGameTableScreen> wit
                 child: TextField(
                   controller: _betCtrl,
                   keyboardType: TextInputType.number,
-                  style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
+                  style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                  textAlign: TextAlign.center,
                   decoration: InputDecoration(
-                    prefixIcon: const Icon(Icons.attach_money_rounded, color: _gold),
+                    prefixIcon: const Icon(Icons.attach_money_rounded, color: _gold, size: 18),
                     hintText: 'BET...',
-                    hintStyle: const TextStyle(color: Colors.white10),
+                    hintStyle: const TextStyle(color: Colors.white10, fontSize: 16),
                     filled: true,
                     fillColor: Colors.black26,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
               _buildAddSubButton(Icons.remove_rounded, () => _adjustBet(-( _selectedMultipleOverride ?? room.betMultiple ))),
               _buildAddSubButton(Icons.add_rounded, () => _adjustBet( _selectedMultipleOverride ?? room.betMultiple )),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
               ElevatedButton(
                 onPressed: () => _betCtrl.text = room.potAmount.toString(),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: _gold,
                   foregroundColor: Colors.black,
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  minimumSize: const Size(60, 48),
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  minimumSize: const Size(48, 40),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
-                child: const Text('POT', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 12)),
+                child: const Text('POT', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 10)),
               ),
             ],
           ),
@@ -317,7 +320,7 @@ class _MatkaGameTableScreenState extends ConsumerState<MatkaGameTableScreen> wit
                   style: ElevatedButton.styleFrom(
                     backgroundColor: _purple,
                     foregroundColor: Colors.white,
-                    minimumSize: const Size(0, 56),
+                    minimumSize: const Size(0, 50),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                   ),
                   child: const Text('PLACE BET', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -329,7 +332,7 @@ class _MatkaGameTableScreenState extends ConsumerState<MatkaGameTableScreen> wit
                   onPressed: _isAnimating ? null : () => _onPass(room, me, players),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: Colors.white60,
-                    minimumSize: const Size(0, 56),
+                    minimumSize: const Size(0, 50),
                     side: const BorderSide(color: Colors.white24),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                   ),
@@ -490,10 +493,11 @@ class _MatkaGameTableScreenState extends ConsumerState<MatkaGameTableScreen> wit
         children: [5, 10, 20, 50, 100].map((m) {
           final isSelected = (_selectedMultipleOverride ?? room.betMultiple) == m;
           return Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 2),
             child: ChoiceChip(
               label: Text('x$m'),
               selected: isSelected,
+              visualDensity: VisualDensity.compact,
               onSelected: (val) {
                 if (val) setState(() => _selectedMultipleOverride = m);
               },
@@ -502,7 +506,7 @@ class _MatkaGameTableScreenState extends ConsumerState<MatkaGameTableScreen> wit
               labelStyle: TextStyle(
                 color: isSelected ? _gold : Colors.white38,
                 fontWeight: FontWeight.bold,
-                fontSize: 12,
+                fontSize: 10,
               ),
               side: BorderSide(color: isSelected ? _gold : Colors.white10),
             ),
@@ -521,10 +525,10 @@ class _MatkaGameTableScreenState extends ConsumerState<MatkaGameTableScreen> wit
         border: Border.all(color: Colors.white10),
       ),
       child: IconButton(
-        icon: Icon(icon, color: _gold, size: 20),
+        icon: Icon(icon, color: _gold, size: 16),
         onPressed: onTap,
         padding: EdgeInsets.zero,
-        constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
       ),
     );
   }
