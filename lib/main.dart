@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter_web_plugins/url_strategy.dart';
 import 'router.dart';
 import 'games/minus/providers/room_provider.dart';
 import 'games/matka/providers/matka_provider.dart';
@@ -8,6 +9,7 @@ import 'shared/config/env_config.dart';
 import 'shared/services/audio_service.dart';
 
 Future<void> main() async {
+  usePathUrlStrategy();
   WidgetsFlutterBinding.ensureInitialized();
   
   await Supabase.initialize(
@@ -31,7 +33,7 @@ class MyApp extends ConsumerWidget {
 
     return MaterialApp.router(
       debugShowCheckedModeBanner: false,
-      title: 'Zindagi Ek Jua',
+      title: 'Casino Delight',
       theme: ThemeData(
         brightness: Brightness.dark,
         primarySwatch: Colors.amber,

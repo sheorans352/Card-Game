@@ -142,13 +142,90 @@ class _HubScreenState extends State<HubScreen> with SingleTickerProviderStateMix
             ),
           ),
 
+          // ── BLOG SECTION ────────────────────────────────────────────────────
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(24, 48, 24, 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(width: 3, height: 18, color: gold),
+                      const SizedBox(width: 10),
+                      const Text(
+                        'LATEST ARTICLES',
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 3,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  GestureDetector(
+                    onTap: () => context.go('/blogs'),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF1A1A2E), Color(0xFF16213E)],
+                        ),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: gold.withOpacity(0.2)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Learn How to Win!',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                SizedBox(height: 4),
+                                Text(
+                                  'Explore our guides and strategies to master your favorite card games.',
+                                  style: TextStyle(
+                                    color: Colors.white38,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: gold.withOpacity(0.1),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.arrow_forward, color: gold),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
           // ── FOOTER ──────────────────────────────────────────────────────────
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 48),
               child: Column(
                 children: [
-                  const Text('ZINDAGI EK JUA',
+                  const Text('CASINO DELIGHT',
                       style: TextStyle(color: Colors.white12, fontSize: 10, letterSpacing: 4)),
                   const SizedBox(height: 4),
                   Text('More games coming soon',
@@ -211,7 +288,7 @@ class _HubScreenState extends State<HubScreen> with SingleTickerProviderStateMix
                     stops: [0.0, 0.5, 1.0],
                   ).createShader(bounds),
                   child: const Text(
-                    'ZINDAGI EK JUA',
+                    'CASINO DELIGHT',
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 30,
@@ -225,7 +302,7 @@ class _HubScreenState extends State<HubScreen> with SingleTickerProviderStateMix
 
                 // Tagline
                 const Text(
-                  'ज़िंदगी एक जुआ',
+                  'कैसीनो डिलाइट',
                   style: TextStyle(
                     color: Colors.white38,
                     fontSize: 14,

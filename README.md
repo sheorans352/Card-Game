@@ -1,4 +1,4 @@
-# Card Game
+# Casino Delight
 
 A Flutter project demonstrating integration with Supabase and Riverpod.
 
