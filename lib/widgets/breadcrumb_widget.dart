@@ -19,38 +19,37 @@ class BreadcrumbWidget extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 12),
       child: Wrap(
         crossAxisAlignment: WrapCrossAlignment.center,
-        children: items.asMap().entries.map((entry) {
+        spacing: 0,
+        runSpacing: 8,
+        children: items.asMap().entries.expand((entry) {
           final idx = entry.key;
           final item = entry.value;
           final isLast = idx == items.length - 1;
 
-          return Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (idx > 0)
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 8),
-                  child: Text(
-                    '>',
-                    style: TextStyle(color: Colors.white24, fontSize: 12),
-                  ),
-                ),
-              GestureDetector(
-                onTap: isLast || item.route == null
-                    ? null
-                    : () => context.go(item.route!),
+          return [
+            if (idx > 0)
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 8),
                 child: Text(
-                  item.label.toUpperCase(),
-                  style: TextStyle(
-                    color: isLast ? Colors.white70 : Colors.amber.withOpacity(0.8),
-                    fontSize: 10,
-                    fontWeight: isLast ? FontWeight.w900 : FontWeight.w600,
-                    letterSpacing: 1.2,
-                  ),
+                  '>',
+                  style: TextStyle(color: Colors.white24, fontSize: 12),
                 ),
               ),
-            ],
-          );
+            GestureDetector(
+              onTap: isLast || item.route == null
+                  ? null
+                  : () => context.go(item.route!),
+              child: Text(
+                item.label.toUpperCase(),
+                style: TextStyle(
+                  color: isLast ? Colors.white70 : Colors.amber.withOpacity(0.8),
+                  fontSize: 10,
+                  fontWeight: isLast ? FontWeight.w900 : FontWeight.w600,
+                  letterSpacing: 1.2,
+                ),
+              ),
+            ),
+          ];
         }).toList(),
       ),
     );

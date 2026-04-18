@@ -47,7 +47,7 @@ class _BlogDetailScreenState extends ConsumerState<BlogDetailScreen> {
             slivers: [
               SliverAppBar(
                 backgroundColor: Colors.black,
-                expandedHeight: 0,
+                toolbarHeight: 70,
                 floating: true,
                 leading: IconButton(
                   icon: const Icon(Icons.arrow_back, color: Colors.white70),
@@ -55,8 +55,10 @@ class _BlogDetailScreenState extends ConsumerState<BlogDetailScreen> {
                 ),
                 title: Text(
                   blog.title.toUpperCase(),
+                  softWrap: true,
                   style: const TextStyle(
                     fontSize: 10,
+                    height: 1.4,
                     letterSpacing: 2,
                     fontWeight: FontWeight.w900,
                   ),
@@ -76,17 +78,29 @@ class _BlogDetailScreenState extends ConsumerState<BlogDetailScreen> {
                         BreadcrumbItem(label: blog.title),
                       ]),
                       const SizedBox(height: 32),
-                      // H1 Title
+                      // H1
                       Text(
-                        blog.title,
+                        blog.h1 ?? blog.title,
                         style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 32,
+                          fontSize: 34,
                           fontWeight: FontWeight.w900,
                           height: 1.2,
                         ),
                       ),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 16),
+                      // Summary
+                      if (blog.summary != null)
+                        Text(
+                          blog.summary!,
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.6),
+                            fontSize: 18,
+                            fontStyle: FontStyle.italic,
+                            height: 1.5,
+                          ),
+                        ),
+                      const SizedBox(height: 32),
                       // Metadata
                       Row(
                         children: [
@@ -155,12 +169,63 @@ class _BlogDetailScreenState extends ConsumerState<BlogDetailScreen> {
                         ),
                         onTapLink: (text, href, title) {
                           if (href != null) {
-                            // Handle external links or app routes
                             // ignore: deprecated_member_use
                             html.window.open(href, '_blank');
                           }
                         },
                       ),
+                      if (blog.internalLinks.isNotEmpty) ...[
+                        const SizedBox(height: 48),
+                        const Text(
+                          'USEFUL LINKS',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 2,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        ...blog.internalLinks.map((link) => Padding(
+                              padding: const EdgeInsets.only(bottom: 8.0),
+                              child: InkWell(
+                                onTap: () => html.window.open(link['url']!, '_blank'),
+                                child: Text(
+                                  '• ${link['label']}',
+                                  style: const TextStyle(color: Colors.amber, fontSize: 14),
+                                ),
+                              ),
+                            )),
+                      ],
+                      const SizedBox(height: 60),
+                      // Related Blogs
+                      if (blog.relatedBlogSlugs.isNotEmpty) ...[
+                        const Divider(color: Colors.white12),
+                        const SizedBox(height: 32),
+                        const Text(
+                          'RELATED ARTICLES',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 2,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        const Text(
+                          'Explore more guides to improve your game.',
+                          style: TextStyle(color: Colors.white38, fontSize: 12),
+                        ),
+                        const SizedBox(height: 24),
+                        // Note: In a real app, you'd fetch the related blogs here.
+                        // For now we show the list of slugs as a placeholder.
+                        ...blog.relatedBlogSlugs.map((slug) => ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              title: Text(slug, style: const TextStyle(color: Colors.white70)),
+                              trailing: const Icon(Icons.arrow_forward_ios, size: 12, color: Colors.white24),
+                              onTap: () => context.go('/blogs/$slug'),
+                            )),
+                      ],
                       const SizedBox(height: 100),
                     ],
                   ),

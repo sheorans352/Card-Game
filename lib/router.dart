@@ -18,10 +18,20 @@ final appRouter = GoRouter(
       path: '/blogs',
       builder: (context, state) => const BlogListScreen(),
       routes: [
+        // Simple slug pattern (e.g., /blogs/my-article)
         GoRoute(
           path: ':slug',
           builder: (context, state) {
             final slug = state.pathParameters['slug']!;
+            return BlogDetailScreen(slug: slug);
+          },
+        ),
+        // Folder pattern (e.g., /blogs/card-games/how-to-play)
+        GoRoute(
+          path: ':category/:slug',
+          builder: (context, state) {
+            final slug = state.pathParameters['slug']!;
+            // We focus on the slug for fetching, as it is unique
             return BlogDetailScreen(slug: slug);
           },
         ),
