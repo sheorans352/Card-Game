@@ -53,10 +53,12 @@ class _BlogDetailScreenState extends ConsumerState<BlogDetailScreen> {
                   icon: const Icon(Icons.arrow_back, color: Colors.white70),
                   onPressed: () => context.go('/blogs'),
                 ),
-                title: Text(
+              title: Text(
                   blog.title.toUpperCase(),
-                  softWrap: true,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
+                    color: Colors.white,
                     fontSize: 10,
                     height: 1.4,
                     letterSpacing: 2,
