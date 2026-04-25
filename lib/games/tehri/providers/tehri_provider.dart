@@ -245,6 +245,13 @@ class TehriOperations {
     });
   }
 
+  Future<void> cutDeck(String roomId, int cutIdx) async {
+    await supabase.rpc('tehri_cut_deck', params: {
+      'rid': roomId,
+      'cut_idx': cutIdx,
+    });
+  }
+
   Future<void> dealInitial(String roomId) async {
     await supabase.rpc('tehri_deal_initial', params: {
       'rid': roomId,

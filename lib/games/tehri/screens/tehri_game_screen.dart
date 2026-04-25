@@ -7,6 +7,7 @@ import '../models/tehri_models.dart';
 import '../../minus/widgets/playing_card.dart';
 import '../../minus/models/card_model.dart';
 import '../widgets/tehri_bidding_overlay.dart';
+import '../widgets/tehri_deck_cut_overlay.dart';
 import '../../minus/widgets/spade_background.dart';
 
 const Color primaryBg = Color(0xFF0A1A2F); 
@@ -266,23 +267,9 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
             ),
           ),
 
-        if (room.status == 'cutting')
-          Center(
-            child: room.cutterId == me.id
-              ? ElevatedButton(
-                  style: ElevatedButton.styleFrom(backgroundColor: accentGold, foregroundColor: Colors.black, padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 24)),
-                  onPressed: () => ref.read(tehriOpsProvider).initRound(room.id, room.dealerId!),
-                  child: const Text('CUT THE DECK', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-                )
-              : const Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    CircularProgressIndicator(color: accentGold),
-                    SizedBox(height: 16),
-                    Text('WAITING FOR CUTTER...', style: TextStyle(color: accentGold, fontWeight: FontWeight.bold)),
-                  ],
-                ),
-          ),
+        // 7. CUTTING OVERLAY
+        if (room.status == 'cutting') 
+          TehriDeckCutOverlay(roomId: room.id),
       ],
     );
   }
