@@ -61,7 +61,24 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
           return playersAsync.when(
             data: (players) {
               final localPlayerId = ref.watch(localTehriPlayerIdProvider);
-              if (localPlayerId == null) return _buildJoiningPhase(context, ref, room);
+              if (localPlayerId == null) {
+                return Scaffold(
+                  backgroundColor: primaryBg,
+                  body: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Text('PLEASE JOIN VIA THE LOBBY', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 20),
+                        ElevatedButton(
+                          onPressed: () => context.go('/tehri'),
+                          child: const Text('GO TO LOBBY'),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }
 
               return _buildGameTable(context, ref, room, players, localPlayerId);
             },
@@ -103,56 +120,6 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
     }
   }
 
-  Widget _buildJoiningPhase(BuildContext context, WidgetRef ref, TehriRoom room) {
-    final nameController = TextEditingController();
-    return Center(
-      child: Container(
-        width: 350,
-        decoration: BoxDecoration(color: Colors.black45, borderRadius: BorderRadius.circular(24), border: Border.all(color: accentGold.withOpacity(0.2))),
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('TEHRI', style: TextStyle(color: accentGold, fontSize: 40, fontWeight: FontWeight.w900, letterSpacing: 4)),
-            const SizedBox(height: 32),
-            TextField(
-              controller: nameController,
-              style: const TextStyle(color: Colors.white),
-              decoration: InputDecoration(
-                hintText: 'ENTER NAME',
-                hintStyle: TextStyle(color: Colors.white.withOpacity(0.2)),
-                filled: true,
-                fillColor: Colors.white.withOpacity(0.05),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-              ),
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: accentGold,
-                foregroundColor: Colors.black,
-                minimumSize: const Size(double.infinity, 56),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-              onPressed: () async {
-                final name = nameController.text.trim();
-                if (name.isEmpty) return;
-                final players = ref.read(tehriPlayersProvider(room.id)).value ?? [];
-                final res = await supabase.from('tehri_players').insert({
-                  'room_id': room.id,
-                  'name': name,
-                  'seat_index': players.length,
-                  'team_index': players.length % 2,
-                }).select().single();
-                ref.read(localTehriPlayerIdProvider.notifier).state = res['id'];
-              },
-              child: const Text('JOIN SEAT', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1)),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   Widget _buildGameTable(BuildContext context, WidgetRef ref, TehriRoom room, List<TehriPlayer> players, String localId) {
     final me = players.firstWhere((p) => p.id == localId);

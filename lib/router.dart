@@ -7,6 +7,8 @@ import 'games/matka/screens/game_table_screen.dart';
 import 'screens/blog_list_screen.dart';
 import 'screens/blog_detail_screen.dart';
 import 'games/tehri/screens/tehri_game_screen.dart';
+import 'games/tehri/screens/tehri_home_screen.dart';
+import 'games/tehri/screens/tehri_lobby_screen.dart';
 
 final appRouter = GoRouter(
   initialLocation: '/',
@@ -68,9 +70,25 @@ final appRouter = GoRouter(
     GoRoute(
       path: '/tehri',
       builder: (context, state) {
-        final roomId = state.uri.queryParameters['roomId'];
-        return TehriGameScreen(roomId: roomId);
+        final code = state.uri.queryParameters['code'];
+        return TehriHomeScreen(prefilledCode: code);
       },
+      routes: [
+        GoRoute(
+          path: 'lobby/:roomId',
+          builder: (context, state) {
+            final roomId = state.pathParameters['roomId']!;
+            return TehriLobbyScreen(roomId: roomId);
+          },
+        ),
+        GoRoute(
+          path: 'table/:roomId',
+          builder: (context, state) {
+            final roomId = state.pathParameters['roomId']!;
+            return TehriGameScreen(roomId: roomId);
+          },
+        ),
+      ],
     ),
   ],
 );

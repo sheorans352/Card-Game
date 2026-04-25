@@ -31,8 +31,10 @@ class _HubScreenState extends State<HubScreen> with SingleTickerProviderStateMix
       if (code != null && code.isNotEmpty) {
         if (gameType == 'matka') {
           context.go('/matka?code=$code');
+        } else if (gameType == 'tehri') {
+          context.go('/tehri?code=$code');
         } else {
-          // Default to Minus (or add 'game=minus' check if needed)
+          // Default to Minus
           context.go('/minus?code=$code');
         }
       }

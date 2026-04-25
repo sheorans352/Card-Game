@@ -5,9 +5,16 @@ import '../models/tehri_models.dart';
 
 final supabase = Supabase.instance.client;
 
+// Session Persistence Keys
+const String kTehriRoomCodeKey = 'tehri_last_room_code';
+const String kTehriPlayerIdKey = 'tehri_last_player_id';
+const String kTehriPlayerNameKey = 'tehri_last_player_name';
+
 // --- ID Providers ---
 final currentTehriRoomIdProvider = StateProvider<String?>((ref) => null);
+final currentTehriRoomCodeProvider = StateProvider<String?>((ref) => null);
 final localTehriPlayerIdProvider = StateProvider<String?>((ref) => null);
+final localTehriPlayerNameProvider = StateProvider<String?>((ref) => null);
 
 // --- Stream Providers ---
 
@@ -16,6 +23,14 @@ final tehriRoomProvider = StreamProvider.family<TehriRoom?, String>((ref, roomId
       .from('tehri_rooms')
       .stream(primaryKey: ['id'])
       .eq('id', roomId)
+      .map((data) => data.isEmpty ? null : TehriRoom.fromMap(data.first));
+});
+
+final tehriRoomByCodeProvider = StreamProvider.family<TehriRoom?, String>((ref, code) {
+  return supabase
+      .from('tehri_rooms')
+      .stream(primaryKey: ['id'])
+      .eq('code', code)
       .map((data) => data.isEmpty ? null : TehriRoom.fromMap(data.first));
 });
 
@@ -60,6 +75,24 @@ final isMyTehriTurnProvider = Provider.family<bool, String>((ref, roomId) {
   return room.currentTurnIndex == me.seatIndex;
 });
 
+// --- Session Logic ---
+final tehriSessionProvider = StateNotifierProvider<TehriSessionNotifier, AsyncValue<void>>((ref) {
+  return TehriSessionNotifier(ref);
+});
+
+class TehriSessionNotifier extends StateNotifier<AsyncValue<void>> {
+  TehriSessionNotifier(this.ref) : super(const AsyncValue.data(null));
+  final Ref ref;
+
+  Future<void> saveSession(String roomCode, String roomId, String playerId, String playerName) async {
+    // We could use SharedPreferences here if we want persistence across reloads
+    ref.read(currentTehriRoomCodeProvider.notifier).state = roomCode;
+    ref.read(currentTehriRoomIdProvider.notifier).state = roomId;
+    ref.read(localTehriPlayerIdProvider.notifier).state = playerId;
+    ref.read(localTehriPlayerNameProvider.notifier).state = playerName;
+  }
+}
+
 // --- Game Operations ---
 
 final tehriOpsProvider = Provider((ref) => TehriOperations());
@@ -89,6 +122,80 @@ class TehriOperations {
       'pid': playerId,
       'card_id': cardId,
     });
+  }
+
+  Future<Map<String, String>> createRoom(String name) async {
+    final code = (100000 + (DateTime.now().millisecondsSinceEpoch % 899999)).toString();
+    
+    final room = await supabase.from('tehri_rooms').insert({
+      'code': code,
+      'status': 'waiting',
+    }).select().single();
+    
+    final player = await supabase.from('tehri_players').insert({
+      'room_id': room['id'],
+      'name': name,
+      'seat_index': 0,
+      'team_index': 0,
+      'is_host': true,
+    }).select().single();
+    
+    await supabase.from('tehri_rooms').update({'host_id': player['id']}).eq('id', room['id']);
+    
+    return {
+      'roomId': room['id'] as String,
+      'roomCode': code,
+      'playerId': player['id'] as String,
+    };
+  }
+
+  Future<Map<String, String>?> joinRoom(String code, String name, {String? existingPlayerId}) async {
+    // 1. Find room
+    final roomRes = await supabase.from('tehri_rooms').select().eq('code', code).eq('status', 'waiting');
+    if (roomRes.isEmpty) return null;
+    final room = roomRes.first;
+    final roomId = room['id'];
+
+    // 2. Check existing player
+    if (existingPlayerId != null) {
+      final pRes = await supabase.from('tehri_players').select().eq('id', existingPlayerId).eq('room_id', roomId);
+      if (pRes.isNotEmpty) {
+        return {
+          'roomId': roomId,
+          'playerId': existingPlayerId,
+        };
+      }
+    }
+
+    // 3. Check player count
+    final players = await supabase.from('tehri_players').select().eq('room_id', roomId);
+    if (players.length >= 4) return null;
+
+    // 4. Join
+    final seat = players.length;
+    final player = await supabase.from('tehri_players').insert({
+      'room_id': roomId,
+      'name': name,
+      'seat_index': seat,
+      'team_index': seat % 2,
+    }).select().single();
+
+    return {
+      'roomId': roomId,
+      'playerId': player['id'] as String,
+    };
+  }
+
+  Future<void> startGame(String roomId) async {
+    // Select a random dealer among the 4 players
+    final players = await supabase.from('tehri_players').select().eq('room_id', roomId);
+    if (players.length < 4) return;
+    
+    final dealer = players[0]; // For now, host is dealer
+    
+    // In Tehri, the dealer selection can be fancy, but we'll start with this.
+    // The RPC will handle the rest.
+    await initRound(roomId, dealer['id']);
   }
 
   Future<void> initRound(String roomId, String dealerId) async {
