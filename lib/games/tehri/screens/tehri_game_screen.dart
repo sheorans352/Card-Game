@@ -301,10 +301,42 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
                     ]),
                   ]),
                 Text(room.status.toUpperCase().replaceAll('_', ' '), style: const TextStyle(color: accentGold, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 2)),
+                
+                // Quit Button
+                IconButton(
+                  icon: const Icon(Icons.logout, color: Colors.white38, size: 20),
+                  onPressed: () => _confirmQuit(context),
+                  tooltip: 'Quit Room',
+                ),
               ],
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  void _confirmQuit(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: playerCardBg,
+        title: const Text('Quit Game?', style: TextStyle(color: Colors.white)),
+        content: const Text('Are you sure you want to leave the room?', style: TextStyle(color: Colors.white70)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('CANCEL'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () {
+              ref.read(tehriSessionProvider.notifier).clearSession();
+              context.go('/');
+            },
+            child: const Text('QUIT'),
+          ),
+        ],
       ),
     );
   }

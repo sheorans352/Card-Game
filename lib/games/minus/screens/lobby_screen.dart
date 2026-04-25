@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
@@ -130,11 +130,16 @@ class LobbyScreen extends ConsumerWidget {
                       else
                         const Text('Waiting for host to start...', style: TextStyle(color: Colors.white54, fontStyle: FontStyle.italic)),
                       
-                      const SizedBox(height: 24),
-                      TextButton.icon(
-                        onPressed: () => Navigator.of(context).pop(),
-                        icon: const Icon(Icons.arrow_back, color: Colors.white38, size: 16),
-                        label: const Text('Leave Room', style: TextStyle(color: Colors.white38)),
+                      const SizedBox(height: 32),
+                      OutlinedButton(
+                        onPressed: () => _confirmQuit(context, ref),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.white24,
+                          side: const BorderSide(color: Colors.white10),
+                          minimumSize: const Size(double.infinity, 50),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        ),
+                        child: const Text('QUIT ROOM', style: TextStyle(letterSpacing: 2, fontSize: 13)),
                       ),
                     ],
                   ),
@@ -145,6 +150,31 @@ class LobbyScreen extends ConsumerWidget {
         },
         loading: () => const Center(child: CircularProgressIndicator(color: accentGold)),
         error: (e, s) => Center(child: Text('Error: $e', style: const TextStyle(color: Colors.white))),
+      ),
+    );
+  }
+
+  void _confirmQuit(BuildContext context, WidgetRef ref) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: cardDark,
+        title: const Text('Quit Lobby?', style: TextStyle(color: Colors.white)),
+        content: const Text('Are you sure you want to leave the room?', style: TextStyle(color: Colors.white70)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('CANCEL'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () {
+              ref.read(sessionProvider.notifier).clearSession();
+              Navigator.of(context).popUntil((route) => route.isFirst);
+            },
+            child: const Text('QUIT'),
+          ),
+        ],
       ),
     );
   }

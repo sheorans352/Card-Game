@@ -1,4 +1,4 @@
-﻿import 'dart:math' as math;
+import 'dart:math' as math;
 import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
@@ -332,10 +332,45 @@ class _GameTableScreenState extends ConsumerState<GameTableScreen> {
                     ],
                   ),
                 ),
+                
+                // Quit Button (Right)
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: IconButton(
+                    icon: const Icon(Icons.logout, color: Colors.white24, size: 20),
+                    onPressed: () => _confirmQuit(context),
+                    tooltip: 'Quit Room',
+                  ),
+                ),
               ],
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  void _confirmQuit(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: playerCardBg,
+        title: const Text('Quit Game?', style: TextStyle(color: Colors.white)),
+        content: const Text('Are you sure you want to leave the room?', style: TextStyle(color: Colors.white70)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('CANCEL'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () {
+              ref.read(sessionProvider.notifier).clearSession();
+              context.go('/');
+            },
+            child: const Text('QUIT'),
+          ),
+        ],
       ),
     );
   }
