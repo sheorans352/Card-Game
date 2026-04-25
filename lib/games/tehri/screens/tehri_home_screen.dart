@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'dart:html' as html;
 import '../providers/tehri_provider.dart';
 
 class TehriHomeScreen extends ConsumerStatefulWidget {
