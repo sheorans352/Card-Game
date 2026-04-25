@@ -29,8 +29,13 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
   Widget build(BuildContext context) {
     if (widget.roomId == null) return const Scaffold(body: Center(child: Text('Invalid Room ID')));
 
+    final sessionAsync = ref.watch(tehriSessionProvider);
     final roomAsync = ref.watch(tehriRoomProvider(widget.roomId!));
     final playersAsync = ref.watch(tehriPlayersProvider(widget.roomId!));
+
+    if (sessionAsync.isLoading) {
+      return const Scaffold(backgroundColor: primaryBg, body: Center(child: CircularProgressIndicator(color: accentGold)));
+    }
 
     // Dealing Coordination (Dealer only)
     ref.listen<AsyncValue<TehriRoom?>>(tehriRoomProvider(widget.roomId!), (prev, next) {

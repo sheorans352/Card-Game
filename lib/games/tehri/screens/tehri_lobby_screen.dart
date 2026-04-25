@@ -17,9 +17,14 @@ class TehriLobbyScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final sessionAsync = ref.watch(tehriSessionProvider);
     final roomAsync = ref.watch(tehriRoomProvider(roomId));
     final playersAsync = ref.watch(tehriPlayersProvider(roomId));
     final localPlayerId = ref.watch(localTehriPlayerIdProvider);
+
+    if (sessionAsync.isLoading) {
+      return const Scaffold(backgroundColor: primaryBg, body: Center(child: CircularProgressIndicator(color: accentCopper)));
+    }
 
     ref.listen(tehriRoomProvider(roomId), (previous, next) {
       next.whenData((room) {

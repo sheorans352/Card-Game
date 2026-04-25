@@ -85,7 +85,7 @@ final tehriSessionProvider = StateNotifierProvider<TehriSessionNotifier, AsyncVa
 });
 
 class TehriSessionNotifier extends StateNotifier<AsyncValue<void>> {
-  TehriSessionNotifier(this.ref) : super(const AsyncValue.data(null)) {
+  TehriSessionNotifier(this.ref) : super(const AsyncValue.loading()) {
     _init();
   }
   final Ref ref;
@@ -109,6 +109,7 @@ class TehriSessionNotifier extends StateNotifier<AsyncValue<void>> {
     if (playerName != null) {
       ref.read(localTehriPlayerNameProvider.notifier).state = playerName;
     }
+    state = const AsyncValue.data(null);
   }
 
   Future<void> saveSession(String roomCode, String roomId, String playerId, String playerName) async {
