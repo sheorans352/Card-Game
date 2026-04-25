@@ -84,11 +84,6 @@ class _TehriBiddingOverlayState extends State<TehriBiddingOverlay>
                   letterSpacing: 1.5,
                 ),
               ),
-              if (widget.isInitial)
-                const Padding(
-                  padding: EdgeInsets.only(top: 4),
-                  child: Text('Based on your 5 cards above', style: TextStyle(color: Colors.white38, fontSize: 11)),
-                ),
               const SizedBox(height: 16),
 
               // Bid Chips
