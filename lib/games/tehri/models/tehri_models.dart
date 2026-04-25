@@ -13,6 +13,7 @@ class TehriRoom {
   final int currentTurnIndex;
   final int roundNumber;
   final int? dealingTeamId;
+  final Map<String, dynamic>? lastSelectionCard;
 
   TehriRoom({
     required this.id,
@@ -27,6 +28,7 @@ class TehriRoom {
     this.currentTurnIndex = 0,
     this.roundNumber = 1,
     this.dealingTeamId,
+    this.lastSelectionCard,
   });
 
   factory TehriRoom.fromMap(Map<String, dynamic> map) {
@@ -43,6 +45,9 @@ class TehriRoom {
       currentTurnIndex: map['current_turn_index'] ?? 0,
       roundNumber: map['round_number'] ?? 1,
       dealingTeamId: map['dealing_team_id'],
+      lastSelectionCard: map['last_selection_card'] != null 
+        ? Map<String, dynamic>.from(map['last_selection_card']) 
+        : null,
     );
   }
 
@@ -60,6 +65,7 @@ class TehriRoom {
       'current_turn_index': currentTurnIndex,
       'round_number': roundNumber,
       'dealing_team_id': dealingTeamId,
+      'last_selection_card': lastSelectionCard,
     };
   }
 }

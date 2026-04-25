@@ -17,6 +17,9 @@ final currentTehriRoomCodeProvider = StateProvider<String?>((ref) => null);
 final localTehriPlayerIdProvider = StateProvider<String?>((ref) => null);
 final localTehriPlayerNameProvider = StateProvider<String?>((ref) => null);
 
+// --- Dealer Selection State ---
+final dealerSelectionCardProvider = StateProvider<Map<String, dynamic>?>((ref) => null);
+
 // --- Stream Providers ---
 
 final tehriRoomProvider = StreamProvider.family<TehriRoom?, String>((ref, roomId) {
@@ -224,15 +227,14 @@ class TehriOperations {
   }
 
   Future<void> startGame(String roomId) async {
-    // Select a random dealer among the 4 players
-    final players = await supabase.from('tehri_players').select().eq('room_id', roomId);
-    if (players.length < 4) return;
-    
-    final dealer = players[0]; // For now, host is dealer
-    
-    // In Tehri, the dealer selection can be fancy, but we'll start with this.
-    // The RPC will handle the rest.
-    await initRound(roomId, dealer['id']);
+    await supabase.rpc('tehri_start_selection', params: {'rid': roomId});
+  }
+
+  Future<void> dealForSelection(String roomId) async {
+    final res = await supabase.rpc('tehri_deal_for_selection', params: {'rid': roomId});
+    // We could broadcast this via a table, but for now we'll just return and handle locally
+    // Actually, it's better to use a dedicated table or column for selection history.
+    // For now, let's just use the RPC result.
   }
 
   Future<void> initRound(String roomId, String dealerId) async {

@@ -148,6 +148,10 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
           ),
         ),
 
+        // 2.5 DEALER SELECTION OVERLAY
+        if (room.status == 'selecting_dealer' && room.lastSelectionCard != null)
+           _buildSelectionDisplay(room.lastSelectionCard!, rotatedPlayers),
+
         // 3. AVATARS (Same positions as Minus)
         _buildPlayerAvatar(rotatedPlayers[0], 'bottom', room, localId),
         _buildPlayerAvatar(rotatedPlayers[1], 'left', room, localId),
@@ -191,15 +195,33 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
             ),
           ),
 
-        // 6. DEALER CONTROLS (Only if not already automatic-dealing)
+        // 6. DEALER SELECTION / START CONTROLS
         if (room.status == 'waiting' && me.isHost && players.length == 4)
            Center(
              child: ElevatedButton(
-               style: ElevatedButton.styleFrom(backgroundColor: accentGold, foregroundColor: Colors.black),
-               onPressed: () => ref.read(tehriOpsProvider).initRound(room.id, me.id),
-               child: const Text('START ROUND'),
+               style: ElevatedButton.styleFrom(backgroundColor: accentGold, foregroundColor: Colors.black, padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 20)),
+               onPressed: () => ref.read(tehriOpsProvider).startGame(room.id),
+               child: const Text('START DEALER SELECTION', style: TextStyle(fontWeight: FontWeight.bold)),
              ),
            ),
+
+        if (room.status == 'selecting_dealer' && me.isHost)
+          Center(
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: accentGold, foregroundColor: Colors.black, padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 20)),
+              onPressed: () => ref.read(tehriOpsProvider).dealForSelection(room.id),
+              child: const Text('DEAL CARD', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ),
+        
+        if (room.status == 'waiting_to_start' && me.isHost)
+          Center(
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: accentGold, foregroundColor: Colors.black, padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 20)),
+              onPressed: () => ref.read(tehriOpsProvider).initRound(room.id, room.dealerId!),
+              child: const Text('START ROUND', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ),
       ],
     );
   }
@@ -271,7 +293,10 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
                   Text('${player.tricksWon}', style: const TextStyle(color: accentGold, fontSize: 18, fontWeight: FontWeight.w900)),
                   const Text('TRICKS', style: TextStyle(color: Colors.white24, fontSize: 8, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 4),
-                  Text('PTS: ${player.points}', style: const TextStyle(color: Colors.white38, fontSize: 8)),
+                  if (player.id == room.dealerId)
+                    Text('PTS: ${player.points}', style: const TextStyle(color: Colors.white38, fontSize: 8))
+                  else
+                    const SizedBox(height: 10),
                 ],
               ),
             ),
@@ -333,6 +358,42 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
           ),
         );
       }).toList(),
+    );
+  }
+
+  Widget _buildSelectionDisplay(Map<String, dynamic> selection, List<TehriPlayer> rotatedPlayers) {
+    final cardId = selection['cardId'] as String;
+    final playerId = selection['playerId'] as String;
+    final isJack = selection['isJack'] as bool;
+    final p = rotatedPlayers.firstWhere((p) => p.id == playerId);
+    final posIdx = rotatedPlayers.indexOf(p);
+
+    Offset offset;
+    switch (posIdx) {
+      case 0: offset = const Offset(0, 100); break;
+      case 1: offset = const Offset(-100, 0); break;
+      case 2: offset = const Offset(0, -100); break;
+      case 3: offset = const Offset(100, 0); break;
+      default: offset = Offset.zero;
+    }
+
+    return Center(
+      child: Transform.translate(
+        offset: offset,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            PlayingCard(card: CardModel.fromId(cardId), width: 90, height: 135),
+            if (isJack)
+              Container(
+                margin: const EdgeInsets.top(8),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                decoration: BoxDecoration(color: accentGold, borderRadius: BorderRadius.circular(8)),
+                child: const Text('FOUND THE J!', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 10)),
+              ),
+          ],
+        ),
+      ),
     );
   }
 }
