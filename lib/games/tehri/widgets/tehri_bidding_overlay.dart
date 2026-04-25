@@ -76,7 +76,7 @@ class _TehriBiddingOverlayState extends State<TehriBiddingOverlay>
               const SizedBox(height: 12),
 
               Text(
-                widget.isInitial ? '🎯 SET TRUMP & BID' : '⚡ OVERBID OR PASS',
+                widget.isInitial ? 'SET TRUMP & BID' : 'OVERBID OR PASS',
                 style: const TextStyle(
                   color: accentGold,
                   fontSize: 16,

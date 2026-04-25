@@ -246,7 +246,7 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(color: accentGold.withOpacity(0.3)),
                     ),
-                    child: const Text('🂡 Searching for Jack of Spades...', 
+                    child: const Text('Searching for Jack of Spades...', 
                       style: TextStyle(color: accentGold, fontSize: 11, letterSpacing: 1)),
                   ),
                   if (me.isHost) ...[
@@ -391,7 +391,7 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(color: accentGold.withOpacity(0.5)),
                         ),
-                        child: const Text('🎉 You are the Dealer!', 
+                        child: const Text('You are the Dealer!', 
                           style: TextStyle(color: accentGold, fontSize: 13, fontWeight: FontWeight.bold, letterSpacing: 1)),
                       ),
                       const SizedBox(height: 12),
@@ -631,7 +631,7 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
             borderRadius: BorderRadius.circular(6),
             boxShadow: [BoxShadow(color: accentGold.withOpacity(0.7), blurRadius: 8)],
           ),
-          child: const Text('J♠', style: TextStyle(color: Colors.black, fontWeight: FontWeight.w900, fontSize: 10)),
+          child: const Text('DEALER', style: TextStyle(color: Colors.black, fontWeight: FontWeight.w900, fontSize: 10)),
         )
       : const SizedBox();
 
