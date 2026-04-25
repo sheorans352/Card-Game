@@ -450,9 +450,9 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
   }
 
   Widget _buildSelectionDisplay(Map<String, dynamic> selection, List<TehriPlayer> rotatedPlayers) {
-    final cardId = selection['cardId'] as String;
-    final playerId = selection['playerId'] as String;
-    final isJack = selection['isJack'] as bool;
+    final cardId = selection['card_id'] as String;
+    final playerId = selection['player_id'] as String;
+    final isJack = selection['is_jack'] as bool;
     final p = rotatedPlayers.firstWhere((p) => p.id == playerId);
     final posIdx = rotatedPlayers.indexOf(p);
 
