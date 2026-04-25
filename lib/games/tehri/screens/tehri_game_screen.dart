@@ -187,9 +187,9 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
           ),
         ),
 
-        // 2.5 DEALER SELECTION OVERLAY
+        // 2.5 DEALER SELECTION: Cards dealt near each player avatar
         if (room.status == 'selecting_dealer' && room.lastSelectionCard != null)
-           _buildSelectionDisplay(room.lastSelectionCard!, rotatedPlayers),
+          _buildSelectionCards(room.lastSelectionCard!, rotatedPlayers),
 
         // 3. AVATARS (Same positions as Minus)
         _buildPlayerAvatar(rotatedPlayers[0], 'bottom', room, localId),
@@ -234,7 +234,38 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
             ),
           ),
 
-        // 6. DEALER SELECTION / START CONTROLS
+        // 6. SELECTION PHASE BOTTOM CONTROLS (host-only subtle button)
+        if (room.status == 'selecting_dealer')
+          Positioned(
+            bottom: 20, left: 0, right: 0,
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.black54,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: accentGold.withOpacity(0.3)),
+                    ),
+                    child: const Text('🂡 Searching for Jack of Spades...', 
+                      style: TextStyle(color: accentGold, fontSize: 11, letterSpacing: 1)),
+                  ),
+                  if (me.isHost) ...[
+                    const SizedBox(height: 8),
+                    TextButton.icon(
+                      style: TextButton.styleFrom(foregroundColor: Colors.white24),
+                      onPressed: () => ref.read(tehriOpsProvider).dealForSelection(room.id),
+                      icon: const Icon(Icons.touch_app, size: 14),
+                      label: const Text('Deal manually', style: TextStyle(fontSize: 11)),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+
         if (room.status == 'waiting' && me.isHost && players.length == 4)
            Center(
              child: ElevatedButton(
@@ -243,36 +274,34 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
                child: const Text('START DEALER SELECTION', style: TextStyle(fontWeight: FontWeight.bold)),
              ),
            ),
-
-        if (room.status == 'selecting_dealer')
-          Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const CircularProgressIndicator(color: accentGold),
-                const SizedBox(height: 16),
-                const Text('FINDING THE J...', style: TextStyle(color: accentGold, fontWeight: FontWeight.bold, letterSpacing: 2)),
-                const SizedBox(height: 24),
-                if (me.isHost)
-                  ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(backgroundColor: accentGold.withOpacity(0.1), foregroundColor: accentGold),
-                    onPressed: () => ref.read(tehriOpsProvider).dealForSelection(room.id),
-                    icon: const Icon(Icons.style),
-                    label: const Text('DEAL NEXT CARD (MANUAL)'),
-                  ),
-              ],
-            ),
-          ),
         
         if (room.status == 'waiting_to_start' && me.isHost)
-          Center(
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: accentGold, foregroundColor: Colors.black, padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 20)),
-              onPressed: () async {
-                 // Reshuffle and move to cutting
-                 await supabase.from('tehri_rooms').update({'status': 'cutting'}).eq('id', room.id);
-              },
-              child: const Text('COLLECT & RESHUFFLE', style: TextStyle(fontWeight: FontWeight.bold)),
+          Positioned(
+            bottom: 20, left: 0, right: 0,
+            child: Center(
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: accentGold, foregroundColor: Colors.black, padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 20)),
+                onPressed: () async {
+                  await supabase.from('tehri_rooms').update({'status': 'cutting'}).eq('id', room.id);
+                },
+                child: const Text('COLLECT & RESHUFFLE', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ),
+          ),
+        if (room.status == 'waiting_to_start' && !me.isHost)
+          Positioned(
+            bottom: 20, left: 0, right: 0,
+            child: Center(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                decoration: BoxDecoration(
+                  color: Colors.black54,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: accentGold.withOpacity(0.3)),
+                ),
+                child: const Text('Dealer found! Waiting for host...', 
+                  style: TextStyle(color: accentGold, fontSize: 12)),
+              ),
             ),
           ),
 
@@ -450,39 +479,58 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
     );
   }
 
-  Widget _buildSelectionDisplay(Map<String, dynamic> selection, List<TehriPlayer> rotatedPlayers) {
-    final cardId = selection['card_id'] as String;
-    final playerId = selection['player_id'] as String;
-    final isJack = selection['is_jack'] as bool;
-    final p = rotatedPlayers.firstWhere((p) => p.id == playerId);
-    final posIdx = rotatedPlayers.indexOf(p);
+  Widget _buildSelectionCards(Map<String, dynamic> lastCard, List<TehriPlayer> rotatedPlayers) {
+    final cardId = lastCard['card_id'] as String?;
+    final receiverId = lastCard['player_id'] as String?;
+    final isJack = lastCard['is_jack'] as bool? ?? false;
 
-    Offset offset;
-    switch (posIdx) {
-      case 0: offset = const Offset(0, 100); break;
-      case 1: offset = const Offset(-100, 0); break;
-      case 2: offset = const Offset(0, -100); break;
-      case 3: offset = const Offset(100, 0); break;
-      default: offset = Offset.zero;
-    }
+    if (cardId == null || receiverId == null) return const SizedBox();
 
-    return Center(
-      child: Transform.translate(
-        offset: offset,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            PlayingCard(card: CardModel.fromId(cardId), width: 90, height: 135),
-            if (isJack)
-              Container(
-                margin: const EdgeInsets.only(top: 8),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                decoration: BoxDecoration(color: accentGold, borderRadius: BorderRadius.circular(8)),
-                child: const Text('FOUND THE J!', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 10)),
+    final posIdx = rotatedPlayers.indexWhere((p) => p.id == receiverId);
+    if (posIdx < 0) return const SizedBox();
+
+    // Position near each avatar
+    final positions = ['bottom', 'left', 'top', 'right'];
+    final pos = positions[posIdx];
+
+    Widget cardWidget = Stack(
+      clipBehavior: Clip.none,
+      children: [
+        PlayingCard(card: CardModel.fromId(cardId), width: 60, height: 85),
+        if (isJack)
+          Positioned(
+            top: -18,
+            left: 0, right: 0,
+            child: Center(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: accentGold,
+                  borderRadius: BorderRadius.circular(8),
+                  boxShadow: [BoxShadow(color: accentGold.withOpacity(0.6), blurRadius: 8)],
+                ),
+                child: const Text('J♠ DEALER!', style: TextStyle(color: Colors.black, fontWeight: FontWeight.w900, fontSize: 9)),
               ),
-          ],
-        ),
-      ),
+            ),
+          ),
+      ],
     );
+
+    switch (pos) {
+      case 'bottom':
+        return Positioned(bottom: 180, left: 0, right: 0,
+          child: Center(child: cardWidget));
+      case 'top':
+        return Positioned(top: 110, left: 0, right: 0,
+          child: Center(child: cardWidget));
+      case 'left':
+        return Positioned(left: 80, top: 0, bottom: 0,
+          child: Align(alignment: Alignment.centerLeft, child: cardWidget));
+      case 'right':
+        return Positioned(right: 80, top: 0, bottom: 0,
+          child: Align(alignment: Alignment.centerRight, child: cardWidget));
+      default:
+        return const SizedBox();
+    }
   }
 }
