@@ -488,46 +488,52 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
     final posIdx = rotatedPlayers.indexWhere((p) => p.id == receiverId);
     if (posIdx < 0) return const SizedBox();
 
-    // Position near each avatar
-    final positions = ['bottom', 'left', 'top', 'right'];
-    final pos = positions[posIdx];
+    // Avatar positions mirror _buildPlayerAvatar:
+    // posIdx 0 = 'bottom' → bottomLeft, padding left:20 bottom:220, box is 80×110
+    // posIdx 1 = 'left'   → topLeft, padding left:20 top:100
+    // posIdx 2 = 'top'    → topRight, padding right:20 top:100
+    // posIdx 3 = 'right'  → bottomRight, padding right:20 bottom:220
 
-    Widget cardWidget = Stack(
-      clipBehavior: Clip.none,
-      children: [
-        PlayingCard(card: CardModel.fromId(cardId), width: 60, height: 85),
-        if (isJack)
-          Positioned(
-            top: -18,
-            left: 0, right: 0,
-            child: Center(
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: accentGold,
-                  borderRadius: BorderRadius.circular(8),
-                  boxShadow: [BoxShadow(color: accentGold.withOpacity(0.6), blurRadius: 8)],
-                ),
-                child: const Text('J♠ DEALER!', style: TextStyle(color: Colors.black, fontWeight: FontWeight.w900, fontSize: 9)),
-              ),
-            ),
+    // Card is 55×80. We place it at the top-right corner of the avatar box (or equivalent)
+    final card = PlayingCard(card: CardModel.fromId(cardId), width: 55, height: 80);
+
+    Widget badge = isJack
+      ? Container(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+          decoration: BoxDecoration(
+            color: accentGold,
+            borderRadius: BorderRadius.circular(6),
+            boxShadow: [BoxShadow(color: accentGold.withOpacity(0.7), blurRadius: 8)],
           ),
-      ],
-    );
+          child: const Text('J♠', style: TextStyle(color: Colors.black, fontWeight: FontWeight.w900, fontSize: 10)),
+        )
+      : const SizedBox();
 
-    switch (pos) {
-      case 'bottom':
-        return Positioned(bottom: 180, left: 0, right: 0,
-          child: Center(child: cardWidget));
-      case 'top':
-        return Positioned(top: 110, left: 0, right: 0,
-          child: Center(child: cardWidget));
-      case 'left':
-        return Positioned(left: 80, top: 0, bottom: 0,
-          child: Align(alignment: Alignment.centerLeft, child: cardWidget));
-      case 'right':
-        return Positioned(right: 80, top: 0, bottom: 0,
-          child: Align(alignment: Alignment.centerRight, child: cardWidget));
+    switch (posIdx) {
+      case 0: // bottom-left avatar → card pops out at its top-right corner
+        return Positioned(
+          left: 20 + 80 - 28,   // avatar left(20) + avatar width(80) - card overlap(28)
+          bottom: 220 + 110 - 10, // avatar bottom(220) + avatar height(110) - card overlap
+          child: Column(mainAxisSize: MainAxisSize.min, children: [badge, const SizedBox(height: 2), card]),
+        );
+      case 1: // top-left avatar → card pops out at its top-right corner
+        return Positioned(
+          left: 20 + 80 - 28,
+          top: 100 - 10,
+          child: Column(mainAxisSize: MainAxisSize.min, children: [badge, const SizedBox(height: 2), card]),
+        );
+      case 2: // top-right avatar → card pops out at its top-left corner
+        return Positioned(
+          right: 20 + 80 - 28,
+          top: 100 - 10,
+          child: Column(mainAxisSize: MainAxisSize.min, children: [badge, const SizedBox(height: 2), card]),
+        );
+      case 3: // bottom-right avatar → card pops out at its top-left corner
+        return Positioned(
+          right: 20 + 80 - 28,
+          bottom: 220 + 110 - 10,
+          child: Column(mainAxisSize: MainAxisSize.min, children: [badge, const SizedBox(height: 2), card]),
+        );
       default:
         return const SizedBox();
     }
