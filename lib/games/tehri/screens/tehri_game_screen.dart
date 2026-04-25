@@ -277,54 +277,65 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
            ),
         
         // Dealer gets the Collect & Reshuffle button; everyone else waits
-        if (room.status == 'waiting_to_start' && me.id == room.dealerId)
-          Positioned(
-            bottom: 20, left: 0, right: 0,
-            child: Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: accentGold.withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: accentGold.withOpacity(0.5)),
-                    ),
-                    child: const Text('🎉 You are the Dealer!', 
-                      style: TextStyle(color: accentGold, fontSize: 13, fontWeight: FontWeight.bold, letterSpacing: 1)),
+        if (room.status == 'waiting_to_start') ...[
+          Builder(builder: (context) {
+            final dealerPlayer = players.firstWhere(
+              (p) => p.id == room.dealerId,
+              orElse: () => players.first,
+            );
+            final dealerName = dealerPlayer.id == me.id ? 'You' : dealerPlayer.name;
+
+            if (me.id == room.dealerId) {
+              return Positioned(
+                bottom: 20, left: 0, right: 0,
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: accentGold.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: accentGold.withOpacity(0.5)),
+                        ),
+                        child: const Text('🎉 You are the Dealer!', 
+                          style: TextStyle(color: accentGold, fontSize: 13, fontWeight: FontWeight.bold, letterSpacing: 1)),
+                      ),
+                      const SizedBox(height: 12),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: accentGold, 
+                          foregroundColor: Colors.black, 
+                          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 20),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        ),
+                        onPressed: () => ref.read(tehriOpsProvider).startCutting(room.id),
+                        child: const Text('COLLECT & RESHUFFLE', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 12),
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: accentGold, 
-                      foregroundColor: Colors.black, 
-                      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 20),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    ),
-                    onPressed: () => ref.read(tehriOpsProvider).startCutting(room.id),
-                    child: const Text('COLLECT & RESHUFFLE', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        if (room.status == 'waiting_to_start' && me.id != room.dealerId)
-          Positioned(
-            bottom: 20, left: 0, right: 0,
-            child: Center(
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                decoration: BoxDecoration(
-                  color: Colors.black54,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: accentGold.withOpacity(0.3)),
                 ),
-                child: const Text('Waiting for dealer to collect cards...', 
-                  style: TextStyle(color: accentGold, fontSize: 12)),
-              ),
-            ),
-          ),
+              );
+            } else {
+              return Positioned(
+                bottom: 20, left: 0, right: 0,
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: Colors.black54,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: accentGold.withOpacity(0.3)),
+                    ),
+                    child: Text('${dealerPlayer.name} is the Dealer — collecting cards...', 
+                      style: const TextStyle(color: accentGold, fontSize: 12)),
+                  ),
+                ),
+              );
+            }
+          }),
+        ],
 
         // 7. CUTTING OVERLAY
         if (room.status == 'cutting') 
