@@ -109,16 +109,17 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
 
   Future<void> _handleDealSequence(TehriRoom room, List<TehriPlayer> players, int count, {required bool isInitial}) async {
     try {
-      // Start dealing clockwise from Cutter (Seat 1 if Dealer is 0)
       final dealerIdx = players.indexWhere((p) => p.id == room.dealerId);
-      final startIndex = (dealerIdx + 1) % 4;
+      // Anti-clockwise: Start from player LEFT (idx - 1 + 4) % 4
+      final startIndex = (dealerIdx - 1 + 4) % 4;
       
-      // Stage 1 dealing (5 cards each) OR Stage 2 dealing (4 then 4)
       int rounds = isInitial ? 1 : 2; 
 
       for (int r = 0; r < rounds; r++) {
         for (int i = 0; i < 4; i++) {
-          final p = players[(startIndex + i) % 4];
+          // Anti-clockwise loop: (start - i + 4) % 4
+          final seatToDeal = (startIndex - i + 4) % 4;
+          final p = players.firstWhere((p) => p.seatIndex == seatToDeal);
           await ref.read(tehriOpsProvider).dealBatch(room.id, p.id, count);
           await Future.delayed(const Duration(milliseconds: 600));
         }
@@ -248,9 +249,30 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
           Center(
             child: ElevatedButton(
               style: ElevatedButton.styleFrom(backgroundColor: accentGold, foregroundColor: Colors.black, padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 20)),
-              onPressed: () => ref.read(tehriOpsProvider).initRound(room.id, room.dealerId!),
-              child: const Text('START ROUND', style: TextStyle(fontWeight: FontWeight.bold)),
+              onPressed: () async {
+                 // Reshuffle and move to cutting
+                 await supabase.from('tehri_rooms').update({'status': 'cutting'}).eq('id', room.id);
+              },
+              child: const Text('COLLECT & RESHUFFLE', style: TextStyle(fontWeight: FontWeight.bold)),
             ),
+          ),
+
+        if (room.status == 'cutting')
+          Center(
+            child: room.cutterId == me.id
+              ? ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: accentGold, foregroundColor: Colors.black, padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 24)),
+                  onPressed: () => ref.read(tehriOpsProvider).initRound(room.id, room.dealerId!),
+                  child: const Text('CUT THE DECK', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                )
+              : const Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CircularProgressIndicator(color: accentGold),
+                    SizedBox(height: 16),
+                    Text('WAITING FOR CUTTER...', style: TextStyle(color: accentGold, fontWeight: FontWeight.bold)),
+                  ],
+                ),
           ),
       ],
     );
