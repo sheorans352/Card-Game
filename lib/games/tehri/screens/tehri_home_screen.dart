@@ -16,6 +16,7 @@ class _TehriHomeScreenState extends ConsumerState<TehriHomeScreen> {
   final _nameController = TextEditingController();
   final _codeController = TextEditingController();
   bool _isHostingTab = true;
+  bool _isLoading = false;
 
   static const Color primaryBg = Color(0xFF100806); // Deep brown mahogany
   static const Color accentCopper = Color(0xFFE67E22);
@@ -177,7 +178,7 @@ class _TehriHomeScreenState extends ConsumerState<TehriHomeScreen> {
           ),
           const SizedBox(height: 24),
           ElevatedButton(
-            onPressed: _hostGame,
+            onPressed: _isLoading ? null : _hostGame,
             style: ElevatedButton.styleFrom(
               backgroundColor: accentCopper,
               foregroundColor: Colors.black,
@@ -185,7 +186,9 @@ class _TehriHomeScreenState extends ConsumerState<TehriHomeScreen> {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               elevation: 8,
             ),
-            child: const Text('CREATE ROOM', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, letterSpacing: 2)),
+            child: _isLoading 
+              ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2))
+              : const Text('CREATE ROOM', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, letterSpacing: 2)),
           ),
         ],
       ),
@@ -222,7 +225,7 @@ class _TehriHomeScreenState extends ConsumerState<TehriHomeScreen> {
           ),
           const SizedBox(height: 24),
           ElevatedButton(
-            onPressed: _joinGame,
+            onPressed: _isLoading ? null : _joinGame,
             style: ElevatedButton.styleFrom(
               backgroundColor: accentCopper,
               foregroundColor: Colors.black,
@@ -230,7 +233,9 @@ class _TehriHomeScreenState extends ConsumerState<TehriHomeScreen> {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               elevation: 8,
             ),
-            child: const Text('JOIN ROOM', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, letterSpacing: 2)),
+            child: _isLoading 
+              ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2))
+              : const Text('JOIN ROOM', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, letterSpacing: 2)),
           ),
         ],
       ),
@@ -263,12 +268,14 @@ class _TehriHomeScreenState extends ConsumerState<TehriHomeScreen> {
   Future<void> _hostGame() async {
     final name = _nameController.text.trim();
     if (name.isEmpty) return;
+    setState(() => _isLoading = true);
     try {
       final res = await ref.read(tehriOpsProvider).createRoom(name);
       await ref.read(tehriSessionProvider.notifier).saveSession(res['roomCode']!, res['roomId']!, res['playerId']!, name);
       if (mounted) context.go('/tehri/lobby/${res['roomId']}');
     } catch (e) {
       debugPrint('Error hosting: $e');
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -276,14 +283,18 @@ class _TehriHomeScreenState extends ConsumerState<TehriHomeScreen> {
     final name = _nameController.text.trim();
     final code = _codeController.text.trim();
     if (name.isEmpty || code.isEmpty) return;
+    setState(() => _isLoading = true);
     try {
       final res = await ref.read(tehriOpsProvider).joinRoom(code, name);
       if (res != null) {
         await ref.read(tehriSessionProvider.notifier).saveSession(code, res['roomId']!, res['playerId']!, name);
         if (mounted) context.go('/tehri/lobby/${res['roomId']}');
+      } else {
+        if (mounted) setState(() => _isLoading = false);
       }
     } catch (e) {
       debugPrint('Error joining: $e');
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 }

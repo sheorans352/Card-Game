@@ -19,6 +19,7 @@ class TehriLobbyScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final roomAsync = ref.watch(tehriRoomProvider(roomId));
     final playersAsync = ref.watch(tehriPlayersProvider(roomId));
+    final localPlayerId = ref.watch(localTehriPlayerIdProvider);
 
     ref.listen(tehriRoomProvider(roomId), (previous, next) {
       next.whenData((room) {
@@ -86,7 +87,7 @@ class TehriLobbyScreen extends ConsumerWidget {
                       const SizedBox(height: 40),
 
                       // Start Game Button
-                      if (room.hostId == ref.read(localTehriPlayerIdProvider))
+                      if (room.hostId == localPlayerId)
                         playersAsync.whenData((p) => p.length == 4).value ?? false
                           ? ElevatedButton(
                               onPressed: () => ref.read(tehriOpsProvider).startGame(roomId),
