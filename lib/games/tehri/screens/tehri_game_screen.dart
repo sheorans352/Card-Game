@@ -58,8 +58,10 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
         }
 
         // Automatic Dealer Selection Dealing
-        if (room.status == 'selecting_dealer' && room.hostId == localId && !_isDealingSelection) {
+        // We rely on DB status and being the host to trigger the loop
+        if (room.status == 'selecting_dealer' && (room.hostId == localId || room.hostId == null) && !_isDealingSelection) {
           _isDealingSelection = true;
+          debugPrint('Starting Auto Selection loop for ${room.id}');
           _handleAutoSelection(room.id);
         } else if (room.status != 'selecting_dealer') {
           _isDealingSelection = false;
@@ -137,16 +139,23 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
   }
 
   Future<void> _handleAutoSelection(String roomId) async {
-    while (mounted && ref.read(tehriRoomProvider(roomId)).value?.status == 'selecting_dealer') {
+    while (mounted) {
+      final currentRoom = ref.read(tehriRoomProvider(roomId)).value;
+      if (currentRoom?.status != 'selecting_dealer') break;
+      
       try {
+        debugPrint('Dealing one card for selection...');
         await ref.read(tehriOpsProvider).dealForSelection(roomId);
-        await Future.delayed(const Duration(milliseconds: 1000));
+        await Future.delayed(const Duration(milliseconds: 1500)); // Slightly slower for ritual feel
       } catch (e) {
         debugPrint('Selection Error: $e');
-        break;
+        // If it's a phase error, just stop
+        if (e.toString().contains('phase')) break;
+        await Future.delayed(const Duration(seconds: 2));
       }
     }
     _isDealingSelection = false;
+    debugPrint('Auto Selection loop finished');
   }
 
 
