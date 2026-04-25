@@ -480,9 +480,10 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
   }
 
   Widget _buildSelectionCards(Map<String, dynamic> lastCard, List<TehriPlayer> rotatedPlayers) {
-    final cardId = lastCard['card_id'] as String?;
-    final receiverId = lastCard['player_id'] as String?;
-    final isJack = lastCard['is_jack'] as bool? ?? false;
+    // DB stores camelCase: cardId, playerId, isJack
+    final cardId = (lastCard['cardId'] ?? lastCard['card_id']) as String?;
+    final receiverId = (lastCard['playerId'] ?? lastCard['player_id']) as String?;
+    final isJack = (lastCard['isJack'] ?? lastCard['is_jack']) as bool? ?? false;
 
     if (cardId == null || receiverId == null) return const SizedBox();
 
