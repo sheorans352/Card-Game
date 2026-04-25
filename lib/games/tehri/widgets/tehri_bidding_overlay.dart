@@ -49,7 +49,7 @@ class _TehriBiddingOverlayState extends State<TehriBiddingOverlay>
   @override
   Widget build(BuildContext context) {
     return Positioned(
-      bottom: 0, left: 0, right: 0,
+      top: 64, left: 0, right: 0,
       child: SlideTransition(
         position: _slideAnim,
         child: Container(

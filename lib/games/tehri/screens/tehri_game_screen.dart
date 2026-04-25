@@ -198,9 +198,9 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
         _buildPlayerAvatar(rotatedPlayers[2], 'top', room, localId),
         _buildPlayerAvatar(rotatedPlayers[3], 'right', room, localId),
 
-        // 4. MY HAND — raised during bidding so visible above the bid panel
+        // 4. MY HAND — always at bottom; bid panel is now at the top
         Positioned(
-          bottom: (room.status == 'bidding_initial' && room.cutterId == localId) ? 340 : 20,
+          bottom: 20,
           left: 0,
           right: 0,
           height: 160,
@@ -250,15 +250,111 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
                       style: TextStyle(color: accentGold, fontSize: 11, letterSpacing: 1)),
                   ),
                   if (me.isHost) ...[
-                    const SizedBox(height: 8),
-                    TextButton.icon(
-                      style: TextButton.styleFrom(foregroundColor: Colors.white24),
+                    const SizedBox(height: 12),
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: accentGold,
+                        foregroundColor: Colors.black,
+                        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
                       onPressed: () => ref.read(tehriOpsProvider).dealForSelection(room.id),
-                      icon: const Icon(Icons.touch_app, size: 14),
-                      label: const Text('Deal manually', style: TextStyle(fontSize: 11)),
+                      icon: const Icon(Icons.arrow_forward_ios, size: 16),
+                      label: const Text('DEAL NEXT CARD', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                     ),
                   ],
                 ],
+              ),
+            ),
+          ),
+
+        // Dealer sees deal button during batch dealing phases
+        if (room.status == 'dealing_initial' && me.id == room.dealerId && !_isDealingBatch)
+          Positioned(
+            bottom: 20, left: 0, right: 0,
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                    margin: const EdgeInsets.only(bottom: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.black54,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: accentGold.withOpacity(0.3)),
+                    ),
+                    child: const Text('You are Dealing — deal 5 cards to each player', 
+                      style: TextStyle(color: accentGold, fontSize: 11)),
+                  ),
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: accentGold,
+                      foregroundColor: Colors.black,
+                      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 18),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                    onPressed: () {
+                      setState(() => _isDealingBatch = true);
+                      _handleDealSequence(room, players, 5, isInitial: true);
+                    },
+                    icon: const Icon(Icons.style, size: 18),
+                    label: const Text('DEAL 5 CARDS TO ALL', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        if (room.status == 'dealing_initial' && me.id != room.dealerId)
+          Positioned(
+            bottom: 20, left: 0, right: 0,
+            child: Center(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                decoration: BoxDecoration(
+                  color: Colors.black54,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: accentGold.withOpacity(0.3)),
+                ),
+                child: const Text('Dealer is dealing your first 5 cards...', 
+                  style: TextStyle(color: accentGold, fontSize: 12)),
+              ),
+            ),
+          ),
+
+        if (room.status == 'dealing_remaining' && me.id == room.dealerId && !_isDealingBatch)
+          Positioned(
+            bottom: 20, left: 0, right: 0,
+            child: Center(
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: accentGold,
+                  foregroundColor: Colors.black,
+                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 18),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+                onPressed: () {
+                  setState(() => _isDealingBatch = true);
+                  _handleDealSequence(room, players, 4, isInitial: false);
+                },
+                icon: const Icon(Icons.style, size: 18),
+                label: const Text('DEAL REMAINING CARDS', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+              ),
+            ),
+          ),
+        if (room.status == 'dealing_remaining' && me.id != room.dealerId)
+          Positioned(
+            bottom: 20, left: 0, right: 0,
+            child: Center(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                decoration: BoxDecoration(
+                  color: Colors.black54,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: accentGold.withOpacity(0.3)),
+                ),
+                child: const Text('Dealer is dealing remaining cards...', 
+                  style: TextStyle(color: accentGold, fontSize: 12)),
               ),
             ),
           ),
