@@ -386,7 +386,7 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
             PlayingCard(card: CardModel.fromId(cardId), width: 90, height: 135),
             if (isJack)
               Container(
-                margin: const EdgeInsets.top(8),
+                margin: const EdgeInsets.only(top: 8),
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                 decoration: BoxDecoration(color: accentGold, borderRadius: BorderRadius.circular(8)),
                 child: const Text('FOUND THE J!', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 10)),
