@@ -23,6 +23,7 @@ class TehriGameScreen extends ConsumerStatefulWidget {
 
 class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
   bool _isDealingBatch = false;
+  bool _isDealingSelection = false;
 
   @override
   Widget build(BuildContext context) {
@@ -49,6 +50,14 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
           }
         } else if (!room.status.startsWith('dealing')) {
           _isDealingBatch = false;
+        }
+
+        // Automatic Dealer Selection Dealing
+        if (room.status == 'selecting_dealer' && room.hostId == localId && !_isDealingSelection) {
+          _isDealingSelection = true;
+          _handleAutoSelection(room.id);
+        } else if (room.status != 'selecting_dealer') {
+          _isDealingSelection = false;
         }
       });
     });
@@ -119,6 +128,19 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
       debugPrint('Dealing Error: $e');
       _isDealingBatch = false;
     }
+  }
+
+  Future<void> _handleAutoSelection(String roomId) async {
+    while (mounted && ref.read(tehriRoomProvider(roomId)).value?.status == 'selecting_dealer') {
+      try {
+        await ref.read(tehriOpsProvider).dealForSelection(roomId);
+        await Future.delayed(const Duration(milliseconds: 1000));
+      } catch (e) {
+        debugPrint('Selection Error: $e');
+        break;
+      }
+    }
+    _isDealingSelection = false;
   }
 
 
@@ -205,12 +227,15 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
              ),
            ),
 
-        if (room.status == 'selecting_dealer' && me.isHost)
-          Center(
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: accentGold, foregroundColor: Colors.black, padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 20)),
-              onPressed: () => ref.read(tehriOpsProvider).dealForSelection(room.id),
-              child: const Text('DEAL CARD', style: TextStyle(fontWeight: FontWeight.bold)),
+        if (room.status == 'selecting_dealer')
+          const Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(color: accentGold),
+                SizedBox(height: 16),
+                Text('FINDING THE J...', style: TextStyle(color: accentGold, fontWeight: FontWeight.bold, letterSpacing: 2)),
+              ],
             ),
           ),
         
