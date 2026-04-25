@@ -136,7 +136,9 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
       }
     } catch (e) {
       debugPrint('Dealing Error: $e');
-      _isDealingBatch = false;
+    } finally {
+      // Always reset so deal buttons reappear if needed
+      if (mounted) setState(() => _isDealingBatch = false);
     }
   }
 
@@ -502,7 +504,13 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
   Widget _buildPlayerAvatar(TehriPlayer player, String pos, TehriRoom room, String localId) {
     final bool isTurn = room.currentTurnIndex == player.seatIndex;
     final bool isDealer = room.dealerId == player.id;
+    final bool isMe = player.id == localId;
     
+    // Face-down card pile for other players (shown during & after dealing)
+    final handAsync = ref.watch(tehriHandProvider(player.id));
+    final cardCount = handAsync.value?.length ?? 0;
+    final showFaceDown = !isMe && cardCount > 0;
+
     Alignment alignment; EdgeInsets padding;
     switch (pos) {
       case 'bottom': alignment = Alignment.bottomLeft; padding = const EdgeInsets.only(left: 20, bottom: 220); break;
@@ -512,6 +520,22 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
       default: alignment = Alignment.center; padding = EdgeInsets.zero;
     }
 
+    // Face-down card stack — stacked offset cards above avatar
+    Widget faceDownStack = const SizedBox();
+    if (showFaceDown) {
+      final displayCount = cardCount.clamp(1, 7);
+      faceDownStack = SizedBox(
+        width: 52, height: 30 + displayCount * 3.0,
+        child: Stack(
+          children: List.generate(displayCount, (idx) => Positioned(
+            top: (displayCount - 1 - idx) * 3.0,
+            left: idx * 1.0,
+            child: PlayingCard(isFaceUp: false, width: 42, height: 58),
+          )),
+        ),
+      );
+    }
+
     return Align(
       alignment: alignment,
       child: Padding(
@@ -519,6 +543,8 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            // Face-down stack above avatar (left/top players) or below (right/bottom)
+            if (showFaceDown && (pos == 'left' || pos == 'top')) ...[faceDownStack, const SizedBox(height: 4)],
             Container(
               width: 80, height: 110,
               decoration: BoxDecoration(
@@ -530,18 +556,21 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(player.id == localId ? 'YOU' : player.name.toUpperCase(), style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900), overflow: TextOverflow.ellipsis),
+                  Text(isMe ? 'YOU' : player.name.toUpperCase(),
+                    style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900),
+                    overflow: TextOverflow.ellipsis),
                   const Divider(color: Colors.white10, indent: 10, endIndent: 10),
                   Text('${player.tricksWon}', style: const TextStyle(color: accentGold, fontSize: 18, fontWeight: FontWeight.w900)),
                   const Text('TRICKS', style: TextStyle(color: Colors.white24, fontSize: 8, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 4),
-                  if (player.id == room.dealerId)
-                    Text('PTS: ${player.points}', style: const TextStyle(color: Colors.white38, fontSize: 8))
+                  if (cardCount > 0 && !isMe)
+                    Text('$cardCount cards', style: const TextStyle(color: Colors.white38, fontSize: 8))
                   else
                     const SizedBox(height: 10),
                 ],
               ),
             ),
+            if (showFaceDown && (pos == 'right' || pos == 'bottom')) ...[const SizedBox(height: 4), faceDownStack],
             if (isDealer) const Padding(padding: EdgeInsets.only(top: 4), child: Text('DEALER', style: TextStyle(color: accentGold, fontSize: 8, fontWeight: FontWeight.w900))),
           ],
         ),
@@ -549,27 +578,51 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
     );
   }
 
+  /// Fan layout matching Minus game: overlapping cards with slight angle spread
   Widget _buildHand(WidgetRef ref, TehriRoom room, TehriPlayer me, List<String> hand) {
-    return Center(
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: hand.asMap().entries.map((entry) {
-            final cardId = entry.value;
-            return Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              child: PlayingCard(
-                card: CardModel.fromId(cardId),
-                width: 70, height: 105,
-                onTap: () {
-                  if (room.status == 'playing' && room.currentTurnIndex == me.seatIndex) {
-                    ref.read(tehriOpsProvider).playCard(room.id, me.id, cardId);
-                  }
-                },
-              ),
-            );
-          }).toList(),
+    if (hand.isEmpty) return const SizedBox();
+    const cardW = 68.0;
+    const cardH = 100.0;
+    final count = hand.length;
+    // Total fan width capped so it stays on screen
+    const overlap = 28.0;
+    final totalW = (count * (cardW - overlap) + overlap).clamp(0.0, 360.0);
+    final spreadPerCard = count > 1 ? (totalW - cardW) / (count - 1) : 0.0;
+    const maxAngle = 0.18; // radians
+
+    return SizedBox(
+      height: cardH + 20,
+      child: Center(
+        child: SizedBox(
+          width: totalW,
+          height: cardH + 20,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: hand.asMap().entries.map((entry) {
+              final i = entry.key;
+              final cardId = entry.value;
+              final mid = (count - 1) / 2.0;
+              final angle = count > 1 ? (i - mid) / (mid == 0 ? 1 : mid) * maxAngle : 0.0;
+              final liftY = count > 1 ? -(1 - ((i - mid).abs() / mid.clamp(1, 999))) * 8 : 0.0;
+              final isPlayable = room.status == 'playing' && room.currentTurnIndex == me.seatIndex;
+
+              return Positioned(
+                left: i * spreadPerCard,
+                top: 10 - liftY,
+                child: Transform.rotate(
+                  angle: angle,
+                  alignment: Alignment.bottomCenter,
+                  child: PlayingCard(
+                    card: CardModel.fromId(cardId),
+                    width: cardW,
+                    height: cardH,
+                    isPlayable: isPlayable,
+                    onTap: isPlayable ? () => ref.read(tehriOpsProvider).playCard(room.id, me.id, cardId) : null,
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
         ),
       ),
     );
