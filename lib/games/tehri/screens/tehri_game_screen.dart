@@ -1,4 +1,5 @@
 import 'dart:ui';
+import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -175,7 +176,7 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
         const SpadeBackground(),
         
         // 1. TOP HUD
-        _buildTopHUD(room),
+        _buildTopHUD(room, players),
 
         // 2. CENTER TRICK AREA
         Center(
@@ -200,7 +201,7 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
         _buildPlayerAvatar(rotatedPlayers[2], 'top', room, localId),
         _buildPlayerAvatar(rotatedPlayers[3], 'right', room, localId),
 
-        // 4. MY HAND — always at bottom; bid panel is now at the top
+        // 4. MY HAND sorted by suit then rank descending
         Positioned(
           bottom: 20,
           left: 0,
@@ -209,8 +210,17 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
           child: handAsync.when(
             data: (hand) {
               final bool restricted = room.status == 'bidding_initial' && room.cutterId == me.id;
-              final visibleHand = restricted ? hand.take(5).toList() : hand;
-              return _buildHand(ref, room, me, visibleHand);
+              final rawHand = restricted ? hand.take(5).toList() : hand;
+              // Sort by suit group (S,H,D,C) then rank descending
+              final sortedHand = List<String>.from(rawHand)..sort((a, b) {
+                const suitOrder = {'S': 0, 'H': 1, 'D': 2, 'C': 3};
+                final sA = a.substring(a.length - 1);
+                final sB = b.substring(b.length - 1);
+                final sCmp = (suitOrder[sA] ?? 4).compareTo(suitOrder[sB] ?? 4);
+                if (sCmp != 0) return sCmp;
+                return CardModel.getRankValue(b).compareTo(CardModel.getRankValue(a)); // desc
+              });
+              return _buildHand(ref, room, me, sortedHand);
             },
             loading: () => const SizedBox(),
             error: (e, s) => const SizedBox(),
@@ -438,7 +448,7 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
     );
   }
 
-  Widget _buildTopHUD(TehriRoom room) {
+  Widget _buildTopHUD(TehriRoom room, List<TehriPlayer> players) {
     return Positioned(
       top: 0, left: 0, right: 0,
       child: ClipRRect(
@@ -451,15 +461,19 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                if (room.trumpSuit != null)
-                  Row(children: [
-                    Text(CardModel.getSuitEmoji(room.trumpSuit!), style: const TextStyle(fontSize: 24)),
-                    const SizedBox(width: 12),
-                    Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text('BID: ${room.currentBid}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
-                      const Text('TRUMP SUIT', style: TextStyle(color: Colors.white38, fontSize: 8, fontWeight: FontWeight.bold)),
-                    ]),
-                  ]),
+                if (room.trumpSuit != null && room.bidderId != null) ...[
+                  Builder(builder: (context) {
+                    final bidder = players.firstWhereOrNull((p) => p.id == room.bidderId);
+                    return Row(children: [
+                      Text(CardModel.getSuitEmoji(room.trumpSuit!), style: const TextStyle(fontSize: 22)),
+                      const SizedBox(width: 10),
+                      Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Text('${bidder?.name ?? 'Bidder'}: ${room.currentBid}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12)),
+                        const Text('BID & TRUMP', style: TextStyle(color: Colors.white38, fontSize: 8, fontWeight: FontWeight.bold)),
+                      ]),
+                    ]);
+                  }),
+                ],
                 Text(room.status.toUpperCase().replaceAll('_', ' '), style: const TextStyle(color: accentGold, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 2)),
                 
                 // Quit Button
@@ -505,11 +519,6 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
     final bool isTurn = room.currentTurnIndex == player.seatIndex;
     final bool isDealer = room.dealerId == player.id;
     final bool isMe = player.id == localId;
-    
-    // Face-down card pile for other players (shown during & after dealing)
-    final handAsync = ref.watch(tehriHandProvider(player.id));
-    final cardCount = handAsync.value?.length ?? 0;
-    final showFaceDown = !isMe && cardCount > 0;
 
     Alignment alignment; EdgeInsets padding;
     switch (pos) {
@@ -520,22 +529,6 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
       default: alignment = Alignment.center; padding = EdgeInsets.zero;
     }
 
-    // Face-down card stack — stacked offset cards above avatar
-    Widget faceDownStack = const SizedBox();
-    if (showFaceDown) {
-      final displayCount = cardCount.clamp(1, 7);
-      faceDownStack = SizedBox(
-        width: 52, height: 30 + displayCount * 3.0,
-        child: Stack(
-          children: List.generate(displayCount, (idx) => Positioned(
-            top: (displayCount - 1 - idx) * 3.0,
-            left: idx * 1.0,
-            child: PlayingCard(isFaceUp: false, width: 42, height: 58),
-          )),
-        ),
-      );
-    }
-
     return Align(
       alignment: alignment,
       child: Padding(
@@ -543,8 +536,6 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Face-down stack above avatar (left/top players) or below (right/bottom)
-            if (showFaceDown && (pos == 'left' || pos == 'top')) ...[faceDownStack, const SizedBox(height: 4)],
             Container(
               width: 80, height: 110,
               decoration: BoxDecoration(
@@ -563,14 +554,10 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
                   Text('${player.tricksWon}', style: const TextStyle(color: accentGold, fontSize: 18, fontWeight: FontWeight.w900)),
                   const Text('TRICKS', style: TextStyle(color: Colors.white24, fontSize: 8, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 4),
-                  if (cardCount > 0 && !isMe)
-                    Text('$cardCount cards', style: const TextStyle(color: Colors.white38, fontSize: 8))
-                  else
-                    const SizedBox(height: 10),
+                  Text('PTS: ${player.points}', style: const TextStyle(color: Colors.white38, fontSize: 8)),
                 ],
               ),
             ),
-            if (showFaceDown && (pos == 'right' || pos == 'bottom')) ...[const SizedBox(height: 4), faceDownStack],
             if (isDealer) const Padding(padding: EdgeInsets.only(top: 4), child: Text('DEALER', style: TextStyle(color: accentGold, fontSize: 8, fontWeight: FontWeight.w900))),
           ],
         ),
