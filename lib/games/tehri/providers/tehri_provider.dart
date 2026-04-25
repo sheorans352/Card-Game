@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/tehri_models.dart';
 
 final supabase = Supabase.instance.client;
@@ -81,15 +82,51 @@ final tehriSessionProvider = StateNotifierProvider<TehriSessionNotifier, AsyncVa
 });
 
 class TehriSessionNotifier extends StateNotifier<AsyncValue<void>> {
-  TehriSessionNotifier(this.ref) : super(const AsyncValue.data(null));
+  TehriSessionNotifier(this.ref) : super(const AsyncValue.data(null)) {
+    _init();
+  }
   final Ref ref;
 
+  Future<void> _init() async {
+    final prefs = await SharedPreferences.getInstance();
+    final urlParams = Uri.base.queryParameters;
+
+    final roomCode = urlParams['code'] ?? prefs.getString(kTehriRoomCodeKey);
+    final playerId = urlParams['playerId'] ?? prefs.getString(kTehriPlayerIdKey);
+    final playerName = prefs.getString(kTehriPlayerNameKey);
+
+    if (roomCode != null) {
+      ref.read(currentTehriRoomCodeProvider.notifier).state = roomCode;
+      await prefs.setString(kTehriRoomCodeKey, roomCode);
+    }
+    if (playerId != null) {
+      ref.read(localTehriPlayerIdProvider.notifier).state = playerId;
+      await prefs.setString(kTehriPlayerIdKey, playerId);
+    }
+    if (playerName != null) {
+      ref.read(localTehriPlayerNameProvider.notifier).state = playerName;
+    }
+  }
+
   Future<void> saveSession(String roomCode, String roomId, String playerId, String playerName) async {
-    // We could use SharedPreferences here if we want persistence across reloads
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(kTehriRoomCodeKey, roomCode);
+    await prefs.setString(kTehriPlayerIdKey, playerId);
+    await prefs.setString(kTehriPlayerNameKey, playerName);
+    
     ref.read(currentTehriRoomCodeProvider.notifier).state = roomCode;
     ref.read(currentTehriRoomIdProvider.notifier).state = roomId;
     ref.read(localTehriPlayerIdProvider.notifier).state = playerId;
     ref.read(localTehriPlayerNameProvider.notifier).state = playerName;
+  }
+
+  Future<void> clearSession() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(kTehriRoomCodeKey);
+    await prefs.remove(kTehriPlayerIdKey);
+    ref.read(currentTehriRoomCodeProvider.notifier).state = null;
+    ref.read(currentTehriRoomIdProvider.notifier).state = null;
+    ref.read(localTehriPlayerIdProvider.notifier).state = null;
   }
 }
 
