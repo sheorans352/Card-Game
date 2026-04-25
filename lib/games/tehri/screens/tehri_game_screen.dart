@@ -188,7 +188,8 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
         ),
 
         // 2.5 DEALER SELECTION: Cards dealt near each player avatar
-        if (room.status == 'selecting_dealer' && room.lastSelectionCard != null)
+        // Keep the last dealt card visible during waiting_to_start so J♠ stays on screen
+        if ((room.status == 'selecting_dealer' || room.status == 'waiting_to_start') && room.lastSelectionCard != null)
           _buildSelectionCards(room.lastSelectionCard!, rotatedPlayers),
 
         // 3. AVATARS (Same positions as Minus)
@@ -275,18 +276,40 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
              ),
            ),
         
-        if (room.status == 'waiting_to_start' && me.isHost)
+        // Dealer gets the Collect & Reshuffle button; everyone else waits
+        if (room.status == 'waiting_to_start' && me.id == room.dealerId)
           Positioned(
             bottom: 20, left: 0, right: 0,
             child: Center(
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(backgroundColor: accentGold, foregroundColor: Colors.black, padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 20)),
-                onPressed: () => ref.read(tehriOpsProvider).startCutting(room.id),
-                child: const Text('COLLECT & RESHUFFLE', style: TextStyle(fontWeight: FontWeight.bold)),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: accentGold.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: accentGold.withOpacity(0.5)),
+                    ),
+                    child: const Text('🎉 You are the Dealer!', 
+                      style: TextStyle(color: accentGold, fontSize: 13, fontWeight: FontWeight.bold, letterSpacing: 1)),
+                  ),
+                  const SizedBox(height: 12),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: accentGold, 
+                      foregroundColor: Colors.black, 
+                      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 20),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    ),
+                    onPressed: () => ref.read(tehriOpsProvider).startCutting(room.id),
+                    child: const Text('COLLECT & RESHUFFLE', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  ),
+                ],
               ),
             ),
           ),
-        if (room.status == 'waiting_to_start' && !me.isHost)
+        if (room.status == 'waiting_to_start' && me.id != room.dealerId)
           Positioned(
             bottom: 20, left: 0, right: 0,
             child: Center(
@@ -297,7 +320,7 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(color: accentGold.withOpacity(0.3)),
                 ),
-                child: const Text('Dealer found! Waiting for host...', 
+                child: const Text('Waiting for dealer to collect cards...', 
                   style: TextStyle(color: accentGold, fontSize: 12)),
               ),
             ),
