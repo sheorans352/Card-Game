@@ -281,9 +281,7 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
             child: Center(
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(backgroundColor: accentGold, foregroundColor: Colors.black, padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 20)),
-                onPressed: () async {
-                  await supabase.from('tehri_rooms').update({'status': 'cutting'}).eq('id', room.id);
-                },
+                onPressed: () => ref.read(tehriOpsProvider).startCutting(room.id),
                 child: const Text('COLLECT & RESHUFFLE', style: TextStyle(fontWeight: FontWeight.bold)),
               ),
             ),

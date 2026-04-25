@@ -231,6 +231,10 @@ class TehriOperations {
     await supabase.rpc('tehri_start_selection', params: {'rid': roomId});
   }
 
+  Future<void> startCutting(String roomId) async {
+    await supabase.rpc('tehri_start_cutting', params: {'rid': roomId});
+  }
+
   Future<void> dealForSelection(String roomId) async {
     final res = await supabase.rpc('tehri_deal_for_selection', params: {'rid': roomId});
     // We could broadcast this via a table, but for now we'll just return and handle locally
