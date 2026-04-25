@@ -198,12 +198,12 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
         _buildPlayerAvatar(rotatedPlayers[2], 'top', room, localId),
         _buildPlayerAvatar(rotatedPlayers[3], 'right', room, localId),
 
-        // 4. MY HAND (Fan Layout similar to Minus)
+        // 4. MY HAND — raised during bidding so visible above the bid panel
         Positioned(
-          bottom: 20,
+          bottom: (room.status == 'bidding_initial' && room.cutterId == localId) ? 340 : 20,
           left: 0,
           right: 0,
-          height: 200,
+          height: 160,
           child: handAsync.when(
             data: (hand) {
               final bool restricted = room.status == 'bidding_initial' && room.cutterId == me.id;
@@ -215,24 +215,20 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
           ),
         ),
 
-        // 5. BIDDING OVERLAYS
+        // 5. BIDDING OVERLAYS (bottom sheet — slides up so cutter can see their cards)
         if (room.status == 'bidding_initial' && room.cutterId == localId)
-          Center(
-            child: TehriBiddingOverlay(
-              minBid: 7,
-              isInitial: true,
-              onBid: (bid, trump) => ref.read(tehriOpsProvider).setInitialBid(room.id, localId, bid, trump),
-            ),
+          TehriBiddingOverlay(
+            minBid: 7,
+            isInitial: true,
+            onBid: (bid, trump) => ref.read(tehriOpsProvider).setInitialBid(room.id, localId, bid, trump),
           ),
 
         if (room.status == 'bidding_final' && room.currentTurnIndex == me.seatIndex)
-          Center(
-            child: TehriBiddingOverlay(
-              minBid: room.currentBid + 1,
-              currentBid: room.currentBid,
-              isInitial: false,
-              onBid: (bid, trump) => ref.read(tehriOpsProvider).placeBid(room.id, localId, bid, trump),
-            ),
+          TehriBiddingOverlay(
+            minBid: room.currentBid + 1,
+            currentBid: room.currentBid,
+            isInitial: false,
+            onBid: (bid, trump) => ref.read(tehriOpsProvider).placeBid(room.id, localId, bid, trump),
           ),
 
         // 6. SELECTION PHASE BOTTOM CONTROLS (host-only subtle button)
