@@ -60,7 +60,8 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
 
         // Automatic Dealer Selection Dealing
         // We rely on DB status and being the host to trigger the loop
-        if (room.status == 'selecting_dealer' && me.isHost && !_isDealingSelection) {
+        final localPlayer = players?.firstWhere((p) => p.id == localId, orElse: () => players!.first);
+        if (room.status == 'selecting_dealer' && (localPlayer?.isHost ?? false) && !_isDealingSelection) {
           _isDealingSelection = true;
           debugPrint('Starting Auto Selection loop for ${room.id}');
           _handleAutoSelection(room.id);
