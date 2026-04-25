@@ -111,7 +111,8 @@ class _HubScreenState extends State<HubScreen> with SingleTickerProviderStateMix
                   symbols: '🃏',
                   gradient: const [Color(0xFF2B1A0D), Color(0xFF1C1209)],
                   accentColor: const Color(0xFFE67E22),
-                  isLive: false,
+                  isLive: true,
+                  onTap: () => context.go('/tehri'),
                   shimmerCtrl: _shimmerCtrl,
                 ),
                 _GameCard(
