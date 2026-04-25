@@ -244,13 +244,21 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
            ),
 
         if (room.status == 'selecting_dealer')
-          const Center(
+          Center(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                CircularProgressIndicator(color: accentGold),
-                SizedBox(height: 16),
-                Text('FINDING THE J...', style: TextStyle(color: accentGold, fontWeight: FontWeight.bold, letterSpacing: 2)),
+                const CircularProgressIndicator(color: accentGold),
+                const SizedBox(height: 16),
+                const Text('FINDING THE J...', style: TextStyle(color: accentGold, fontWeight: FontWeight.bold, letterSpacing: 2)),
+                const SizedBox(height: 24),
+                if (me.isHost)
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(backgroundColor: accentGold.withOpacity(0.1), foregroundColor: accentGold),
+                    onPressed: () => ref.read(tehriOpsProvider).dealForSelection(room.id),
+                    icon: const Icon(Icons.style),
+                    label: const Text('DEAL NEXT CARD (MANUAL)'),
+                  ),
               ],
             ),
           ),
