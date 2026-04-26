@@ -139,7 +139,7 @@ BEGIN
 
   -- 4. Update Room
   UPDATE public.tehri_rooms SET 
-    status = 'dealing_initial',
+    status = 'cutting',
     dealer_id = did,
     cutter_id = cid,
     bidder_id = null,
