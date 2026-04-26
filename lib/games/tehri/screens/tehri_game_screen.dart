@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:ui';
 import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
@@ -195,36 +196,39 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
         if ((room.status == 'selecting_dealer' || room.status == 'waiting_to_start') && room.lastSelectionCard != null)
           _buildSelectionCards(room.lastSelectionCard!, rotatedPlayers),
 
-        // 3. AVATARS (Same positions as Minus)
+        // 3. AVATARS + OPPONENT HAND FANS
         _buildPlayerAvatar(rotatedPlayers[0], 'bottom', room, localId),
         _buildPlayerAvatar(rotatedPlayers[1], 'left', room, localId),
         _buildPlayerAvatar(rotatedPlayers[2], 'top', room, localId),
         _buildPlayerAvatar(rotatedPlayers[3], 'right', room, localId),
+        // Opponent face-down fans (indices 1-3 in rotated list = left/top/right)
+        ..._buildOpponentHands(ref, rotatedPlayers),
 
-        // 4. MY HAND sorted by suit then rank descending
-        Positioned(
-          bottom: 20,
-          left: 0,
-          right: 0,
-          height: 160,
-          child: handAsync.when(
-            data: (hand) {
-              final bool restricted = room.status == 'bidding_initial' && room.cutterId == me.id;
-              final rawHand = restricted ? hand.take(5).toList() : hand;
-              // Sort by suit group (S,H,D,C) then rank descending
-              final sortedHand = List<String>.from(rawHand)..sort((a, b) {
-                const suitOrder = {'S': 0, 'H': 1, 'D': 2, 'C': 3};
-                final sA = a.substring(a.length - 1);
-                final sB = b.substring(b.length - 1);
-                final sCmp = (suitOrder[sA] ?? 4).compareTo(suitOrder[sB] ?? 4);
-                if (sCmp != 0) return sCmp;
-                return CardModel.getRankValue(b).compareTo(CardModel.getRankValue(a)); // desc
-              });
-              return _buildHand(ref, room, me, sortedHand);
-            },
-            loading: () => const SizedBox(),
-            error: (e, s) => const SizedBox(),
-          ),
+        // 4. MY HAND — animated cards slide in, sorted by suit/rank
+        ...handAsync.when(
+          data: (hand) {
+            final bool restricted = room.status == 'bidding_initial' && room.cutterId == me.id;
+            final rawHand = restricted ? hand.take(5).toList() : hand;
+            final sortedHand = List<String>.from(rawHand)..sort((a, b) {
+              const suitOrder = {'S': 0, 'H': 1, 'D': 2, 'C': 3};
+              final sA = a.substring(a.length - 1);
+              final sB = b.substring(b.length - 1);
+              final sCmp = (suitOrder[sA] ?? 4).compareTo(suitOrder[sB] ?? 4);
+              if (sCmp != 0) return sCmp;
+              return CardModel.getRankValue(b).compareTo(CardModel.getRankValue(a));
+            });
+            final isPlayable = room.status == 'playing' && room.currentTurnIndex == me.seatIndex;
+            return sortedHand.asMap().entries.map((e) => TehriHandCardWidget(
+              key: ValueKey(e.value),
+              cardId: e.value,
+              index: e.key,
+              total: sortedHand.length,
+              isPlayable: isPlayable,
+              onTap: isPlayable ? () => ref.read(tehriOpsProvider).playCard(room.id, me.id, e.value) : null,
+            )).toList();
+          },
+          loading: () => [],
+          error: (e, s) => [],
         ),
 
         // 5. BIDDING OVERLAYS (bottom sheet — slides up so cutter can see their cards)
@@ -565,54 +569,21 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
     );
   }
 
-  /// Fan layout matching Minus game: overlapping cards with slight angle spread
-  Widget _buildHand(WidgetRef ref, TehriRoom room, TehriPlayer me, List<String> hand) {
-    if (hand.isEmpty) return const SizedBox();
-    const cardW = 68.0;
-    const cardH = 100.0;
-    final count = hand.length;
-    // Total fan width capped so it stays on screen
-    const overlap = 28.0;
-    final totalW = (count * (cardW - overlap) + overlap).clamp(0.0, 360.0);
-    final spreadPerCard = count > 1 ? (totalW - cardW) / (count - 1) : 0.0;
-    const maxAngle = 0.18; // radians
-
-    return SizedBox(
-      height: cardH + 20,
-      child: Center(
-        child: SizedBox(
-          width: totalW,
-          height: cardH + 20,
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: hand.asMap().entries.map((entry) {
-              final i = entry.key;
-              final cardId = entry.value;
-              final mid = (count - 1) / 2.0;
-              final angle = count > 1 ? (i - mid) / (mid == 0 ? 1 : mid) * maxAngle : 0.0;
-              final liftY = count > 1 ? -(1 - ((i - mid).abs() / mid.clamp(1, 999))) * 8 : 0.0;
-              final isPlayable = room.status == 'playing' && room.currentTurnIndex == me.seatIndex;
-
-              return Positioned(
-                left: i * spreadPerCard,
-                top: 10 - liftY,
-                child: Transform.rotate(
-                  angle: angle,
-                  alignment: Alignment.bottomCenter,
-                  child: PlayingCard(
-                    card: CardModel.fromId(cardId),
-                    width: cardW,
-                    height: cardH,
-                    isPlayable: isPlayable,
-                    onTap: isPlayable ? () => ref.read(tehriOpsProvider).playCard(room.id, me.id, cardId) : null,
-                  ),
-                ),
-              );
-            }).toList(),
-          ),
-        ),
-      ),
-    );
+  // Build face-down opponent fan cards (indices 1-3 in rotated list)
+  List<Widget> _buildOpponentHands(WidgetRef ref, List<TehriPlayer> rotatedPlayers) {
+    final positions = ['left', 'top', 'right'];
+    final List<Widget> widgets = [];
+    for (int i = 1; i <= 3; i++) {
+      final p = rotatedPlayers[i];
+      final pos = positions[i - 1];
+      final handAsync = ref.watch(tehriHandProvider(p.id));
+      handAsync.whenData((cards) {
+        for (int j = 0; j < cards.length; j++) {
+          widgets.add(TehriOpponentCardWidget(position: pos, index: j, total: cards.length));
+        }
+      });
+    }
+    return widgets;
   }
 
   Widget _buildTrickArea(TehriTrick? trick, List<TehriPlayer> rotatedPlayers) {
@@ -703,5 +674,160 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
       default:
         return const SizedBox();
     }
+  }
+}
+
+// ─── Animated hand card (my cards slide in from top like dealing) ───────────
+class TehriHandCardWidget extends StatefulWidget {
+  final String cardId;
+  final int index;
+  final int total;
+  final bool isPlayable;
+  final VoidCallback? onTap;
+
+  const TehriHandCardWidget({
+    super.key,
+    required this.cardId,
+    required this.index,
+    required this.total,
+    required this.isPlayable,
+    this.onTap,
+  });
+
+  @override
+  State<TehriHandCardWidget> createState() => _TehriHandCardWidgetState();
+}
+
+class _TehriHandCardWidgetState extends State<TehriHandCardWidget>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final Animation<double> _progress;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 480));
+    _progress = CurvedAnimation(parent: _ctrl, curve: Curves.easeOutCubic);
+    // Stagger: each card in batch slides in slighly after the previous
+    final stagger = (widget.index % 13) * 55;
+    Future.delayed(Duration(milliseconds: stagger), () {
+      if (mounted) _ctrl.forward();
+    });
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final total = widget.total;
+    final i = widget.index;
+    // Fan layout: spread cards across bottom
+    final fanX = (i - (total - 1) / 2.0) * 22.0;
+    final fanAngle = (i - (total - 1) / 2.0) * 0.07;
+    const fanY = -85.0;
+
+    return Align(
+      alignment: Alignment.bottomCenter,
+      child: AnimatedBuilder(
+        animation: _progress,
+        builder: (context, child) {
+          final t = _progress.value;
+          final currentX = fanX * t;
+          final currentY = fanY - (1.0 - t) * 380.0; // slides from above screen → fan position
+          final currentAngle = fanAngle * t;
+          final opacity = (t * 2.5).clamp(0.0, 1.0);
+          return Opacity(
+            opacity: opacity,
+            child: Transform.translate(
+              offset: Offset(currentX, currentY),
+              child: Transform.rotate(angle: currentAngle, child: child),
+            ),
+          );
+        },
+        child: GestureDetector(
+          onTap: widget.onTap,
+          child: Opacity(
+            opacity: widget.isPlayable ? 1.0 : 0.65,
+            child: PlayingCard(
+              card: CardModel.fromId(widget.cardId),
+              isFaceUp: true,
+              isPlayable: widget.isPlayable,
+              width: 70,
+              height: 105,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Face-down opponent card fan (same as Minus OpponentCardWidget) ──────────
+class TehriOpponentCardWidget extends StatelessWidget {
+  final String position;
+  final int index;
+  final int total;
+  const TehriOpponentCardWidget({
+    super.key,
+    required this.position,
+    required this.index,
+    required this.total,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final fanOffset = (index - (total - 1) / 2) * 12.0;
+    final rotation = (index - (total - 1) / 2) * 0.05;
+    Alignment alignment;
+    EdgeInsets padding;
+    double angle;
+    switch (position) {
+      case 'left':
+        alignment = Alignment.topLeft;
+        padding = const EdgeInsets.only(left: 20, top: 100);
+        angle = math.pi / 6 + (rotation * 0.5);
+        break;
+      case 'top':
+        alignment = Alignment.topRight;
+        padding = const EdgeInsets.only(right: 20, top: 100);
+        angle = -math.pi / 6 + (rotation * 0.5);
+        break;
+      case 'right':
+        alignment = Alignment.bottomRight;
+        padding = const EdgeInsets.only(right: 20, bottom: 210);
+        angle = -math.pi / 12 + (rotation * 0.5);
+        break;
+      default:
+        alignment = Alignment.center;
+        padding = EdgeInsets.zero;
+        angle = 0;
+    }
+    return Align(
+      alignment: alignment,
+      child: Padding(
+        padding: padding,
+        child: SizedBox(
+          width: 86,
+          height: 120,
+          child: Stack(
+            alignment: Alignment.center,
+            clipBehavior: Clip.none,
+            children: [
+              Transform.translate(
+                offset: Offset(fanOffset, -10),
+                child: Transform.rotate(
+                  angle: angle,
+                  child: const PlayingCard(isFaceUp: false, width: 44, height: 66),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
