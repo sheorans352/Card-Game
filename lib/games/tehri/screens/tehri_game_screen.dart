@@ -196,13 +196,14 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
         if ((room.status == 'selecting_dealer' || room.status == 'waiting_to_start') && room.lastSelectionCard != null)
           _buildSelectionCards(room.lastSelectionCard!, rotatedPlayers),
 
-        // 3. AVATARS + OPPONENT HAND FANS
+        // 3. OPPONENT HAND FANS first (so they render BEHIND avatars)
+        ..._buildOpponentHands(ref, rotatedPlayers),
+
+        // AVATARS on top of fan cards
         _buildPlayerAvatar(rotatedPlayers[0], 'bottom', room, localId, players),
         _buildPlayerAvatar(rotatedPlayers[1], 'left', room, localId, players),
         _buildPlayerAvatar(rotatedPlayers[2], 'top', room, localId, players),
         _buildPlayerAvatar(rotatedPlayers[3], 'right', room, localId, players),
-        // Opponent face-down fans (indices 1-3 in rotated list = left/top/right)
-        ..._buildOpponentHands(ref, rotatedPlayers),
 
         // 4. MY HAND — animated cards slide in, sorted by suit/rank
         ...handAsync.when(
@@ -490,21 +491,38 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
                   final teamBTricks = teamB.fold(0, (sum, p) => sum + p.tricksWon);
                   final nameA = teamA.map((p) => p.name).join(' & ');
                   final nameB = teamB.map((p) => p.name).join(' & ');
+                  // Bidder's team → show "X / bid tricks"; other team → plain trick count
+                  final bidderSeat = players.firstWhereOrNull((p) => p.id == room.bidderId)?.seatIndex;
+                  final bidderOnEven = bidderSeat != null && bidderSeat % 2 == 0;
+                  // Even team = seats 0+2, Odd team = seats 1+3
+                  final teamAIsBidder = bidderOnEven;
                   return Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Row(mainAxisSize: MainAxisSize.min, children: [
                         Text(nameA, style: const TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold)),
-                        Container(margin: const EdgeInsets.symmetric(horizontal: 4), padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                        const SizedBox(width: 4),
+                        Container(padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
                           decoration: BoxDecoration(color: accentGold.withOpacity(0.2), borderRadius: BorderRadius.circular(6)),
-                          child: Text('$teamATricks tricks  |  ${room.gameWinsEvenTeam} wins', style: const TextStyle(color: accentGold, fontSize: 8, fontWeight: FontWeight.w900))),
+                          child: teamAIsBidder && room.currentBid > 0
+                            ? Text('$teamATricks / ${room.currentBid} bid  |  ${room.gameWinsEvenTeam} wins',
+                                style: const TextStyle(color: accentGold, fontSize: 8, fontWeight: FontWeight.w900))
+                            : Text('$teamATricks tricks  |  ${room.gameWinsEvenTeam} wins',
+                                style: const TextStyle(color: accentGold, fontSize: 8, fontWeight: FontWeight.w900)),
+                        ),
                       ]),
                       const SizedBox(height: 2),
                       Row(mainAxisSize: MainAxisSize.min, children: [
                         Text(nameB, style: const TextStyle(color: Colors.white70, fontSize: 8, fontWeight: FontWeight.bold)),
-                        Container(margin: const EdgeInsets.symmetric(horizontal: 4), padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                        const SizedBox(width: 4),
+                        Container(padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
                           decoration: BoxDecoration(color: Colors.white.withOpacity(0.08), borderRadius: BorderRadius.circular(6)),
-                          child: Text('$teamBTricks tricks  |  ${room.gameWinsOddTeam} wins', style: const TextStyle(color: Colors.white70, fontSize: 8, fontWeight: FontWeight.w900))),
+                          child: !teamAIsBidder && room.currentBid > 0
+                            ? Text('$teamBTricks / ${room.currentBid} bid  |  ${room.gameWinsOddTeam} wins',
+                                style: const TextStyle(color: Colors.white70, fontSize: 8, fontWeight: FontWeight.w900))
+                            : Text('$teamBTricks tricks  |  ${room.gameWinsOddTeam} wins',
+                                style: const TextStyle(color: Colors.white70, fontSize: 8, fontWeight: FontWeight.w900)),
+                        ),
                       ]),
                     ],
                   );
