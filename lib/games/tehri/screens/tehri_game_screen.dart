@@ -852,33 +852,37 @@ class _TehriHandCardWidgetState extends State<TehriHandCardWidget>
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
     final total = widget.total;
     final i = widget.index;
-    // Fan layout: spread cards across bottom
+
+    // Fan layout using REAL layout position so hit area matches visual on Flutter Web
     final fanX = (i - (total - 1) / 2.0) * 22.0;
     final fanAngle = (i - (total - 1) / 2.0) * 0.07;
-    const fanY = -85.0;
+    // Positioned.left = screen center + fan offset - half card width
+    final cardLeft = (screenWidth / 2) + fanX - 35.0;
+    const cardBottom = 85.0;
 
-    return Align(
-      alignment: Alignment.bottomCenter,
+    // Positioned (not Align+Transform.translate) so hit area = visual position
+    return Positioned(
+      left: cardLeft,
+      bottom: cardBottom,
       child: AnimatedBuilder(
         animation: _progress,
         builder: (context, _) {
           final t = _progress.value;
-          final currentX = fanX * t;
-          final currentY = fanY - (1.0 - t) * 380.0;
+          // Only Y for the slide-in animation; X is handled by Positioned.left
+          final slideY = -(1.0 - t) * 380.0;
           final currentAngle = fanAngle * t;
           final opacity = (t * 2.5).clamp(0.0, 1.0);
-          // GestureDetector INSIDE Transform so hit area matches visual position on web
           return Opacity(
             opacity: opacity,
             child: Transform.translate(
-              offset: Offset(currentX, currentY),
+              offset: Offset(0, slideY), // Y-only — zero after animation ends
               child: Transform.rotate(
                 angle: currentAngle,
                 child: Opacity(
                   opacity: widget.isPlayable ? 1.0 : 0.65,
-                  // Pass onTap directly into PlayingCard's own GestureDetector
                   child: PlayingCard(
                     card: CardModel.fromId(widget.cardId),
                     isFaceUp: true,
