@@ -561,12 +561,32 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
                   final bidderPlayer = players.firstWhereOrNull((p) => p.id == room.bidderId);
                   final bidderTeamIndex = bidderPlayer?.teamIndex;
                   
+                  // For the non-bidding team, the target to "break" the bid is (14 - currentBid)
+                  // e.g. Bid 7 -> Opponent needs 7 (14-7). Bid 8 -> Opponent needs 6 (14-8).
+                  final breakTarget = 14 - room.currentBid;
+
                   return Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      _buildTeamHUDRow(nameA, teamATricks, room.currentBid, bidderTeamIndex == 0, room.gameWinsEvenTeam, isEven: true),
+                      _buildTeamHUDRow(
+                        nameA, 
+                        teamATricks, 
+                        bidderTeamIndex == 0 ? room.currentBid : breakTarget, 
+                        bidderTeamIndex == 0, 
+                        room.gameWinsEvenTeam, 
+                        isEven: true,
+                        label: bidderTeamIndex == 0 ? 'bid' : 'to break'
+                      ),
                       const SizedBox(height: 4),
-                      _buildTeamHUDRow(nameB, teamBTricks, room.currentBid, bidderTeamIndex == 1, room.gameWinsOddTeam, isEven: false),
+                      _buildTeamHUDRow(
+                        nameB, 
+                        teamBTricks, 
+                        bidderTeamIndex == 1 ? room.currentBid : breakTarget, 
+                        bidderTeamIndex == 1, 
+                        room.gameWinsOddTeam, 
+                        isEven: false,
+                        label: bidderTeamIndex == 1 ? 'bid' : 'to break'
+                      ),
                     ],
                   );
                 }),
@@ -585,7 +605,7 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
     );
   }
 
-  Widget _buildTeamHUDRow(String names, int tricks, int bid, bool isBidderTeam, int wins, {required bool isEven}) {
+  Widget _buildTeamHUDRow(String names, int tricks, int target, bool isBidderTeam, int wins, {required bool isEven, required String label}) {
     final color = isEven ? accentGold : Colors.white70;
     final bg = isEven ? accentGold.withOpacity(0.15) : Colors.white.withOpacity(0.08);
     
@@ -609,10 +629,10 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
             border: isBidderTeam ? Border.all(color: color.withOpacity(0.3), width: 0.5) : null,
           ),
           child: Text(
-            isBidderTeam && bid > 0
-              ? '$tricks / $bid  •  $wins W'
+            target > 0
+              ? '$tricks / $target $label  •  $wins W'
               : '$tricks pts  •  $wins W',
-            style: TextStyle(color: color, fontSize: 9, fontWeight: FontWeight.w900),
+            style: TextStyle(color: color, fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 0.2),
           ),
         ),
       ],
@@ -649,7 +669,6 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
     final bool isDealer = room.dealerId == player.id;
     final bool isMe = player.id == localId;
 
-
     Alignment alignment; EdgeInsets padding;
     switch (pos) {
       case 'bottom': alignment = Alignment.bottomLeft; padding = const EdgeInsets.only(left: 20, bottom: 220); break;
@@ -678,34 +697,37 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(isMe ? 'YOU' : player.name.toUpperCase(),
-                    style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900),
+                    style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 0.5),
                     overflow: TextOverflow.ellipsis),
-                  const Divider(color: Colors.white10, indent: 10, endIndent: 10),
-                  // Dealer: show TEHRI score + individual tricks
-                  // Others: show individual tricks only
+                  Container(
+                    width: 40, height: 1, 
+                    margin: const EdgeInsets.symmetric(vertical: 6),
+                    color: accentGold.withOpacity(0.2),
+                  ),
+                  
+                  // Always show personal tricks won this round
+                  Text('${player.tricksWon}', 
+                    style: const TextStyle(color: accentGold, fontSize: 18, fontWeight: FontWeight.w900)),
+                  const Text('TRICKS', style: TextStyle(color: Colors.white24, fontSize: 8, fontWeight: FontWeight.bold)),
+                  
+                  const SizedBox(height: 6),
+
+                  // If Dealer, show Tehri score points (0-52)
                   if (isDealer && room.status != 'selecting_dealer' && room.status != 'waiting_to_start') ...[
-                    // Tehri score — colour coded
+                    const Divider(color: Colors.white10, indent: 15, endIndent: 15, height: 8),
                     Text('${room.tehriScore}',
                       style: TextStyle(
                         color: room.tehriScore <= 20 ? Colors.greenAccent
                              : room.tehriScore <= 40 ? Colors.amberAccent
                              : Colors.redAccent,
-                        fontSize: 17, fontWeight: FontWeight.w900,
+                        fontSize: 12, fontWeight: FontWeight.w900,
                       )),
-                    const Text('TEHRI', style: TextStyle(color: Colors.white24, fontSize: 7, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 2),
-                    // Also show personal tricks for this round
-                    Text('${player.tricksWon} tricks',
-                      style: const TextStyle(color: accentGold, fontSize: 9, fontWeight: FontWeight.w700)),
-                  ] else ...[
-                    Text('${player.tricksWon}', style: const TextStyle(color: accentGold, fontSize: 18, fontWeight: FontWeight.w900)),
-                    const Text('TRICKS', style: TextStyle(color: Colors.white24, fontSize: 8, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 10),
+                    const Text('TEHRI PTS', style: TextStyle(color: Colors.white24, fontSize: 6, fontWeight: FontWeight.bold)),
                   ],
                 ],
               ),
             ),
-            if (isDealer) const Padding(padding: EdgeInsets.only(top: 4), child: Text('DEALER', style: TextStyle(color: accentGold, fontSize: 8, fontWeight: FontWeight.w900))),
+            if (isDealer) const Padding(padding: EdgeInsets.only(top: 4), child: Text('DEALER', style: TextStyle(color: accentGold, fontSize: 8, fontWeight: FontWeight.w900, letterSpacing: 1))),
           ],
         ),
       ),
