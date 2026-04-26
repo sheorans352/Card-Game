@@ -516,18 +516,24 @@ BEGIN
   SELECT id INTO final_cutter_id FROM public.tehri_players 
   WHERE room_id = rid AND seat_index = (final_dealer_seat + 1) % 4;
 
-  -- Cleanup previous round data
+  -- 3. AGGRESSIVE CLEANUP
+  -- We delete everything related to the previous round
   DELETE FROM public.tehri_tricks WHERE room_id = rid;
   DELETE FROM public.tehri_hands WHERE player_id IN (SELECT id FROM public.tehri_players WHERE room_id = rid);
   UPDATE public.tehri_players SET tricks_won = 0 WHERE room_id = rid;
   
-  -- Reshuffle shoe
+  -- 4. NEW SHUFFLE (FISHER-YATES SIMULATION)
   UPDATE public.tehri_shoes 
-  SET shoe = (SELECT array_agg(card ORDER BY random()) FROM unnest(shoe) AS card),
-      shoe_ptr = 0
+  SET shoe = (
+    SELECT array_agg(card) FROM (
+      SELECT card FROM unnest(shoe) AS card
+      ORDER BY random()
+    ) t
+  ),
+  shoe_ptr = 0
   WHERE room_id = rid;
 
-  -- Update room status
+  -- 5. UPATE ROOM
   UPDATE public.tehri_rooms SET
     tehri_score = final_tehri_pts,
     dealer_id = final_dealer_id,
@@ -536,6 +542,7 @@ BEGIN
     current_bid = 0,
     bidder_id = NULL,
     trump_suit = NULL,
+    bid_turn_count = 0,
     current_turn_index = (SELECT seat_index FROM public.tehri_players WHERE id = final_cutter_id),
     round_number = round_number + 1
   WHERE id = rid;
