@@ -126,15 +126,13 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
   Future<void> _handleDealSequence(TehriRoom room, List<TehriPlayer> players, int count, {required bool isInitial}) async {
     try {
       final dealerIdx = players.indexWhere((p) => p.id == room.dealerId);
-      // Anti-clockwise: Start from player LEFT (idx - 1 + 4) % 4
-      final startIndex = (dealerIdx - 1 + 4) % 4;
-      
-      int rounds = isInitial ? 1 : 2; 
+
+      int rounds = isInitial ? 1 : 2;
 
       for (int r = 0; r < rounds; r++) {
         for (int i = 0; i < 4; i++) {
-          // Anti-clockwise loop: (start - i + 4) % 4
-          final seatToDeal = (startIndex - i + 4) % 4;
+          // Anti-clockwise: dealer+1, dealer+2, dealer+3, dealer (self)
+          final seatToDeal = (dealerIdx + 1 + i) % 4;
           final p = players.firstWhere((p) => p.seatIndex == seatToDeal);
           await ref.read(tehriOpsProvider).dealBatch(room.id, p.id, count);
           await Future.delayed(const Duration(milliseconds: 600));
