@@ -863,33 +863,35 @@ class _TehriHandCardWidgetState extends State<TehriHandCardWidget>
       alignment: Alignment.bottomCenter,
       child: AnimatedBuilder(
         animation: _progress,
-        builder: (context, child) {
+        builder: (context, _) {
           final t = _progress.value;
           final currentX = fanX * t;
-          final currentY = fanY - (1.0 - t) * 380.0; // slides from above screen → fan position
+          final currentY = fanY - (1.0 - t) * 380.0;
           final currentAngle = fanAngle * t;
           final opacity = (t * 2.5).clamp(0.0, 1.0);
+          // GestureDetector INSIDE Transform so hit area matches visual position on web
           return Opacity(
             opacity: opacity,
             child: Transform.translate(
               offset: Offset(currentX, currentY),
-              child: Transform.rotate(angle: currentAngle, child: child),
+              child: Transform.rotate(
+                angle: currentAngle,
+                child: Opacity(
+                  opacity: widget.isPlayable ? 1.0 : 0.65,
+                  // Pass onTap directly into PlayingCard's own GestureDetector
+                  child: PlayingCard(
+                    card: CardModel.fromId(widget.cardId),
+                    isFaceUp: true,
+                    isPlayable: widget.isPlayable,
+                    onTap: widget.onTap,
+                    width: 70,
+                    height: 105,
+                  ),
+                ),
+              ),
             ),
           );
         },
-        child: GestureDetector(
-          onTap: widget.onTap,
-          child: Opacity(
-            opacity: widget.isPlayable ? 1.0 : 0.65,
-            child: PlayingCard(
-              card: CardModel.fromId(widget.cardId),
-              isFaceUp: true,
-              isPlayable: widget.isPlayable,
-              width: 70,
-              height: 105,
-            ),
-          ),
-        ),
       ),
     );
   }
