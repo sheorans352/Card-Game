@@ -17,6 +17,12 @@ final currentTehriRoomCodeProvider = StateProvider<String?>((ref) => null);
 final localTehriPlayerIdProvider = StateProvider<String?>((ref) => null);
 final localTehriPlayerNameProvider = StateProvider<String?>((ref) => null);
 
+// --- Optimistic Card Play (mirrors Minus pattern for zero-lag UI) ---
+// Cards the local player has tapped — removed from hand immediately, before DB confirms.
+final tehriLocalPlayedCardsProvider = StateProvider<Set<String>>((ref) => {});
+// Cards mid-flight to the server (prevents double-tap while awaiting confirmation).
+final tehriPendingCardPlayProvider = StateProvider<Set<String>>((ref) => {});
+
 // --- Dealer Selection State ---
 final dealerSelectionCardProvider = StateProvider<Map<String, dynamic>?>((ref) => null);
 

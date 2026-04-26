@@ -73,6 +73,16 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
       });
     });
 
+    // Clear optimistic card state when a new round starts
+    ref.listen<AsyncValue<TehriRoom?>>(tehriRoomProvider(widget.roomId!), (prev, next) {
+      final prevStatus = prev?.value?.status;
+      final nextStatus = next.value?.status;
+      if (nextStatus == 'cutting' && prevStatus != 'cutting') {
+        ref.read(tehriLocalPlayedCardsProvider.notifier).state = {};
+        ref.read(tehriPendingCardPlayProvider.notifier).state = {};
+      }
+    });
+
     return Scaffold(
       backgroundColor: primaryBg,
       body: roomAsync.when(
@@ -208,9 +218,14 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
         // 4. MY HAND — animated cards slide in, sorted by suit/rank
         ...handAsync.when(
           data: (hand) {
+            final localPlayedCards = ref.watch(tehriLocalPlayedCardsProvider);
+            final pendingCards = ref.watch(tehriPendingCardPlayProvider);
+
             final bool restricted = room.status == 'bidding_initial' && room.cutterId == me.id;
             final rawHand = restricted ? hand.take(5).toList() : hand;
-            final sortedHand = List<String>.from(rawHand)..sort((a, b) {
+            // Optimistically exclude cards the player has already tapped
+            final visibleHand = rawHand.where((c) => !localPlayedCards.contains(c)).toList();
+            final sortedHand = List<String>.from(visibleHand)..sort((a, b) {
               const suitOrder = {'S': 0, 'H': 1, 'D': 2, 'C': 3};
               final sA = a.substring(a.length - 1);
               final sB = b.substring(b.length - 1);
@@ -218,15 +233,29 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
               if (sCmp != 0) return sCmp;
               return CardModel.getRankValue(b).compareTo(CardModel.getRankValue(a));
             });
-            final isPlayable = room.status == 'playing' && room.currentTurnIndex == me.seatIndex;
-            return sortedHand.asMap().entries.map((e) => TehriHandCardWidget(
-              key: ValueKey(e.value),
-              cardId: e.value,
-              index: e.key,
-              total: sortedHand.length,
-              isPlayable: isPlayable,
-              onTap: isPlayable ? () => ref.read(tehriOpsProvider).playCard(room.id, me.id, e.value) : null,
-            )).toList();
+            final isMyTurn = room.status == 'playing' && room.currentTurnIndex == me.seatIndex;
+            return sortedHand.asMap().entries.map((e) {
+              final cardId = e.value;
+              final isPending = pendingCards.contains(cardId);
+              final canPlay = isMyTurn && !isPending;
+              return TehriHandCardWidget(
+                key: ValueKey(cardId),
+                cardId: cardId,
+                index: e.key,
+                total: sortedHand.length,
+                isPlayable: canPlay,
+                onTap: canPlay ? () {
+                  // Optimistic: remove card from hand instantly
+                  ref.read(tehriPendingCardPlayProvider.notifier).update((s) => {...s, cardId});
+                  ref.read(tehriLocalPlayedCardsProvider.notifier).update((s) => {...s, cardId});
+                  // Fire RPC in background — rollback on failure
+                  ref.read(tehriOpsProvider).playCard(room.id, me.id, cardId).catchError((_) {
+                    ref.read(tehriPendingCardPlayProvider.notifier).update((s) => s.where((v) => v != cardId).toSet());
+                    ref.read(tehriLocalPlayedCardsProvider.notifier).update((s) => s.where((v) => v != cardId).toSet());
+                  });
+                } : null,
+              );
+            }).toList();
           },
           loading: () => [],
           error: (e, s) => [],
