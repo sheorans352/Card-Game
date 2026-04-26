@@ -601,18 +601,6 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
     final bool isDealer = room.dealerId == player.id;
     final bool isMe = player.id == localId;
 
-    // Bidder's team points: bidder + their partner (opposite seat = seatIndex ^ 1 for 0↔1 / 2↔3... 
-    // actually opposite in a 4-player ring is (seatIndex + 2) % 4)
-    final bool isBidder = player.id == room.bidderId;
-    int? teamPoints;
-    if (room.bidderId != null) {
-      final bidder = allPlayers.firstWhereOrNull((p) => p.id == room.bidderId);
-      if (bidder != null) {
-        final partnerSeat = (bidder.seatIndex + 2) % 4;
-        final partner = allPlayers.firstWhereOrNull((p) => p.seatIndex == partnerSeat);
-        teamPoints = bidder.points + (partner?.points ?? 0);
-      }
-    }
 
     Alignment alignment; EdgeInsets padding;
     switch (pos) {
@@ -660,19 +648,7 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
                     Text('${player.tricksWon}', style: const TextStyle(color: accentGold, fontSize: 18, fontWeight: FontWeight.w900)),
                     const Text('TRICKS', style: TextStyle(color: Colors.white24, fontSize: 8, fontWeight: FontWeight.bold)),
                   ],
-                  const SizedBox(height: 4),
-                  // Bidder's avatar shows team pts toward 52
-                  if (isBidder && teamPoints != null)
-                    Column(children: [
-                      Text('$teamPoints / 52',
-                        style: TextStyle(
-                          color: teamPoints >= 52 ? Colors.greenAccent : Colors.redAccent,
-                          fontSize: 9, fontWeight: FontWeight.w900,
-                        )),
-                      Text('TEAM PTS', style: TextStyle(color: Colors.white38, fontSize: 7)),
-                    ])
-                  else
-                    const SizedBox(height: 10),
+                  const SizedBox(height: 10),
                 ],
               ),
             ),
