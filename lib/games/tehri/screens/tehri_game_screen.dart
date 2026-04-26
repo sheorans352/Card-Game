@@ -576,6 +576,7 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
                         bidderTeamIndex == 0 ? room.currentBid : breakTarget, 
                         bidderTeamIndex == 0, 
                         room.gameWinsEvenTeam, 
+                        room.currentBid,
                         isEven: true,
                         label: bidderTeamIndex == 0 ? 'bid' : 'to break'
                       ),
@@ -586,6 +587,7 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
                         bidderTeamIndex == 1 ? room.currentBid : breakTarget, 
                         bidderTeamIndex == 1, 
                         room.gameWinsOddTeam, 
+                        room.currentBid,
                         isEven: false,
                         label: bidderTeamIndex == 1 ? 'bid' : 'to break'
                       ),
@@ -607,10 +609,10 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
     );
   }
 
-  Widget _buildTeamHUDRow(String names, int tricks, int target, bool isBidderTeam, int wins, {required bool isEven, required String label}) {
+  Widget _buildTeamHUDRow(String names, int tricks, int target, bool isBidderTeam, int wins, int currentBid, {required bool isEven, required String label}) {
     final color = isEven ? accentGold : Colors.white70;
     final bg = isEven ? accentGold.withOpacity(0.15) : Colors.white.withOpacity(0.08);
-    final hasBid = room.currentBid > 0;
+    final hasBid = currentBid > 0;
     
     return Row(
       mainAxisSize: MainAxisSize.min,
