@@ -304,14 +304,18 @@ BEGIN
   END IF;
 
   -- Move turn
-  IF (r.current_turn_index + 1) % 4 = (SELECT seat_index FROM public.tehri_players WHERE id = r.cutter_id) THEN
-    -- Bidding cycle complete
+  IF r.bid_turn_count + 1 >= 4 THEN
+    SELECT seat_index INTO bidder_seat FROM public.tehri_players WHERE id = r.bidder_id;
     UPDATE public.tehri_rooms SET 
-      status = 'playing',
-      current_turn_index = (SELECT seat_index FROM public.tehri_players WHERE id = bidder_id)
+      status             = 'playing',
+      current_turn_index = bidder_seat,
+      bid_turn_count     = 0
     WHERE id = rid;
   ELSE
-    UPDATE public.tehri_rooms SET current_turn_index = (r.current_turn_index + 1) % 4 WHERE id = rid;
+    UPDATE public.tehri_rooms SET 
+      current_turn_index = (r.current_turn_index + 1) % 4,  -- anti-clockwise
+      bid_turn_count     = r.bid_turn_count + 1
+    WHERE id = rid;
   END IF;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
@@ -363,7 +367,7 @@ BEGIN
   -- Remove card from hand
   UPDATE public.tehri_hands SET cards = array_remove(hand, card_id) WHERE player_id = pid;
   
-  -- Next turn
+  -- Next turn (Anti-clockwise)
   UPDATE public.tehri_rooms SET current_turn_index = (r.current_turn_index + 1) % 4 WHERE id = rid;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
@@ -586,6 +590,75 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+
+-- RPC: Start Dealer Selection
+CREATE OR REPLACE FUNCTION public.tehri_start_selection(rid uuid)
+RETURNS void AS $$
+DECLARE
+  new_shoe text[];
+BEGIN
+  new_shoe := public.tehri_generate_shoe();
+  INSERT INTO public.tehri_shoes (room_id, shoe, shoe_ptr) 
+  VALUES (rid, new_shoe, 0)
+  ON CONFLICT (room_id) DO UPDATE SET shoe = EXCLUDED.shoe, shoe_ptr = 0;
+
+  UPDATE public.tehri_rooms SET 
+    status = 'selecting_dealer',
+    current_turn_index = 0,
+    dealer_id = NULL,
+    cutter_id = NULL
+  WHERE id = rid;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- RPC: Deal for Selection
+CREATE OR REPLACE FUNCTION public.tehri_deal_for_selection(rid uuid)
+RETURNS jsonb AS $$
+DECLARE
+  r record;
+  s record;
+  p record;
+  card_id text;
+  is_spades_jack boolean;
+  next_seat int;
+  res jsonb;
+BEGIN
+  SELECT * INTO r FROM public.tehri_rooms WHERE id = rid FOR UPDATE;
+  SELECT * INTO s FROM public.tehri_shoes WHERE room_id = rid FOR UPDATE;
+
+  IF r.status <> 'selecting_dealer' THEN
+    RAISE EXCEPTION 'Not in selecting_dealer phase';
+  END IF;
+
+  next_seat := r.current_turn_index;
+  SELECT * INTO p FROM public.tehri_players WHERE room_id = rid AND seat_index = next_seat;
+
+  card_id := s.shoe[s.shoe_ptr + 1];
+  is_spades_jack := card_id = 'JS';
+
+  res := jsonb_build_object(
+    'cardId', card_id,
+    'playerId', p.id,
+    'isJack', is_spades_jack
+  );
+
+  UPDATE public.tehri_shoes SET shoe_ptr = s.shoe_ptr + 1 WHERE room_id = rid;
+  
+  IF is_spades_jack THEN
+    UPDATE public.tehri_rooms SET 
+      dealer_id = p.id,
+      status = 'waiting_to_start',
+      current_turn_index = next_seat,
+      last_selection_card = res
+    WHERE id = rid;
+  ELSE
+    -- Anti-clockwise logic: +1 moves Bottom -> Left -> Top -> Right
+    UPDATE public.tehri_rooms SET current_turn_index = (next_seat + 1) % 4, last_selection_card = res WHERE id = rid;
+  END IF;
+
+  RETURN res;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- 5. ENABLE REALTIME
 DO $$
