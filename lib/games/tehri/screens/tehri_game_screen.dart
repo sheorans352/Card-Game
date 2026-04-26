@@ -633,22 +633,27 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
                     style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900),
                     overflow: TextOverflow.ellipsis),
                   const Divider(color: Colors.white10, indent: 10, endIndent: 10),
-                  // Dealer shows Tehri score; others show tricks won
+                  // Dealer: show TEHRI score + individual tricks
+                  // Others: show individual tricks only
                   if (isDealer && room.status != 'selecting_dealer' && room.status != 'waiting_to_start') ...[
-                    // Tehri score — colour coded: green ≤20, yellow 21-40, red 41+
+                    // Tehri score — colour coded
                     Text('${room.tehriScore}',
                       style: TextStyle(
                         color: room.tehriScore <= 20 ? Colors.greenAccent
                              : room.tehriScore <= 40 ? Colors.amberAccent
                              : Colors.redAccent,
-                        fontSize: 20, fontWeight: FontWeight.w900,
+                        fontSize: 17, fontWeight: FontWeight.w900,
                       )),
-                    const Text('TEHRI', style: TextStyle(color: Colors.white24, fontSize: 8, fontWeight: FontWeight.bold)),
+                    const Text('TEHRI', style: TextStyle(color: Colors.white24, fontSize: 7, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 2),
+                    // Also show personal tricks for this round
+                    Text('${player.tricksWon} tricks',
+                      style: const TextStyle(color: accentGold, fontSize: 9, fontWeight: FontWeight.w700)),
                   ] else ...[
                     Text('${player.tricksWon}', style: const TextStyle(color: accentGold, fontSize: 18, fontWeight: FontWeight.w900)),
                     const Text('TRICKS', style: TextStyle(color: Colors.white24, fontSize: 8, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 10),
                   ],
-                  const SizedBox(height: 10),
                 ],
               ),
             ),
