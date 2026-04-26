@@ -478,8 +478,32 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
                     ]);
                   }),
                 ],
-                Text(room.status.toUpperCase().replaceAll('_', ' '), style: const TextStyle(color: accentGold, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 2)),
-                
+                // CENTER: team trick score (once game is in playing/bidding state)
+                Builder(builder: (context) {
+                  // Teams: seats 0+2 vs seats 1+3 (opposite players)
+                  if (players.length < 4 || room.currentBid == 0) {
+                    return Text(room.status.toUpperCase().replaceAll('_', ' '),
+                      style: const TextStyle(color: accentGold, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 2));
+                  }
+                  // Identify the two teams by seat parity
+                  final teamA = players.where((p) => p.seatIndex % 2 == 0).toList();
+                  final teamB = players.where((p) => p.seatIndex % 2 == 1).toList();
+                  final teamATricks = teamA.fold(0, (sum, p) => sum + p.tricksWon);
+                  final teamBTricks = teamB.fold(0, (sum, p) => sum + p.tricksWon);
+                  final nameA = teamA.map((p) => p.name).join(' & ');
+                  final nameB = teamB.map((p) => p.name).join(' & ');
+                  return Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text('$nameA: $teamATricks',
+                        style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 2),
+                      Text('$nameB: $teamBTricks',
+                        style: const TextStyle(color: Colors.white70, fontSize: 9, fontWeight: FontWeight.bold)),
+                    ],
+                  );
+                }),
+
                 // Quit Button
                 IconButton(
                   icon: const Icon(Icons.logout, color: Colors.white38, size: 20),
@@ -558,7 +582,11 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
                   Text('${player.tricksWon}', style: const TextStyle(color: accentGold, fontSize: 18, fontWeight: FontWeight.w900)),
                   const Text('TRICKS', style: TextStyle(color: Colors.white24, fontSize: 8, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 4),
-                  Text('PTS: ${player.points}', style: const TextStyle(color: Colors.white38, fontSize: 8)),
+                  // Points only shown for the bidder (the player who won the contract)
+                  if (player.id == room.bidderId)
+                    Text('PTS: ${player.points}', style: const TextStyle(color: accentGold, fontSize: 8, fontWeight: FontWeight.bold))
+                  else
+                    const SizedBox(height: 10),
                 ],
               ),
             ),
