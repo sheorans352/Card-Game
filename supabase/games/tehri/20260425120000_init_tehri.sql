@@ -441,58 +441,151 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Final Scoring Logic
+-- Final Scoring Logic & Round Transition
 CREATE OR REPLACE FUNCTION public.tehri_resolve_round(rid uuid)
 RETURNS void AS $$
 DECLARE
   r record;
+  dealer record;
   bidder record;
-  bid_team int;
-  is_dealing_team boolean;
-  tricks_won_team int;
-  score_delta int;
+  dealer_partner_seat int;
+  bidder_team_tricks int;
+  bidder_on_dealer_team boolean;
+  bid_made boolean;
+  new_tehri int;
+  
+  final_dealer_id uuid;
+  final_cutter_id uuid;
+  final_dealer_seat int;
+  final_tehri_pts int;
 BEGIN
   SELECT * INTO r FROM public.tehri_rooms WHERE id = rid FOR UPDATE;
+  SELECT * INTO dealer FROM public.tehri_players WHERE id = r.dealer_id;
   SELECT * INTO bidder FROM public.tehri_players WHERE id = r.bidder_id;
-  
-  bid_team := bidder.team_index;
-  is_dealing_team := (bid_team = r.dealing_team_id);
-  
-  SELECT sum(tricks_won) INTO tricks_won_team FROM public.tehri_players 
-  WHERE room_id = rid AND team_index = bid_team;
 
-  IF tricks_won_team >= r.current_bid THEN
-    -- Success
-    IF is_dealing_team THEN
-      score_delta := -r.current_bid; -- Reduce dealing team's points
-      UPDATE public.tehri_players SET points = points + score_delta WHERE room_id = rid AND team_index = bid_team;
-    ELSE
-      score_delta := r.current_bid; -- Increase dealing team's points
-      UPDATE public.tehri_players SET points = points + score_delta WHERE room_id = rid AND team_index = r.dealing_team_id;
-    END IF;
+  dealer_partner_seat := (dealer.seat_index + 2) % 4;
+
+  -- Calculate tricks won by bidder's team
+  SELECT COALESCE(SUM(tricks_won), 0) INTO bidder_team_tricks
+  FROM public.tehri_players
+  WHERE room_id = rid
+    AND team_index = bidder.team_index;
+
+  bidder_on_dealer_team := (bidder.team_index = dealer.team_index);
+  bid_made := bidder_team_tricks >= r.current_bid;
+
+  -- Tehri score logic
+  IF bidder_on_dealer_team THEN
+    new_tehri := CASE WHEN bid_made THEN r.tehri_score - r.current_bid
+                                    ELSE r.tehri_score + (2 * r.current_bid) END;
   ELSE
-    -- Failure
-    IF is_dealing_team THEN
-      score_delta := 2 * r.current_bid; -- Increase dealing team's points
-      UPDATE public.tehri_players SET points = points + score_delta WHERE room_id = rid AND team_index = bid_team;
-    ELSE
-      score_delta := -2 * r.current_bid; -- Decrease dealing team's points
-      UPDATE public.tehri_players SET points = points + score_delta WHERE room_id = rid AND team_index = r.dealing_team_id;
-    END IF;
+    new_tehri := CASE WHEN bid_made THEN r.tehri_score + r.current_bid
+                                    ELSE r.tehri_score - (2 * r.current_bid) END;
   END IF;
 
-  -- Check Win Condition
-  IF EXISTS (SELECT 1 FROM public.tehri_players WHERE room_id = rid AND points >= 52) THEN
-    UPDATE public.tehri_rooms SET status = 'ended' WHERE id = rid;
-  ELSE
-    -- Move to next dealer
+  -- Determine new dealer (Rotation anti-clockwise = +1)
+  IF new_tehri < 0 THEN
+    -- Deal passes anti-clockwise: (dealer seat + 1)
+    final_tehri_pts := ABS(new_tehri);
+    SELECT id, seat_index INTO final_dealer_id, final_dealer_seat 
+    FROM public.tehri_players
+    WHERE room_id = rid AND seat_index = (dealer.seat_index + 1) % 4;
+  ELSIF new_tehri >= 52 THEN
+    -- Skip to partner
+    final_tehri_pts := new_tehri - 52;
+    SELECT id, seat_index INTO final_dealer_id, final_dealer_seat 
+    FROM public.tehri_players
+    WHERE room_id = rid AND seat_index = dealer_partner_seat;
+    
+    -- Update game wins
     UPDATE public.tehri_rooms SET 
-      dealer_id = (SELECT id FROM public.tehri_players WHERE room_id = rid AND seat_index = (SELECT (seat_index + 1) % 4 FROM public.tehri_players WHERE id = r.dealer_id)),
-      status = 'waiting' -- Return to waiting or directly to next round
+      game_wins_even_team = game_wins_even_team + (CASE WHEN dealer.team_index = 0 THEN 0 ELSE 1 END),
+      game_wins_odd_team  = game_wins_odd_team  + (CASE WHEN dealer.team_index = 0 THEN 1 ELSE 0 END)
     WHERE id = rid;
+  ELSE
+    final_tehri_pts := new_tehri;
+    final_dealer_id := r.dealer_id;
+    final_dealer_seat := dealer.seat_index;
   END IF;
+
+  -- Cutter is ALWAYS person to the LEFT of the new dealer (Anti-clockwise = +1)
+  SELECT id INTO final_cutter_id FROM public.tehri_players 
+  WHERE room_id = rid AND seat_index = (final_dealer_seat + 1) % 4;
+
+  -- Cleanup previous round data
+  DELETE FROM public.tehri_tricks WHERE room_id = rid;
+  DELETE FROM public.tehri_hands WHERE player_id IN (SELECT id FROM public.tehri_players WHERE room_id = rid);
+  UPDATE public.tehri_players SET tricks_won = 0 WHERE room_id = rid;
+  
+  -- Reshuffle shoe
+  UPDATE public.tehri_shoes 
+  SET shoe = (SELECT array_agg(card ORDER BY random()) FROM unnest(shoe) AS card),
+      shoe_ptr = 0
+  WHERE room_id = rid;
+
+  -- Update room status
+  UPDATE public.tehri_rooms SET
+    tehri_score = final_tehri_pts,
+    dealer_id = final_dealer_id,
+    cutter_id = final_cutter_id,
+    status = 'cutting',
+    current_bid = 0,
+    bidder_id = NULL,
+    trump_suit = NULL,
+    current_turn_index = (SELECT seat_index FROM public.tehri_players WHERE id = final_cutter_id),
+    round_number = round_number + 1
+  WHERE id = rid;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- RPC: Cut Deck
+CREATE OR REPLACE FUNCTION public.tehri_cut_deck(rid uuid, cut_idx int)
+RETURNS void AS $$
+DECLARE
+  s record;
+BEGIN
+  SELECT * INTO s FROM public.tehri_shoes WHERE room_id = rid FOR UPDATE;
+  
+  -- Reorder the shoe array
+  UPDATE public.tehri_shoes 
+  SET shoe = shoe[cut_idx+1:52] || shoe[1:cut_idx]
+  WHERE room_id = rid;
+
+  -- Move status from 'cutting' to 'dealing_initial'
+  UPDATE public.tehri_rooms SET status = 'dealing_initial' WHERE id = rid;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- RPC: Start Cutting
+CREATE OR REPLACE FUNCTION public.tehri_start_cutting(rid uuid)
+RETURNS void AS $$
+DECLARE
+  r record;
+  dealer_seat int;
+  cutter_seat int;
+  v_cutter_id uuid;
+BEGIN
+  SELECT * INTO r FROM public.tehri_rooms WHERE id = rid FOR UPDATE;
+
+  IF r.status <> 'waiting_to_start' THEN
+    RAISE EXCEPTION 'Room is not in waiting_to_start phase';
+  END IF;
+
+  dealer_seat := (SELECT seat_index FROM public.tehri_players WHERE id = r.dealer_id);
+  cutter_seat := (dealer_seat + 1) % 4;
+  SELECT id INTO v_cutter_id FROM public.tehri_players WHERE room_id = rid AND seat_index = cutter_seat;
+
+  UPDATE public.tehri_shoes 
+  SET shoe = (SELECT array_agg(card ORDER BY random()) FROM unnest(shoe) AS card),
+      shoe_ptr = 0
+  WHERE room_id = rid;
+
+  UPDATE public.tehri_rooms 
+  SET status = 'cutting', cutter_id = v_cutter_id, last_selection_card = NULL
+  WHERE id = rid;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
 
 -- 5. ENABLE REALTIME
 DO $$
