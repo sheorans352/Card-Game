@@ -125,17 +125,22 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
 
   Future<void> _handleDealSequence(TehriRoom room, List<TehriPlayer> players, int count, {required bool isInitial}) async {
     try {
-      final dealerIdx = players.indexWhere((p) => p.id == room.dealerId);
+      // Find the cutter's seat index to start dealing
+      final cutterIdx = players.indexWhere((p) => p.id == room.cutterId);
+      if (cutterIdx == -1) return;
 
       int rounds = isInitial ? 1 : 2;
 
       for (int r = 0; r < rounds; r++) {
         for (int i = 0; i < 4; i++) {
-          // Anti-clockwise: dealer+1, dealer+2, dealer+3, dealer (self)
-          final seatToDeal = (dealerIdx + 1 + i) % 4;
+          // Move anti-clockwise in a circle starting from the cutter
+          final seatToDeal = (cutterIdx + i) % 4;
           final p = players.firstWhere((p) => p.seatIndex == seatToDeal);
+          
           await ref.read(tehriOpsProvider).dealBatch(room.id, p.id, count);
-          await Future.delayed(const Duration(milliseconds: 600));
+          
+          // Small delay between players to make the "dealing" visible
+          await Future.delayed(const Duration(milliseconds: 700));
         }
       }
 
@@ -147,7 +152,6 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
     } catch (e) {
       debugPrint('Dealing Error: $e');
     } finally {
-      // Always reset so deal buttons reappear if needed
       if (mounted) setState(() => _isDealingBatch = false);
     }
   }
