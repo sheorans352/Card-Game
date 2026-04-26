@@ -191,7 +191,7 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
         Center(
           child: tricksAsync.when(
             data: (tricks) {
-              final activeTrick = (room.status != 'selecting_dealer' && room.status != 'cutting') 
+              final activeTrick = (room.status == 'playing') 
                   ? tricks.where((t) => t.winnerId == null).lastOrNull 
                   : null;
               return _buildTrickArea(activeTrick, rotatedPlayers);
