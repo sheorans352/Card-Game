@@ -14,8 +14,8 @@ class TehriRoom {
   final int roundNumber;
   final int? dealingTeamId;
   final int tehriScore;
-  final int gameWinsDealerTeam;
-  final int gameWinsOpponentTeam;
+  final int gameWinsEvenTeam;   // seats 0+2 win when THEY push opponents to ≥52
+  final int gameWinsOddTeam;    // seats 1+3 win when THEY push opponents to ≥52
   final Map<String, dynamic>? lastSelectionCard;
 
   TehriRoom({
@@ -32,8 +32,8 @@ class TehriRoom {
     this.roundNumber = 1,
     this.dealingTeamId,
     this.tehriScore = 0,
-    this.gameWinsDealerTeam = 0,
-    this.gameWinsOpponentTeam = 0,
+    this.gameWinsEvenTeam = 0,
+    this.gameWinsOddTeam = 0,
     this.lastSelectionCard,
   });
 
@@ -52,8 +52,8 @@ class TehriRoom {
       roundNumber: map['round_number'] ?? 1,
       dealingTeamId: map['dealing_team_id'],
       tehriScore: map['tehri_score'] ?? 0,
-      gameWinsDealerTeam: map['game_wins_dealer_team'] ?? 0,
-      gameWinsOpponentTeam: map['game_wins_opponent_team'] ?? 0,
+      gameWinsEvenTeam: map['game_wins_even_team'] ?? 0,
+      gameWinsOddTeam: map['game_wins_odd_team'] ?? 0,
       lastSelectionCard: map['last_selection_card'] != null 
         ? Map<String, dynamic>.from(map['last_selection_card']) 
         : null,

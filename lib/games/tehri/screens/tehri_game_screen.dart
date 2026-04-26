@@ -497,14 +497,14 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
                         Text(nameA, style: const TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold)),
                         Container(margin: const EdgeInsets.symmetric(horizontal: 4), padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
                           decoration: BoxDecoration(color: accentGold.withOpacity(0.2), borderRadius: BorderRadius.circular(6)),
-                          child: Text('$teamATricks tricks  |  ${room.gameWinsDealerTeam - 0} wins', style: const TextStyle(color: accentGold, fontSize: 8, fontWeight: FontWeight.w900))),
+                          child: Text('$teamATricks tricks  |  ${room.gameWinsEvenTeam} wins', style: const TextStyle(color: accentGold, fontSize: 8, fontWeight: FontWeight.w900))),
                       ]),
                       const SizedBox(height: 2),
                       Row(mainAxisSize: MainAxisSize.min, children: [
                         Text(nameB, style: const TextStyle(color: Colors.white70, fontSize: 8, fontWeight: FontWeight.bold)),
                         Container(margin: const EdgeInsets.symmetric(horizontal: 4), padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
                           decoration: BoxDecoration(color: Colors.white.withOpacity(0.08), borderRadius: BorderRadius.circular(6)),
-                          child: Text('$teamBTricks tricks  |  ${room.gameWinsOpponentTeam} wins', style: const TextStyle(color: Colors.white70, fontSize: 8, fontWeight: FontWeight.w900))),
+                          child: Text('$teamBTricks tricks  |  ${room.gameWinsOddTeam} wins', style: const TextStyle(color: Colors.white70, fontSize: 8, fontWeight: FontWeight.w900))),
                       ]),
                     ],
                   );
