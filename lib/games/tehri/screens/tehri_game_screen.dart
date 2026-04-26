@@ -548,45 +548,25 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
                     return Text(room.status.toUpperCase().replaceAll('_', ' '),
                       style: const TextStyle(color: accentGold, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 2));
                   }
-                  final teamA = players.where((p) => p.seatIndex % 2 == 0).toList();
-                  final teamB = players.where((p) => p.seatIndex % 2 == 1).toList();
+                  // Source of truth: teamIndex from database
+                  final teamA = players.where((p) => p.teamIndex == 0).toList();
+                  final teamB = players.where((p) => p.teamIndex == 1).toList();
+                  
                   final teamATricks = teamA.fold(0, (sum, p) => sum + p.tricksWon);
                   final teamBTricks = teamB.fold(0, (sum, p) => sum + p.tricksWon);
-                  final nameA = teamA.map((p) => p.name).join(' & ');
-                  final nameB = teamB.map((p) => p.name).join(' & ');
-                  // Bidder's team → show "X / bid tricks"; other team → plain trick count
-                  final bidderSeat = players.firstWhereOrNull((p) => p.id == room.bidderId)?.seatIndex;
-                  final bidderOnEven = bidderSeat != null && bidderSeat % 2 == 0;
-                  // Even team = seats 0+2, Odd team = seats 1+3
-                  final teamAIsBidder = bidderOnEven;
+                  
+                  final nameA = teamA.isEmpty ? 'Team A' : teamA.map((p) => p.name).join(' & ');
+                  final nameB = teamB.isEmpty ? 'Team B' : teamB.map((p) => p.name).join(' & ');
+
+                  final bidderPlayer = players.firstWhereOrNull((p) => p.id == room.bidderId);
+                  final bidderTeamIndex = bidderPlayer?.teamIndex;
+                  
                   return Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Row(mainAxisSize: MainAxisSize.min, children: [
-                        Text(nameA, style: const TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold)),
-                        const SizedBox(width: 4),
-                        Container(padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                          decoration: BoxDecoration(color: accentGold.withOpacity(0.2), borderRadius: BorderRadius.circular(6)),
-                          child: teamAIsBidder && room.currentBid > 0
-                            ? Text('$teamATricks / ${room.currentBid} bid  |  ${room.gameWinsEvenTeam} wins',
-                                style: const TextStyle(color: accentGold, fontSize: 8, fontWeight: FontWeight.w900))
-                            : Text('$teamATricks tricks  |  ${room.gameWinsEvenTeam} wins',
-                                style: const TextStyle(color: accentGold, fontSize: 8, fontWeight: FontWeight.w900)),
-                        ),
-                      ]),
-                      const SizedBox(height: 2),
-                      Row(mainAxisSize: MainAxisSize.min, children: [
-                        Text(nameB, style: const TextStyle(color: Colors.white70, fontSize: 8, fontWeight: FontWeight.bold)),
-                        const SizedBox(width: 4),
-                        Container(padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                          decoration: BoxDecoration(color: Colors.white.withOpacity(0.08), borderRadius: BorderRadius.circular(6)),
-                          child: !teamAIsBidder && room.currentBid > 0
-                            ? Text('$teamBTricks / ${room.currentBid} bid  |  ${room.gameWinsOddTeam} wins',
-                                style: const TextStyle(color: Colors.white70, fontSize: 8, fontWeight: FontWeight.w900))
-                            : Text('$teamBTricks tricks  |  ${room.gameWinsOddTeam} wins',
-                                style: const TextStyle(color: Colors.white70, fontSize: 8, fontWeight: FontWeight.w900)),
-                        ),
-                      ]),
+                      _buildTeamHUDRow(nameA, teamATricks, room.currentBid, bidderTeamIndex == 0, room.gameWinsEvenTeam, isEven: true),
+                      const SizedBox(height: 4),
+                      _buildTeamHUDRow(nameB, teamBTricks, room.currentBid, bidderTeamIndex == 1, room.gameWinsOddTeam, isEven: false),
                     ],
                   );
                 }),
@@ -602,6 +582,40 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildTeamHUDRow(String names, int tricks, int bid, bool isBidderTeam, int wins, {required bool isEven}) {
+    final color = isEven ? accentGold : Colors.white70;
+    final bg = isEven ? accentGold.withOpacity(0.15) : Colors.white.withOpacity(0.08);
+    
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(
+          width: 100,
+          child: Text(names, 
+            style: TextStyle(color: color, fontSize: 8, fontWeight: FontWeight.bold),
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.right,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius: BorderRadius.circular(4),
+            border: isBidderTeam ? Border.all(color: color.withOpacity(0.3), width: 0.5) : null,
+          ),
+          child: Text(
+            isBidderTeam && bid > 0
+              ? '$tricks / $bid  •  $wins W'
+              : '$tricks pts  •  $wins W',
+            style: TextStyle(color: color, fontSize: 9, fontWeight: FontWeight.w900),
+          ),
+        ),
+      ],
     );
   }
 

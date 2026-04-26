@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import '../../../games/minus/models/card_model.dart';
 
 class PlayingCard extends StatelessWidget {
@@ -28,6 +28,7 @@ class PlayingCard extends StatelessWidget {
     final color = isRed ? const Color(0xFFB71C1C) : const Color(0xFF212121);
 
     return GestureDetector(
+      onTapDown: onTap != null ? (_) => onTap!() : null,
       onTap: onTap,
       child: Container(
         width: width,
