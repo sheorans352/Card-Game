@@ -293,4 +293,10 @@ class TehriOperations {
       'rid': roomId,
     });
   }
+
+  Future<void> finalizeRoundSummary(String roomId) async {
+    await supabase.rpc('tehri_finalize_round_summary', params: {
+      'rid': roomId,
+    });
+  }
 }

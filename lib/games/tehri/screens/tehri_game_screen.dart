@@ -514,6 +514,10 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
         // 7. CUTTING OVERLAY
         if (room.status == 'cutting') 
           TehriDeckCutOverlay(roomId: room.id),
+
+        // 8. ROUND SUMMARY OVERLAY
+        if (room.status == 'resolving_round' && room.lastRoundSummary != null)
+          TehriRoundSummaryOverlay(roomId: room.id, summary: room.lastRoundSummary!),
       ],
     );
   }
@@ -1004,6 +1008,149 @@ class TehriOpponentCardWidget extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class TehriRoundSummaryOverlay extends ConsumerWidget {
+  final String roomId;
+  final Map<String, dynamic> summary;
+
+  const TehriRoundSummaryOverlay({super.key, required this.roomId, required this.summary});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final oldScore = summary['oldScore'] ?? 0;
+    final newScore = summary['newScore'] ?? 0;
+    final delta = summary['scoreDelta'] ?? 0;
+    final bidderName = summary['bidderName'] ?? 'Unknown';
+    final bidAmount = summary['bidAmount'] ?? 0;
+    final tricksMade = summary['tricksMade'] ?? 0;
+    final bidSuccess = summary['bidSuccess'] ?? false;
+    final dealerStatus = summary['dealerStatus'] ?? '';
+    final nextDealer = summary['nextDealerName'] ?? '';
+
+    final room = ref.watch(tehriRoomProvider(roomId)).value;
+    final me = ref.watch(localTehriPlayerIdProvider);
+    final isDealer = room?.dealerId == me;
+
+    return Center(
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        margin: const EdgeInsets.symmetric(horizontal: 40),
+        decoration: BoxDecoration(
+          color: Colors.black.withOpacity(0.95),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: accentGold.withOpacity(0.3), width: 2),
+          boxShadow: [
+            BoxShadow(color: accentGold.withOpacity(0.2), blurRadius: 20, spreadRadius: 5),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('ROUND COMPLETED', 
+              style: TextStyle(color: accentGold, fontSize: 18, fontWeight: FontWeight.bold, letterSpacing: 2)),
+            const SizedBox(height: 16),
+            
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+              decoration: BoxDecoration(
+                color: (bidSuccess ? Colors.green : Colors.red).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Bidder Team', style: TextStyle(color: Colors.white70, fontSize: 10)),
+                      Text(bidderName, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                    ],
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      const Text('Required v/s Actual', style: TextStyle(color: Colors.white70, fontSize: 10)),
+                      Text('$bidAmount v/s $tricksMade', style: TextStyle(
+                        color: bidSuccess ? Colors.greenAccent : Colors.redAccent,
+                        fontWeight: FontWeight.bold, fontSize: 14)),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            
+            const SizedBox(height: 20),
+            
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _buildScoreBox('START', oldScore.toString()),
+                const Icon(Icons.arrow_forward_rounded, color: Colors.white24, size: 24),
+                _buildScoreBox('END', newScore.toString(), color: accentGold),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: (delta >= 0 ? Colors.red : Colors.green).withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    (delta >= 0 ? '+$delta' : '$delta'),
+                    style: TextStyle(
+                      color: delta >= 0 ? Colors.redAccent : Colors.greenAccent,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            
+            const SizedBox(height: 20),
+            
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(12)),
+              child: Column(
+                children: [
+                   Text(dealerStatus.toUpperCase(), style: const TextStyle(color: Colors.white38, fontSize: 10, fontWeight: FontWeight.bold)),
+                   const SizedBox(height: 4),
+                   Text('NEXT DEALER: $nextDealer', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                ],
+              ),
+            ),
+            
+            const SizedBox(height: 24),
+            
+            if (isDealer)
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: accentGold,
+                  foregroundColor: Colors.black,
+                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                onPressed: () => ref.read(tehriOpsProvider).finalizeRoundSummary(roomId),
+                child: const Text('PROCEED TO NEXT ROUND', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13)),
+              )
+            else
+              const Text('Waiting for Dealer to proceed...', style: TextStyle(color: Colors.white38, fontSize: 11, fontStyle: FontStyle.italic)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildScoreBox(String label, String value, {Color? color}) {
+    return Column(
+      children: [
+        Text(label, style: const TextStyle(color: Colors.white38, fontSize: 9, fontWeight: FontWeight.bold)),
+        Text(value, style: TextStyle(color: color ?? Colors.white, fontSize: 24, fontWeight: FontWeight.w900)),
+      ],
     );
   }
 }

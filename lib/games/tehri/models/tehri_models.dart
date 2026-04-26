@@ -17,6 +17,7 @@ class TehriRoom {
   final int gameWinsEvenTeam;   // seats 0+2 win when THEY push opponents to ≥52
   final int gameWinsOddTeam;    // seats 1+3 win when THEY push opponents to ≥52
   final Map<String, dynamic>? lastSelectionCard;
+  final Map<String, dynamic>? lastRoundSummary;
 
   TehriRoom({
     required this.id,
@@ -35,6 +36,7 @@ class TehriRoom {
     this.gameWinsEvenTeam = 0,
     this.gameWinsOddTeam = 0,
     this.lastSelectionCard,
+    this.lastRoundSummary,
   });
 
   factory TehriRoom.fromMap(Map<String, dynamic> map) {
@@ -56,6 +58,9 @@ class TehriRoom {
       gameWinsOddTeam: map['game_wins_odd_team'] ?? 0,
       lastSelectionCard: map['last_selection_card'] != null 
         ? Map<String, dynamic>.from(map['last_selection_card']) 
+        : null,
+      lastRoundSummary: map['last_round_summary'] != null
+        ? Map<String, dynamic>.from(map['last_round_summary'])
         : null,
     );
   }
