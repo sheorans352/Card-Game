@@ -610,6 +610,7 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
   Widget _buildTeamHUDRow(String names, int tricks, int target, bool isBidderTeam, int wins, {required bool isEven, required String label}) {
     final color = isEven ? accentGold : Colors.white70;
     final bg = isEven ? accentGold.withOpacity(0.15) : Colors.white.withOpacity(0.08);
+    final hasBid = room.currentBid > 0;
     
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -628,12 +629,12 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
           decoration: BoxDecoration(
             color: bg,
             borderRadius: BorderRadius.circular(4),
-            border: isBidderTeam ? Border.all(color: color.withOpacity(0.3), width: 0.5) : null,
+            border: (hasBid && isBidderTeam) ? Border.all(color: color.withOpacity(0.3), width: 0.5) : null,
           ),
           child: Text(
-            target > 0
+            hasBid
               ? '$tricks / $target $label  •  $wins W'
-              : '$tricks pts  •  $wins W',
+              : '$wins wins',
             style: TextStyle(color: color, fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 0.2),
           ),
         ),
