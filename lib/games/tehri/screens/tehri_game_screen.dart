@@ -261,6 +261,42 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
           error: (e, s) => [],
         ),
 
+        // 4.5 TURN INDICATOR — shown when in playing phase
+        if (room.status == 'playing')
+          Positioned(
+            bottom: 195, left: 0, right: 0,
+            child: Center(
+              child: Builder(builder: (context) {
+                final isMyTurn = room.currentTurnIndex == me.seatIndex;
+                final currentPlayer = players.firstWhereOrNull((p) => p.seatIndex == room.currentTurnIndex);
+                return AnimatedContainer(
+                  duration: const Duration(milliseconds: 300),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: isMyTurn ? accentGold.withOpacity(0.18) : Colors.black45,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: isMyTurn ? accentGold : Colors.white24,
+                      width: isMyTurn ? 1.5 : 1,
+                    ),
+                    boxShadow: isMyTurn ? [BoxShadow(color: accentGold.withOpacity(0.3), blurRadius: 12, spreadRadius: 2)] : [],
+                  ),
+                  child: Text(
+                    isMyTurn
+                      ? '✦ YOUR TURN — TAP A CARD ✦'
+                      : 'Waiting for ${currentPlayer?.name ?? 'player'} to play...',
+                    style: TextStyle(
+                      color: isMyTurn ? accentGold : Colors.white54,
+                      fontSize: isMyTurn ? 12 : 10,
+                      fontWeight: isMyTurn ? FontWeight.w900 : FontWeight.w500,
+                      letterSpacing: isMyTurn ? 1.5 : 0.5,
+                    ),
+                  ),
+                );
+              }),
+            ),
+          ),
+
         // 5. BIDDING OVERLAYS (bottom sheet — slides up so cutter can see their cards)
         if (room.status == 'bidding_initial' && room.cutterId == localId)
           TehriBiddingOverlay(
