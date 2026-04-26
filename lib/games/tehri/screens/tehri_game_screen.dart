@@ -478,14 +478,12 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
                     ]);
                   }),
                 ],
-                // CENTER: team trick score (once game is in playing/bidding state)
+                // CENTER: Tehri score + game wins (once bid is set)
                 Builder(builder: (context) {
-                  // Teams: seats 0+2 vs seats 1+3 (opposite players)
-                  if (players.length < 4 || room.currentBid == 0) {
+                  if (players.length < 4) {
                     return Text(room.status.toUpperCase().replaceAll('_', ' '),
                       style: const TextStyle(color: accentGold, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 2));
                   }
-                  // Identify the two teams by seat parity
                   final teamA = players.where((p) => p.seatIndex % 2 == 0).toList();
                   final teamB = players.where((p) => p.seatIndex % 2 == 1).toList();
                   final teamATricks = teamA.fold(0, (sum, p) => sum + p.tricksWon);
@@ -495,11 +493,19 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
                   return Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text('$nameA: $teamATricks',
-                        style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)),
+                      Row(mainAxisSize: MainAxisSize.min, children: [
+                        Text(nameA, style: const TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold)),
+                        Container(margin: const EdgeInsets.symmetric(horizontal: 4), padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                          decoration: BoxDecoration(color: accentGold.withOpacity(0.2), borderRadius: BorderRadius.circular(6)),
+                          child: Text('$teamATricks tricks  |  ${room.gameWinsDealerTeam - 0} wins', style: const TextStyle(color: accentGold, fontSize: 8, fontWeight: FontWeight.w900))),
+                      ]),
                       const SizedBox(height: 2),
-                      Text('$nameB: $teamBTricks',
-                        style: const TextStyle(color: Colors.white70, fontSize: 9, fontWeight: FontWeight.bold)),
+                      Row(mainAxisSize: MainAxisSize.min, children: [
+                        Text(nameB, style: const TextStyle(color: Colors.white70, fontSize: 8, fontWeight: FontWeight.bold)),
+                        Container(margin: const EdgeInsets.symmetric(horizontal: 4), padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                          decoration: BoxDecoration(color: Colors.white.withOpacity(0.08), borderRadius: BorderRadius.circular(6)),
+                          child: Text('$teamBTricks tricks  |  ${room.gameWinsOpponentTeam} wins', style: const TextStyle(color: Colors.white70, fontSize: 8, fontWeight: FontWeight.w900))),
+                      ]),
                     ],
                   );
                 }),
@@ -592,10 +598,23 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
                     style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900),
                     overflow: TextOverflow.ellipsis),
                   const Divider(color: Colors.white10, indent: 10, endIndent: 10),
-                  Text('${player.tricksWon}', style: const TextStyle(color: accentGold, fontSize: 18, fontWeight: FontWeight.w900)),
-                  const Text('TRICKS', style: TextStyle(color: Colors.white24, fontSize: 8, fontWeight: FontWeight.bold)),
+                  // Dealer shows Tehri score; others show tricks won
+                  if (isDealer && room.status != 'selecting_dealer' && room.status != 'waiting_to_start') ...[
+                    // Tehri score — colour coded: green ≤20, yellow 21-40, red 41+
+                    Text('${room.tehriScore}',
+                      style: TextStyle(
+                        color: room.tehriScore <= 20 ? Colors.greenAccent
+                             : room.tehriScore <= 40 ? Colors.amberAccent
+                             : Colors.redAccent,
+                        fontSize: 20, fontWeight: FontWeight.w900,
+                      )),
+                    const Text('TEHRI', style: TextStyle(color: Colors.white24, fontSize: 8, fontWeight: FontWeight.bold)),
+                  ] else ...[
+                    Text('${player.tricksWon}', style: const TextStyle(color: accentGold, fontSize: 18, fontWeight: FontWeight.w900)),
+                    const Text('TRICKS', style: TextStyle(color: Colors.white24, fontSize: 8, fontWeight: FontWeight.bold)),
+                  ],
                   const SizedBox(height: 4),
-                  // Only bidder's avatar shows the team's cumulative points toward 52
+                  // Bidder's avatar shows team pts toward 52
                   if (isBidder && teamPoints != null)
                     Column(children: [
                       Text('$teamPoints / 52',

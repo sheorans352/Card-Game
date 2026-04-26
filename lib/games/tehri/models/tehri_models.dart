@@ -13,6 +13,9 @@ class TehriRoom {
   final int currentTurnIndex;
   final int roundNumber;
   final int? dealingTeamId;
+  final int tehriScore;
+  final int gameWinsDealerTeam;
+  final int gameWinsOpponentTeam;
   final Map<String, dynamic>? lastSelectionCard;
 
   TehriRoom({
@@ -28,6 +31,9 @@ class TehriRoom {
     this.currentTurnIndex = 0,
     this.roundNumber = 1,
     this.dealingTeamId,
+    this.tehriScore = 0,
+    this.gameWinsDealerTeam = 0,
+    this.gameWinsOpponentTeam = 0,
     this.lastSelectionCard,
   });
 
@@ -45,6 +51,9 @@ class TehriRoom {
       currentTurnIndex: map['current_turn_index'] ?? 0,
       roundNumber: map['round_number'] ?? 1,
       dealingTeamId: map['dealing_team_id'],
+      tehriScore: map['tehri_score'] ?? 0,
+      gameWinsDealerTeam: map['game_wins_dealer_team'] ?? 0,
+      gameWinsOpponentTeam: map['game_wins_opponent_team'] ?? 0,
       lastSelectionCard: map['last_selection_card'] != null 
         ? Map<String, dynamic>.from(map['last_selection_card']) 
         : null,
