@@ -61,7 +61,7 @@ class LobbyScreen extends ConsumerWidget {
                       
                       // Room Code Card
                       Container(
-                        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 32),
+                        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
                         decoration: BoxDecoration(
                           color: cardDark,
                           borderRadius: BorderRadius.circular(16),
@@ -70,14 +70,17 @@ class LobbyScreen extends ConsumerWidget {
                         child: Column(
                           children: [
                             Text(
-                              code.split('').join('  '),
+                              code.split('').join(' '),
                               style: const TextStyle(
-                                fontSize: 48,
+                                fontSize: 32,
                                 fontWeight: FontWeight.bold,
                                 color: Colors.white,
-                                letterSpacing: 8,
+                                letterSpacing: 4,
                               ),
+                              maxLines: 1,
+                              overflow: TextOverflow.visible,
                             ),
+                            const SizedBox(height: 4),
                             const Text('ROOM CODE', style: TextStyle(fontSize: 10, color: accentGold, fontWeight: FontWeight.bold)),
                           ],
                         ),
@@ -225,7 +228,7 @@ class LobbyScreen extends ConsumerWidget {
               children: [
                 Text(
                   name,
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14, overflow: TextOverflow.ellipsis),
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16, overflow: TextOverflow.ellipsis),
                 ),
                 const SizedBox(height: 4),
                 Row(

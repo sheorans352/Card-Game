@@ -57,7 +57,7 @@ class TehriLobbyScreen extends ConsumerWidget {
                       
                       // Room Code Card
                       Container(
-                        padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 32),
+                        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
                         decoration: BoxDecoration(
                           color: cardDark,
                           borderRadius: BorderRadius.circular(20),
@@ -66,9 +66,12 @@ class TehriLobbyScreen extends ConsumerWidget {
                         child: Column(
                           children: [
                             Text(
-                              room.code.split('').join('  '),
-                              style: const TextStyle(fontSize: 48, fontWeight: FontWeight.bold, color: Colors.white, letterSpacing: 8),
+                              room.code.split('').join(' '),
+                              style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.white, letterSpacing: 4),
+                              maxLines: 1,
+                              overflow: TextOverflow.visible,
                             ),
+                            const SizedBox(height: 4),
                             const Text('ROOM CODE', style: TextStyle(fontSize: 10, color: accentCopper, fontWeight: FontWeight.bold, letterSpacing: 2)),
                           ],
                         ),
@@ -201,7 +204,7 @@ class TehriLobbyScreen extends ConsumerWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13), overflow: TextOverflow.ellipsis),
+                Text(name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16), overflow: TextOverflow.ellipsis),
                 if (isHost || isYou) const SizedBox(height: 4),
                 Row(
                   children: [
