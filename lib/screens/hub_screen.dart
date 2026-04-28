@@ -50,7 +50,8 @@ class _HubScreenState extends State<HubScreen> with SingleTickerProviderStateMix
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
-    final crossCount = width > 900 ? 3 : 2;
+    final isDesktop = width > 900;
+    final crossCount = isDesktop ? 3 : 2;
 
     return Scaffold(
       backgroundColor: bgDeep,
@@ -140,7 +141,7 @@ class _HubScreenState extends State<HubScreen> with SingleTickerProviderStateMix
                 crossAxisCount: crossCount,
                 crossAxisSpacing: 12,
                 mainAxisSpacing: 12,
-                childAspectRatio: 0.78,
+                childAspectRatio: isDesktop ? 1.56 : 0.78,
               ),
             ),
           ),
