@@ -859,6 +859,33 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
         return const SizedBox();
     }
   }
+
+  Widget _buildCenterStatus(String message) {
+    return Center(
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 40),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.black87,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: accentGold.withOpacity(0.3)),
+          boxShadow: const [
+            BoxShadow(color: Colors.black54, blurRadius: 10),
+          ],
+        ),
+        child: Text(
+          message,
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            color: accentGold,
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.5,
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 // ─── Animated hand card (my cards slide in from top like dealing) ───────────
@@ -1021,32 +1048,6 @@ class TehriOpponentCardWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildCenterStatus(String message) {
-    return Center(
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 40),
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-        decoration: BoxDecoration(
-          color: Colors.black87,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: accentGold.withOpacity(0.3)),
-          boxShadow: const [
-            BoxShadow(color: Colors.black54, blurRadius: 10),
-          ],
-        ),
-        child: Text(
-          message,
-          textAlign: TextAlign.center,
-          style: const TextStyle(
-            color: accentGold,
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            letterSpacing: 0.5,
-          ),
-        ),
-      ),
-    );
-  }
 }
 
 class TehriRoundSummaryOverlay extends ConsumerWidget {
