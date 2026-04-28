@@ -344,29 +344,27 @@ BEGIN
   WHERE room_id = rid AND winner_id IS NULL 
   ORDER BY trick_number DESC LIMIT 1;
 
+  -- ALWAYS remove card from hand
+  UPDATE public.tehri_hands SET cards = array_remove(hand, card_id) WHERE player_id = pid;
+
   IF tr IS NULL THEN
     -- Start NEW trick
     INSERT INTO public.tehri_tricks (room_id, trick_number, led_by, lead_suit, cards, player_ids)
     VALUES (rid, (SELECT coalesce(max(trick_number), 0) + 1 FROM public.tehri_tricks WHERE room_id = rid), pid, right(card_id, 1), ARRAY[card_id], ARRAY[pid]);
   ELSE
     -- Add to existing trick
-    -- Validate Follow Suit (optional check if you want to enforce strict follow-suit logic here)
-    -- ...
     UPDATE public.tehri_tricks SET 
       cards = array_append(cards, card_id),
       player_ids = array_append(player_ids, pid)
     WHERE id = tr.id;
     
     -- If 4 cards, resolve trick
-    IF array_length(tr.cards, 1) = 3 THEN -- tr.cards is from before update
+    IF array_length(tr.cards, 1) = 3 THEN 
       PERFORM public.tehri_resolve_trick(tr.id);
       RETURN;
     END IF;
   END IF;
 
-  -- Remove card from hand
-  UPDATE public.tehri_hands SET cards = array_remove(hand, card_id) WHERE player_id = pid;
-  
   -- Next turn (Anti-clockwise)
   UPDATE public.tehri_rooms SET current_turn_index = (r.current_turn_index + 1) % 4 WHERE id = rid;
 END;
@@ -458,10 +456,9 @@ DECLARE
   bid_made boolean;
   new_tehri int;
   
-  final_dealer_id uuid;
-  final_cutter_id uuid;
-  final_dealer_seat int;
-  final_tehri_pts int;
+  summary jsonb;
+  next_dealer_name text;
+  dealer_status text;
 BEGIN
   SELECT * INTO r FROM public.tehri_rooms WHERE id = rid FOR UPDATE;
   SELECT * INTO dealer FROM public.tehri_players WHERE id = r.dealer_id;
@@ -481,27 +478,98 @@ BEGIN
   -- Tehri score logic
   IF bidder_on_dealer_team THEN
     new_tehri := CASE WHEN bid_made THEN r.tehri_score - r.current_bid
-                                    ELSE r.tehri_score + (2 * r.current_bid) END;
+                                     ELSE r.tehri_score + (2 * r.current_bid) END;
   ELSE
     new_tehri := CASE WHEN bid_made THEN r.tehri_score + r.current_bid
-                                    ELSE r.tehri_score - (2 * r.current_bid) END;
+                                     ELSE r.tehri_score - (2 * r.current_bid) END;
   END IF;
 
-  -- Determine new dealer (Rotation anti-clockwise = +1)
+  -- Determine dealer status for summary
   IF new_tehri < 0 THEN
-    -- Deal passes anti-clockwise: (dealer seat + 1)
-    final_tehri_pts := ABS(new_tehri);
-    SELECT id, seat_index INTO final_dealer_id, final_dealer_seat 
-    FROM public.tehri_players
+    dealer_status := 'Dealer team scores! Deal passes anti-clockwise.';
+    SELECT name INTO next_dealer_name FROM public.tehri_players 
     WHERE room_id = rid AND seat_index = (dealer.seat_index + 1) % 4;
   ELSIF new_tehri >= 52 THEN
-    -- Skip to partner
+    dealer_status := 'Opponents push dealer over 52! Skip to partner.';
+    SELECT name INTO next_dealer_name FROM public.tehri_players 
+    WHERE room_id = rid AND seat_index = dealer_partner_seat;
+  ELSE
+    dealer_status := 'Deal stays with current dealer.';
+    next_dealer_name := dealer.name;
+  END IF;
+
+  summary := jsonb_build_object(
+    'oldScore', r.tehri_score,
+    'newScore', ABS(CASE WHEN new_tehri >= 52 THEN new_tehri - 52 ELSE new_tehri END),
+    'scoreDelta', (new_tehri - r.tehri_score),
+    'bidderName', bidder.name,
+    'bidAmount', r.current_bid,
+    'tricksMade', bidder_team_tricks,
+    'bidSuccess', bid_made,
+    'dealerStatus', dealer_status,
+    'nextDealerName', next_dealer_name
+  );
+
+  -- UPATE ROOM to Resolving state
+  UPDATE public.tehri_rooms SET
+    status = 'resolving_round',
+    last_round_summary = summary
+  WHERE id = rid;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- RPC: Finalize Round Summary
+CREATE OR REPLACE FUNCTION public.tehri_finalize_round_summary(rid uuid)
+RETURNS void AS $$
+DECLARE
+  r record;
+  dealer record;
+  dealer_partner_seat int;
+  new_tehri int;
+  bidder_team_tricks int;
+  bidder record;
+  bidder_on_dealer_team boolean;
+  bid_made boolean;
+
+  final_dealer_id uuid;
+  final_cutter_id uuid;
+  final_dealer_seat int;
+  final_tehri_pts int;
+BEGIN
+  SELECT * INTO r FROM public.tehri_rooms WHERE id = rid FOR UPDATE;
+  
+  IF r.status <> 'resolving_round' THEN
+    RAISE EXCEPTION 'Room is not in resolving_round state';
+  END IF;
+
+  SELECT * INTO dealer FROM public.tehri_players WHERE id = r.dealer_id;
+  SELECT * INTO bidder FROM public.tehri_players WHERE id = r.bidder_id;
+  dealer_partner_seat := (dealer.seat_index + 2) % 4;
+
+  -- Re-calculate logic to determine final rotation
+  SELECT COALESCE(SUM(tricks_won), 0) INTO bidder_team_tricks
+  FROM public.tehri_players WHERE room_id = rid AND team_index = bidder.team_index;
+  bidder_on_dealer_team := (bidder.team_index = dealer.team_index);
+  bid_made := bidder_team_tricks >= r.current_bid;
+
+  IF bidder_on_dealer_team THEN
+    new_tehri := CASE WHEN bid_made THEN r.tehri_score - r.current_bid
+                                     ELSE r.tehri_score + (2 * r.current_bid) END;
+  ELSE
+    new_tehri := CASE WHEN bid_made THEN r.tehri_score + r.current_bid
+                                     ELSE r.tehri_score - (2 * r.current_bid) END;
+  END IF;
+
+  -- Final dealer rotation
+  IF new_tehri < 0 THEN
+    final_tehri_pts := ABS(new_tehri);
+    SELECT id, seat_index INTO final_dealer_id, final_dealer_seat 
+    FROM public.tehri_players WHERE room_id = rid AND seat_index = (dealer.seat_index + 1) % 4;
+  ELSIF new_tehri >= 52 THEN
     final_tehri_pts := new_tehri - 52;
     SELECT id, seat_index INTO final_dealer_id, final_dealer_seat 
-    FROM public.tehri_players
-    WHERE room_id = rid AND seat_index = dealer_partner_seat;
+    FROM public.tehri_players WHERE room_id = rid AND seat_index = dealer_partner_seat;
     
-    -- Update game wins
     UPDATE public.tehri_rooms SET 
       game_wins_even_team = game_wins_even_team + (CASE WHEN dealer.team_index = 0 THEN 0 ELSE 1 END),
       game_wins_odd_team  = game_wins_odd_team  + (CASE WHEN dealer.team_index = 0 THEN 1 ELSE 0 END)
@@ -512,12 +580,10 @@ BEGIN
     final_dealer_seat := dealer.seat_index;
   END IF;
 
-  -- Cutter is ALWAYS person to the LEFT of the new dealer (Anti-clockwise = +1)
   SELECT id INTO final_cutter_id FROM public.tehri_players 
   WHERE room_id = rid AND seat_index = (final_dealer_seat + 1) % 4;
 
   -- 3. AGGRESSIVE CLEANUP
-  -- We delete everything related to the previous round
   DELETE FROM public.tehri_tricks WHERE room_id = rid;
   DELETE FROM public.tehri_hands WHERE player_id IN (SELECT id FROM public.tehri_players WHERE room_id = rid);
   UPDATE public.tehri_players SET tricks_won = 0 WHERE room_id = rid;
@@ -533,7 +599,7 @@ BEGIN
   shoe_ptr = 0
   WHERE room_id = rid;
 
-  -- 5. UPATE ROOM
+  -- 5. UPDATE ROOM
   UPDATE public.tehri_rooms SET
     tehri_score = final_tehri_pts,
     dealer_id = final_dealer_id,
@@ -544,9 +610,11 @@ BEGIN
     trump_suit = NULL,
     bid_turn_count = 0,
     current_turn_index = (SELECT seat_index FROM public.tehri_players WHERE id = final_cutter_id),
-    round_number = round_number + 1
+    round_number = round_number + 1,
+    last_round_summary = NULL
   WHERE id = rid;
 END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- RPC: Cut Deck

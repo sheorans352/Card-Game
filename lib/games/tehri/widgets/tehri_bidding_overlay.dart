@@ -34,8 +34,8 @@ class _TehriBiddingOverlayState extends State<TehriBiddingOverlay>
   void initState() {
     super.initState();
     _selectedBid = widget.currentBid > 0 ? widget.currentBid + 1 : widget.minBid;
-    _slideCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 400));
-    _slideAnim = Tween<Offset>(begin: const Offset(0, 1), end: Offset.zero)
+    _slideCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 350));
+    _slideAnim = Tween<Offset>(begin: const Offset(0, 0.15), end: Offset.zero)
         .animate(CurvedAnimation(parent: _slideCtrl, curve: Curves.easeOutCubic));
     _slideCtrl.forward();
   }
@@ -48,18 +48,19 @@ class _TehriBiddingOverlayState extends State<TehriBiddingOverlay>
 
   @override
   Widget build(BuildContext context) {
-    return Positioned(
-      top: 64, left: 0, right: 0,
+    return Center(
       child: SlideTransition(
         position: _slideAnim,
         child: Container(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+          margin: const EdgeInsets.symmetric(horizontal: 24),
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
           decoration: BoxDecoration(
             color: cardDark,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            borderRadius: BorderRadius.circular(24),
             border: Border.all(color: accentGold.withOpacity(0.4)),
             boxShadow: [
               BoxShadow(color: accentGold.withOpacity(0.15), blurRadius: 20, spreadRadius: 2),
+              BoxShadow(color: Colors.black.withOpacity(0.6), blurRadius: 12),
             ],
           ),
           child: Column(

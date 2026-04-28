@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/tehri_provider.dart';
-import '../models/tehri_models.dart';
 
 class TehriDeckCutOverlay extends ConsumerStatefulWidget {
   final String roomId;
@@ -12,9 +11,9 @@ class TehriDeckCutOverlay extends ConsumerStatefulWidget {
 }
 
 class _TehriDeckCutOverlayState extends ConsumerState<TehriDeckCutOverlay> {
-  static const Color primaryBg = Color(0xFF100806);
   static const Color accentCopper = Color(0xFFE67E22);
-  static const Color cardDark = Color(0xFF1A1210);
+  static const Color cardDark = Color(0xFF100E1A);
+  static const Color accentGold = Color(0xFFE5B84B);
 
   double _cutPercentage = 0.5;
   bool _isConfirming = false;
@@ -22,6 +21,7 @@ class _TehriDeckCutOverlayState extends ConsumerState<TehriDeckCutOverlay> {
   @override
   Widget build(BuildContext context) {
     final roomAsync = ref.watch(tehriRoomProvider(widget.roomId));
+    final playersAsync = ref.watch(tehriPlayersProvider(widget.roomId));
     final me = ref.watch(localTehriPlayerProvider(widget.roomId));
 
     return roomAsync.when(
@@ -29,95 +29,100 @@ class _TehriDeckCutOverlayState extends ConsumerState<TehriDeckCutOverlay> {
         if (room == null || room.status != 'cutting') return const SizedBox();
         final isCutter = room.cutterId == me?.id;
 
-        return Container(
-          color: Colors.black.withOpacity(0.9),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Text(
-                'CUT THE DECK',
-                style: TextStyle(
-                  color: accentCopper,
-                  fontSize: 28,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 6,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                isCutter ? 'SLIDE TO CHOOSE YOUR CUT' : 'WAITING FOR CUTTER...',
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.4),
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.2,
-                ),
-              ),
-              const SizedBox(height: 60),
-              
-              // Animated Deck Visual
-              SizedBox(
-                height: 240,
-                width: 320,
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    // Bottom half
-                    Transform(
-                      transform: Matrix4.identity()
-                        ..setEntry(3, 2, 0.001)
-                        ..rotateX(-0.3),
-                      child: Container(
-                        width: 150,
-                        height: 200,
-                        decoration: BoxDecoration(
-                          color: cardDark,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.white10, width: 1),
-                          boxShadow: [
-                            BoxShadow(color: Colors.black, blurRadius: 20, offset: const Offset(10, 10)),
-                          ],
-                        ),
-                        child: _buildCardBackPattern(),
-                      ),
-                    ),
-                    // Top half (Animated cut)
-                    AnimatedPositioned(
-                      duration: const Duration(milliseconds: 400),
-                      curve: Curves.easeOutCubic,
-                      left: 85 + (_cutPercentage * 60),
-                      top: 15 - (_cutPercentage * 30),
-                      child: Transform(
-                        transform: Matrix4.identity()
-                          ..setEntry(3, 2, 0.001)
-                          ..rotateX(-0.3)
-                          ..rotateZ(0.08 * _cutPercentage),
-                        child: Container(
-                          width: 150,
-                          height: 200,
-                          decoration: BoxDecoration(
-                            color: cardDark,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: accentCopper.withOpacity(0.5), width: 1.5),
-                            boxShadow: [
-                              BoxShadow(color: Colors.black87, blurRadius: 15, offset: const Offset(-5, 5)),
-                              if (isCutter) BoxShadow(color: accentCopper.withOpacity(0.2), blurRadius: 10, spreadRadius: 1),
-                            ],
-                          ),
-                          child: _buildCardBackPattern(isTop: true),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+        // Get cutter name from players list
+        final players = playersAsync.value ?? [];
+        final cutterPlayer = players.firstWhere(
+          (p) => p.id == room.cutterId,
+          orElse: () => players.first,
+        );
+        final cutterName = isCutter ? 'You' : cutterPlayer.name;
 
-              const SizedBox(height: 80),
-              
-              if (isCutter) ...[
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 60),
-                  child: SliderTheme(
+        return Center(
+          child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 24),
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: cardDark.withOpacity(0.97),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: accentCopper.withOpacity(0.5), width: 1.5),
+              boxShadow: [
+                BoxShadow(color: accentCopper.withOpacity(0.2), blurRadius: 24, spreadRadius: 4),
+                BoxShadow(color: Colors.black.withOpacity(0.6), blurRadius: 12),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'CUT THE DECK',
+                  style: TextStyle(
+                    color: accentGold,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 4,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  isCutter
+                    ? 'Slide to choose your cut point'
+                    : 'Waiting for $cutterName to cut the deck...',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.5),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                if (isCutter) ...[
+                  // Compact deck visual
+                  SizedBox(
+                    height: 100,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        // Bottom pile
+                        Positioned(
+                          left: 50,
+                          child: Container(
+                            width: 70, height: 95,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF1A1210),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.white12),
+                              boxShadow: [BoxShadow(color: Colors.black54, blurRadius: 6)],
+                            ),
+                          ),
+                        ),
+                        // Top pile (cut portion — slides right)
+                        AnimatedPositioned(
+                          duration: const Duration(milliseconds: 300),
+                          curve: Curves.easeOut,
+                          left: 90 + (_cutPercentage * 50),
+                          top: 0,
+                          child: Container(
+                            width: 70, height: 95,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF1A1210),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: accentCopper.withOpacity(0.6), width: 1.5),
+                              boxShadow: [BoxShadow(color: accentCopper.withOpacity(0.2), blurRadius: 8)],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  // Cut position indicator
+                  Text(
+                    'Cut at card ${(_cutPercentage * 51).round() + 1} / 52',
+                    style: const TextStyle(color: Colors.white38, fontSize: 10),
+                  ),
+                  const SizedBox(height: 12),
+                  SliderTheme(
                     data: SliderTheme.of(context).copyWith(
                       activeTrackColor: accentCopper,
                       inactiveTrackColor: Colors.white10,
@@ -129,51 +134,47 @@ class _TehriDeckCutOverlayState extends ConsumerState<TehriDeckCutOverlay> {
                       onChanged: _isConfirming ? null : (val) => setState(() => _cutPercentage = val),
                     ),
                   ),
-                ),
-                const SizedBox(height: 40),
-                ElevatedButton(
-                  onPressed: _isConfirming ? null : () async {
-                    setState(() => _isConfirming = true);
-                    final cutIdx = (_cutPercentage * 51).round();
-                    await ref.read(tehriOpsProvider).cutDeck(room.id, cutIdx);
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: accentCopper,
-                    foregroundColor: Colors.black,
-                    minimumSize: const Size(240, 56),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: _isConfirming ? null : () async {
+                      setState(() => _isConfirming = true);
+                      final cutIdx = (_cutPercentage * 51).round();
+                      await ref.read(tehriOpsProvider).cutDeck(room.id, cutIdx);
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: accentCopper,
+                      foregroundColor: Colors.black,
+                      minimumSize: const Size(double.infinity, 48),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                    child: _isConfirming
+                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2))
+                      : const Text('CONFIRM CUT', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1.5)),
                   ),
-                  child: _isConfirming 
-                    ? const CircularProgressIndicator(color: Colors.black)
-                    : const Text('CONFIRM CUT', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 2)),
-                ),
-              ] else ...[
-                const CircularProgressIndicator(color: accentCopper, strokeWidth: 2),
-                const SizedBox(height: 20),
-                const Text('Waiting for cutter...', style: TextStyle(color: Colors.white24, fontStyle: FontStyle.italic)),
+                ] else ...[
+                  // Non-cutter waiting state — simple spinner + name
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const SizedBox(
+                        width: 16, height: 16,
+                        child: CircularProgressIndicator(color: accentCopper, strokeWidth: 2),
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        '$cutterName is cutting...',
+                        style: const TextStyle(color: Colors.white54, fontSize: 12, fontStyle: FontStyle.italic),
+                      ),
+                    ],
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
         );
       },
       loading: () => const SizedBox(),
       error: (e, s) => const SizedBox(),
-    );
-  }
-
-  Widget _buildCardBackPattern({bool isTop = false}) {
-    return Opacity(
-      opacity: isTop ? 0.3 : 0.15,
-      child: const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.style, color: accentCopper, size: 40),
-            SizedBox(height: 10),
-            Text('TEHRI', style: TextStyle(color: accentCopper, fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 4)),
-          ],
-        ),
-      ),
     );
   }
 }

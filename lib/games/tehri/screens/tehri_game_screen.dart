@@ -267,9 +267,9 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
 
         // 4.5 TURN INDICATOR — shown when in playing phase
         if (room.status == 'playing')
-          Positioned(
-            bottom: 195, left: 0, right: 0,
-            child: Center(
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.only(top: 160), // Push slightly below the cards
               child: Builder(builder: (context) {
                 final isMyTurn = room.currentTurnIndex == me.seatIndex;
                 final currentPlayer = players.firstWhereOrNull((p) => p.seatIndex == room.currentTurnIndex);
@@ -301,21 +301,27 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
             ),
           ),
 
-        // 5. BIDDING OVERLAYS (bottom sheet — slides up so cutter can see their cards)
-        if (room.status == 'bidding_initial' && room.cutterId == localId)
-          TehriBiddingOverlay(
-            minBid: 7,
-            isInitial: true,
-            onBid: (bid, trump) => ref.read(tehriOpsProvider).setInitialBid(room.id, localId, bid, trump),
-          ),
+        // 5. BIDDING OVERLAYS (Centered popup)
+        if (room.status == 'bidding_initial')
+          if (room.cutterId == localId)
+            TehriBiddingOverlay(
+              minBid: 7,
+              isInitial: true,
+              onBid: (bid, trump) => ref.read(tehriOpsProvider).setInitialBid(room.id, localId, bid, trump),
+            )
+          else
+            _buildCenterStatus('Waiting for ${players.firstWhereOrNull((p) => p.id == room.cutterId)?.name ?? 'Cutter'} to set the initial bid...'),
 
-        if (room.status == 'bidding_final' && room.currentTurnIndex == me.seatIndex)
-          TehriBiddingOverlay(
-            minBid: room.currentBid + 1,
-            currentBid: room.currentBid,
-            isInitial: false,
-            onBid: (bid, trump) => ref.read(tehriOpsProvider).placeBid(room.id, localId, bid, trump),
-          ),
+        if (room.status == 'bidding_final')
+          if (room.currentTurnIndex == me.seatIndex)
+            TehriBiddingOverlay(
+              minBid: room.currentBid + 1,
+              currentBid: room.currentBid,
+              isInitial: false,
+              onBid: (bid, trump) => ref.read(tehriOpsProvider).placeBid(room.id, localId, bid, trump),
+            )
+          else
+            _buildCenterStatus('Waiting for ${players.firstWhereOrNull((p) => p.seatIndex == room.currentTurnIndex)?.name ?? 'player'} to bid...'),
 
         // 6. SELECTION PHASE BOTTOM CONTROLS (host-only subtle button)
         if (room.status == 'selecting_dealer')
@@ -1009,6 +1015,33 @@ class TehriOpponentCardWidget extends StatelessWidget {
                 ),
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCenterStatus(String message) {
+    return Center(
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 40),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.black87,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: accentGold.withOpacity(0.3)),
+          boxShadow: const [
+            BoxShadow(color: Colors.black54, blurRadius: 10),
+          ],
+        ),
+        child: Text(
+          message,
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            color: accentGold,
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.5,
           ),
         ),
       ),
