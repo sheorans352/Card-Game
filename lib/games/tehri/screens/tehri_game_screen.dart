@@ -238,17 +238,40 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
               return CardModel.getRankValue(b).compareTo(CardModel.getRankValue(a));
             });
             final isMyTurn = room.status == 'playing' && room.currentTurnIndex == me.seatIndex;
+            
+            // LEAD SUIT ENFORCEMENT:
+            String? leadSuit;
+            final tricks = tricksAsync.value ?? [];
+            final activeTrick = tricks.where((t) => t.winnerId == null).lastOrNull;
+            if (activeTrick != null && activeTrick.cards.isNotEmpty) {
+              final firstCard = activeTrick.cards.first;
+              leadSuit = firstCard.substring(firstCard.length - 1).toUpperCase();
+            }
+
+            final bool hasLeadSuit = leadSuit != null && 
+                visibleHand.any((c) => c.substring(c.length - 1).toUpperCase() == leadSuit);
+
             return sortedHand.asMap().entries.map((e) {
               final cardId = e.value;
               final isPending = pendingCards.contains(cardId);
-              final canPlay = isMyTurn && !isPending;
+              final cardSuit = cardId.substring(cardId.length - 1).toUpperCase();
+              
+              bool canPlay = isMyTurn && !isPending;
+              if (canPlay && hasLeadSuit && cardSuit != leadSuit) {
+                canPlay = false; // Must follow suit if you have it
+              }
+
               return TehriHandCardWidget(
                 key: ValueKey(cardId),
                 cardId: cardId,
                 index: e.key,
                 total: sortedHand.length,
                 isPlayable: canPlay,
-                onTap: canPlay ? () {
+                onTap: (isMyTurn && !isPending) ? () {
+                  // If they tap an unplayable card, we still let the RPC fail or we can block it here
+                  // To be strict, we only allow tap if canPlay is true
+                  if (!canPlay && hasLeadSuit) return; 
+
                   // Optimistic: remove card from hand instantly
                   ref.read(tehriPendingCardPlayProvider.notifier).update((s) => {...s, cardId});
                   ref.read(tehriLocalPlayedCardsProvider.notifier).update((s) => {...s, cardId});
@@ -965,7 +988,7 @@ class _TehriHandCardWidgetState extends State<TehriHandCardWidget>
               child: Transform.rotate(
                 angle: currentAngle,
                 child: Opacity(
-                  opacity: widget.isPlayable ? 1.0 : 0.65,
+                  opacity: widget.isPlayable ? 1.0 : 0.4,
                   child: PlayingCard(
                     card: CardModel.fromId(widget.cardId),
                     isFaceUp: true,
