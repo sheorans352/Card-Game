@@ -861,7 +861,8 @@ class _TehriGameScreenState extends ConsumerState<TehriGameScreen> {
   }
 
   Widget _buildCenterStatus(String message) {
-    return Center(
+    return Align(
+      alignment: const Alignment(0, -0.35), // Move up from center
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 40),
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),

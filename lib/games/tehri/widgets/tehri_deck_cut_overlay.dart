@@ -37,10 +37,12 @@ class _TehriDeckCutOverlayState extends ConsumerState<TehriDeckCutOverlay> {
         );
         final cutterName = isCutter ? 'You' : cutterPlayer.name;
 
-        return Center(
+        return Align(
+          alignment: const Alignment(0, -0.35), // Move up from center
           child: Container(
+            width: 380, // More compact on desktop
             margin: const EdgeInsets.symmetric(horizontal: 24),
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
               color: cardDark.withOpacity(0.97),
               borderRadius: BorderRadius.circular(24),

@@ -48,12 +48,14 @@ class _TehriBiddingOverlayState extends State<TehriBiddingOverlay>
 
   @override
   Widget build(BuildContext context) {
-    return Center(
+    return Align(
+      alignment: const Alignment(0, -0.35), // Move up from center
       child: SlideTransition(
         position: _slideAnim,
         child: Container(
+          width: 400, // Fixed width for desktop consistency
           margin: const EdgeInsets.symmetric(horizontal: 24),
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
           decoration: BoxDecoration(
             color: cardDark,
             borderRadius: BorderRadius.circular(24),
