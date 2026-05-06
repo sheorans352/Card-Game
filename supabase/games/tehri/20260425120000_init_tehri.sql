@@ -278,7 +278,7 @@ BEGIN
   UPDATE public.tehri_shoes SET shoe_ptr = ptr WHERE room_id = rid;
   UPDATE public.tehri_rooms SET 
     status = 'bidding_final',
-    current_turn_index = (SELECT seat_index FROM public.tehri_players WHERE id = r.cutter_id)
+    current_turn_index = (SELECT (seat_index + 1) % 4 FROM public.tehri_players WHERE id = r.cutter_id)
   WHERE id = rid;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
@@ -683,7 +683,7 @@ BEGIN
 
   UPDATE public.tehri_rooms SET 
     status = 'selecting_dealer',
-    current_turn_index = 0,
+    current_turn_index = 1, -- Start from player next to host
     dealer_id = NULL,
     cutter_id = NULL
   WHERE id = rid;
