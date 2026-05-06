@@ -60,27 +60,24 @@ class PlayingCard extends StatelessWidget {
     final String val = card!.value;
     final String suit = card!.suit.code;
 
+    final bool isRed = suit == 'H' || suit == 'D';
+    final Color color = isRed ? const Color(0xFFC62828) : const Color(0xFF000000); // Deep Red (Red 800) and Solid Black
+
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(8),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: isDimmed 
-            ? [Colors.grey.shade300, Colors.grey.shade400] 
-            : [Colors.white, Colors.grey.shade50],
-        ),
+        color: isDimmed ? Colors.grey.shade300 : Colors.white, // Solid opaque background
       ),
       child: Stack(
         children: [
           // Corner indicators
           Positioned(
             top: 5, left: 5,
-            child: _buildCornerInfo(val, suit, color),
+            child: _buildCornerInfo(val, suit, color, isDimmed),
           ),
           Positioned(
             bottom: 5, right: 5,
-            child: RotatedBox(quarterTurns: 2, child: _buildCornerInfo(val, suit, color)),
+            child: RotatedBox(quarterTurns: 2, child: _buildCornerInfo(val, suit, color, isDimmed)),
           ),
 
           // Main Center Content
@@ -94,16 +91,7 @@ class PlayingCard extends StatelessWidget {
             Container(
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: accentGold.withOpacity(0.15), width: 1.5),
-              ),
-            ),
-          
-          // Opaque Dimming Overlay (if needed, but gradient handles it)
-          if (isDimmed)
-            Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(8),
-                color: Colors.black.withOpacity(0.1),
+                border: Border.all(color: accentGold.withOpacity(0.2), width: 1.5),
               ),
             ),
         ],
@@ -111,14 +99,15 @@ class PlayingCard extends StatelessWidget {
     );
   }
 
-  Widget _buildCornerInfo(String val, String suit, Color color) {
+  Widget _buildCornerInfo(String val, String suit, Color color, bool isDimmed) {
+    final displayColor = isDimmed ? color.withOpacity(0.4) : color;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         Text(
           val,
           style: TextStyle(
-            color: color,
+            color: displayColor,
             fontWeight: FontWeight.w900,
             fontSize: width * 0.2,
             height: 1,
@@ -126,32 +115,35 @@ class PlayingCard extends StatelessWidget {
         ),
         Text(
           _getSuitEmoji(suit),
-          style: TextStyle(fontSize: width * 0.15, color: color),
+          style: TextStyle(fontSize: width * 0.15, color: displayColor, fontWeight: FontWeight.w900),
         ),
       ],
     );
   }
 
   Widget _buildMainContent(String val, String suit, Color color, bool isDimmed) {
+    final displayColor = isDimmed ? color.withOpacity(0.4) : color;
+    
     // Aces and Face Cards (J, Q, K) use the "Old Style" Large Center Suit
     if (['A', 'J', 'Q', 'K'].contains(val)) {
       return Text(
         _getSuitEmoji(suit), 
         style: TextStyle(
           fontSize: width * 0.48, 
-          color: isDimmed ? color.withOpacity(0.3) : color
+          color: displayColor,
+          fontWeight: FontWeight.w900,
         )
       );
     }
 
     // Pips for 2-10
     final int count = int.tryParse(val) ?? 0;
-    return _buildPips(count, suit, isDimmed ? color.withOpacity(0.5) : color);
+    return _buildPips(count, suit, displayColor);
   }
 
   Widget _buildPips(int count, String suit, Color color) {
     final emoji = _getSuitEmoji(suit);
-    final style = TextStyle(fontSize: width * 0.16, color: color);
+    final style = TextStyle(fontSize: width * 0.16, color: color, fontWeight: FontWeight.w900);
 
     switch (count) {
       case 2:
