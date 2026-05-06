@@ -61,22 +61,35 @@ class PlayingCard extends StatelessWidget {
     final String suit = card!.suit.code;
 
     final bool isRed = suit == 'H' || suit == 'D';
-    final Color color = isRed ? const Color(0xFFC62828) : const Color(0xFF000000); // Deep Red (Red 800) and Solid Black
+    final Color color = isRed ? const Color(0xFFE53935) : const Color(0xFF000000); // Vibrant Red and True Black
 
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(8),
-        color: isDimmed ? Colors.grey.shade300 : Colors.white, // Solid opaque background
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: isDimmed 
+            ? [Colors.grey.shade50, Colors.grey.shade100] 
+            : [Colors.white, const Color(0xFFF9F9F9)],
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(isDimmed ? 0.05 : 0.15),
+            blurRadius: 3,
+            offset: const Offset(0, 1.5),
+          ),
+        ],
       ),
       child: Stack(
         children: [
           // Corner indicators
           Positioned(
-            top: 5, left: 5,
+            top: 4, left: 5,
             child: _buildCornerInfo(val, suit, color, isDimmed),
           ),
           Positioned(
-            bottom: 5, right: 5,
+            bottom: 4, right: 5,
             child: RotatedBox(quarterTurns: 2, child: _buildCornerInfo(val, suit, color, isDimmed)),
           ),
 
@@ -86,12 +99,12 @@ class PlayingCard extends StatelessWidget {
             child: Center(child: _buildMainContent(val, suit, color, isDimmed)),
           ),
 
-          // Subtle gold border for face cards
+          // Brightened gold border for face cards
           if (['A', 'K', 'Q', 'J'].contains(val))
             Container(
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: accentGold.withOpacity(0.2), width: 1.5),
+                border: Border.all(color: const Color(0xFFFFD700).withOpacity(0.3), width: 1.5),
               ),
             ),
         ],
@@ -111,11 +124,17 @@ class PlayingCard extends StatelessWidget {
             fontWeight: FontWeight.w900,
             fontSize: width * 0.2,
             height: 1,
+            shadows: isDimmed ? null : [Shadow(color: Colors.black.withOpacity(0.05), offset: const Offset(0.5, 0.5), blurRadius: 0.5)],
           ),
         ),
         Text(
           _getSuitEmoji(suit),
-          style: TextStyle(fontSize: width * 0.15, color: displayColor, fontWeight: FontWeight.w900),
+          style: TextStyle(
+            fontSize: width * 0.15, 
+            color: displayColor, 
+            fontWeight: FontWeight.w900,
+            shadows: isDimmed ? null : [Shadow(color: Colors.black.withOpacity(0.05), offset: const Offset(0.5, 0.5), blurRadius: 0.5)],
+          ),
         ),
       ],
     );
@@ -123,6 +142,7 @@ class PlayingCard extends StatelessWidget {
 
   Widget _buildMainContent(String val, String suit, Color color, bool isDimmed) {
     final displayColor = isDimmed ? color.withOpacity(0.4) : color;
+    final shadows = isDimmed ? null : [Shadow(color: Colors.black.withOpacity(0.08), offset: const Offset(1, 1), blurRadius: 1)];
     
     // Aces and Face Cards (J, Q, K) use the "Old Style" Large Center Suit
     if (['A', 'J', 'Q', 'K'].contains(val)) {
@@ -132,18 +152,19 @@ class PlayingCard extends StatelessWidget {
           fontSize: width * 0.48, 
           color: displayColor,
           fontWeight: FontWeight.w900,
+          shadows: shadows,
         )
       );
     }
 
     // Pips for 2-10
     final int count = int.tryParse(val) ?? 0;
-    return _buildPips(count, suit, displayColor);
+    return _buildPips(count, suit, displayColor, shadows);
   }
 
-  Widget _buildPips(int count, String suit, Color color) {
+  Widget _buildPips(int count, String suit, Color color, List<Shadow>? shadows) {
     final emoji = _getSuitEmoji(suit);
-    final style = TextStyle(fontSize: width * 0.16, color: color, fontWeight: FontWeight.w900);
+    final style = TextStyle(fontSize: width * 0.16, color: color, fontWeight: FontWeight.w900, shadows: shadows);
 
     switch (count) {
       case 2:
