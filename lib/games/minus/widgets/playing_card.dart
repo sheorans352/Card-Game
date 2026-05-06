@@ -85,7 +85,7 @@ class PlayingCard extends StatelessWidget {
 
           // Main Center Content
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 24),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 26),
             child: Center(child: _buildMainContent(val, suit, color, isDimmed)),
           ),
 
@@ -138,15 +138,15 @@ class PlayingCard extends StatelessWidget {
       return Text(
         _getSuitEmoji(suit), 
         style: TextStyle(
-          fontSize: width * 0.5, 
-          color: isDimmed ? color.withOpacity(0.4) : color.withOpacity(0.8)
+          fontSize: width * 0.48, 
+          color: isDimmed ? color.withOpacity(0.3) : color
         )
       );
     }
 
     // Pips for 2-10
     final int count = int.tryParse(val) ?? 0;
-    return _buildPips(count, suit, isDimmed ? color.withOpacity(0.6) : color);
+    return _buildPips(count, suit, isDimmed ? color.withOpacity(0.5) : color);
   }
 
   Widget _buildPips(int count, String suit, Color color) {

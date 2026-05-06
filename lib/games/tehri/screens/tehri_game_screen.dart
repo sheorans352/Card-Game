@@ -962,8 +962,8 @@ class _TehriHandCardWidgetState extends State<TehriHandCardWidget>
     final total = widget.total;
     final i = widget.index;
 
-    // Increased spread from 22.0 to 32.0 for better visibility of pips
-    final fanX = (i - (total - 1) / 2.0) * 32.0;
+    // Spread reduced from 32.0 to 26.0 to prevent going off-screen
+    final fanX = (i - (total - 1) / 2.0) * 26.0;
     final fanAngle = (i - (total - 1) / 2.0) * 0.06;
     final cardLeft = (screenWidth / 2) + fanX - 35.0;
     
