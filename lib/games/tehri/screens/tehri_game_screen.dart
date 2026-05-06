@@ -987,16 +987,14 @@ class _TehriHandCardWidgetState extends State<TehriHandCardWidget>
               offset: Offset(0, slideY), // Y-only — zero after animation ends
               child: Transform.rotate(
                 angle: currentAngle,
-                child: Opacity(
-                  opacity: widget.isPlayable ? 1.0 : 0.4,
-                  child: PlayingCard(
-                    card: CardModel.fromId(widget.cardId),
-                    isFaceUp: true,
-                    isPlayable: widget.isPlayable,
-                    onTap: widget.onTap,
-                    width: 70,
-                    height: 105,
-                  ),
+                child: PlayingCard(
+                  card: CardModel.fromId(widget.cardId),
+                  isFaceUp: true,
+                  isPlayable: widget.isPlayable,
+                  isDimmed: !widget.isPlayable,
+                  onTap: widget.onTap,
+                  width: 70,
+                  height: 105,
                 ),
               ),
             ),

@@ -8,6 +8,7 @@ class PlayingCard extends StatelessWidget {
   final double height;
   final VoidCallback? onTap;
   final bool isPlayable;
+  final bool isDimmed;
 
   static const Color accentGold = Color(0xFFC7A14C);
   static const Color cardDark = Color(0xFF141414);
@@ -20,6 +21,7 @@ class PlayingCard extends StatelessWidget {
     this.height = 90,
     this.onTap,
     this.isPlayable = true,
+    this.isDimmed = false,
   });
 
   @override
@@ -64,7 +66,9 @@ class PlayingCard extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Colors.white, Colors.grey.shade50],
+          colors: isDimmed 
+            ? [Colors.grey.shade300, Colors.grey.shade400] 
+            : [Colors.white, Colors.grey.shade50],
         ),
       ),
       child: Stack(
@@ -82,7 +86,7 @@ class PlayingCard extends StatelessWidget {
           // Main Center Content
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 24),
-            child: Center(child: _buildMainContent(val, suit, color)),
+            child: Center(child: _buildMainContent(val, suit, color, isDimmed)),
           ),
 
           // Subtle gold border for face cards
@@ -91,6 +95,15 @@ class PlayingCard extends StatelessWidget {
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: accentGold.withOpacity(0.15), width: 1.5),
+              ),
+            ),
+          
+          // Opaque Dimming Overlay (if needed, but gradient handles it)
+          if (isDimmed)
+            Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(8),
+                color: Colors.black.withOpacity(0.1),
               ),
             ),
         ],
@@ -119,29 +132,21 @@ class PlayingCard extends StatelessWidget {
     );
   }
 
-  Widget _buildMainContent(String val, String suit, Color color) {
-    if (val == 'A') {
-      return Text(_getSuitEmoji(suit), style: TextStyle(fontSize: width * 0.5, color: color));
-    }
-
-    if (['J', 'Q', 'K'].contains(val)) {
-      IconData icon;
-      if (val == 'K') icon = Icons.workspace_premium;
-      else if (val == 'Q') icon = Icons.auto_awesome;
-      else icon = Icons.person;
-
-      return Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, color: color.withOpacity(0.8), size: width * 0.45),
-          Text(val, style: TextStyle(color: color.withOpacity(0.5), fontWeight: FontWeight.bold, fontSize: width * 0.1)),
-        ],
+  Widget _buildMainContent(String val, String suit, Color color, bool isDimmed) {
+    // Aces and Face Cards (J, Q, K) use the "Old Style" Large Center Suit
+    if (['A', 'J', 'Q', 'K'].contains(val)) {
+      return Text(
+        _getSuitEmoji(suit), 
+        style: TextStyle(
+          fontSize: width * 0.5, 
+          color: isDimmed ? color.withOpacity(0.4) : color.withOpacity(0.8)
+        )
       );
     }
 
     // Pips for 2-10
     final int count = int.tryParse(val) ?? 0;
-    return _buildPips(count, suit, color);
+    return _buildPips(count, suit, isDimmed ? color.withOpacity(0.6) : color);
   }
 
   Widget _buildPips(int count, String suit, Color color) {
