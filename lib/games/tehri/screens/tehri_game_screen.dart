@@ -962,14 +962,14 @@ class _TehriHandCardWidgetState extends State<TehriHandCardWidget>
     final total = widget.total;
     final i = widget.index;
 
-    // Fan layout using REAL layout position so hit area matches visual on Flutter Web
-    final fanX = (i - (total - 1) / 2.0) * 22.0;
-    final fanAngle = (i - (total - 1) / 2.0) * 0.07;
-    // Positioned.left = screen center + fan offset - half card width
+    // Increased spread from 22.0 to 32.0 for better visibility of pips
+    final fanX = (i - (total - 1) / 2.0) * 32.0;
+    final fanAngle = (i - (total - 1) / 2.0) * 0.06;
     final cardLeft = (screenWidth / 2) + fanX - 35.0;
-    const cardBottom = 85.0;
+    
+    // Playable cards pop up slightly (lifted by 15 pixels)
+    final cardBottom = widget.isPlayable ? 100.0 : 85.0;
 
-    // Positioned (not Align+Transform.translate) so hit area = visual position
     return Positioned(
       left: cardLeft,
       bottom: cardBottom,
@@ -977,7 +977,6 @@ class _TehriHandCardWidgetState extends State<TehriHandCardWidget>
         animation: _progress,
         builder: (context, _) {
           final t = _progress.value;
-          // Only Y for the slide-in animation; X is handled by Positioned.left
           final slideY = -(1.0 - t) * 380.0;
           final currentAngle = fanAngle * t;
           final opacity = (t * 2.5).clamp(0.0, 1.0);
