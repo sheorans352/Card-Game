@@ -1094,7 +1094,7 @@ class TehriRoundSummaryOverlay extends ConsumerWidget {
 
     final room = ref.watch(tehriRoomProvider(roomId)).value;
     final me = ref.watch(localTehriPlayerIdProvider);
-    final isDealer = room?.dealerId == me;
+    final isNextDealer = summary['nextDealerId'] == me;
 
     return Center(
       child: Container(
@@ -1188,7 +1188,7 @@ class TehriRoundSummaryOverlay extends ConsumerWidget {
             
             const SizedBox(height: 24),
             
-            if (isDealer)
+            if (isNextDealer)
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: accentGold,

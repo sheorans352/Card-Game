@@ -464,6 +464,7 @@ DECLARE
   
   summary jsonb;
   next_dealer_name text;
+  next_dealer_id uuid;
   dealer_status text;
 BEGIN
   SELECT * INTO r FROM public.tehri_rooms WHERE id = rid FOR UPDATE;
@@ -493,14 +494,15 @@ BEGIN
   -- Determine dealer status for summary
   IF new_tehri < 0 THEN
     dealer_status := 'Dealer team scores! Deal passes anti-clockwise.';
-    SELECT name INTO next_dealer_name FROM public.tehri_players 
+    SELECT id, name INTO next_dealer_id, next_dealer_name FROM public.tehri_players 
     WHERE room_id = rid AND seat_index = (dealer.seat_index + 1) % 4;
   ELSIF new_tehri >= 52 THEN
     dealer_status := 'Opponents push dealer over 52! Skip to partner.';
-    SELECT name INTO next_dealer_name FROM public.tehri_players 
+    SELECT id, name INTO next_dealer_id, next_dealer_name FROM public.tehri_players 
     WHERE room_id = rid AND seat_index = dealer_partner_seat;
   ELSE
     dealer_status := 'Deal stays with current dealer.';
+    next_dealer_id := dealer.id;
     next_dealer_name := dealer.name;
   END IF;
 
@@ -513,7 +515,8 @@ BEGIN
     'tricksMade', bidder_team_tricks,
     'bidSuccess', bid_made,
     'dealerStatus', dealer_status,
-    'nextDealerName', next_dealer_name
+    'nextDealerName', next_dealer_name,
+    'nextDealerId', next_dealer_id
   );
 
   -- UPATE ROOM to Resolving state
