@@ -222,7 +222,7 @@ BEGIN
   SELECT * INTO r FROM public.tehri_rooms WHERE id = rid FOR UPDATE;
   UPDATE public.tehri_rooms SET 
     status = 'bidding_final',
-    current_turn_index = (SELECT seat_index FROM public.tehri_players WHERE id = r.cutter_id)
+    current_turn_index = (SELECT (seat_index + 1) % 4 FROM public.tehri_players WHERE id = r.cutter_id)
   WHERE id = rid;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
