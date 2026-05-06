@@ -55,6 +55,8 @@ class PlayingCard extends StatelessWidget {
 
   Widget _buildFront(Color color) {
     if (card == null) return const SizedBox();
+    final String val = card!.value;
+    final String suit = card!.suit.code;
 
     return Container(
       decoration: BoxDecoration(
@@ -62,79 +64,158 @@ class PlayingCard extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Colors.white, Colors.grey.shade100],
+          colors: [Colors.white, Colors.grey.shade50],
         ),
       ),
       child: Stack(
         children: [
           // Corner indicators
           Positioned(
-            top: 6,
-            left: 6,
-            child: Column(
-              children: [
-                Text(
-                  card!.value,
-                  style: TextStyle(
-                    color: color,
-                    fontWeight: FontWeight.w900,
-                    fontSize: width * 0.22,
-                    height: 1,
-                  ),
-                ),
-                Text(
-                  _getSuitEmoji(card!.suit.code),
-                  style: TextStyle(fontSize: width * 0.18, color: color),
-                ),
-              ],
-            ),
+            top: 5, left: 5,
+            child: _buildCornerInfo(val, suit, color),
           ),
-          // Center Large Suit (Premium Faint Pattern)
-          Center(
-            child: Text(
-              _getSuitEmoji(card!.suit.code),
-              style: TextStyle(
-                fontSize: width * 0.5,
-                color: color.withOpacity(0.08),
-              ),
-            ),
-          ),
-          // Bottom rotated indicators
           Positioned(
-            bottom: 6,
-            right: 6,
-            child: RotatedBox(
-              quarterTurns: 2,
-              child: Column(
-                children: [
-                  Text(
-                    card!.value,
-                    style: TextStyle(
-                      color: color,
-                      fontWeight: FontWeight.w900,
-                      fontSize: width * 0.22,
-                      height: 1,
-                    ),
-                  ),
-                  Text(
-                    _getSuitEmoji(card!.suit.code),
-                    style: TextStyle(fontSize: width * 0.18, color: color),
-                  ),
-                ],
-              ),
-            ),
+            bottom: 5, right: 5,
+            child: RotatedBox(quarterTurns: 2, child: _buildCornerInfo(val, suit, color)),
           ),
-          // Add subtle gold border for face cards or high cards (Ace, King, Queen, Jack)
-          if (['A', 'K', 'Q', 'J'].contains(card!.value))
+
+          // Main Center Content
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 24),
+            child: Center(child: _buildMainContent(val, suit, color)),
+          ),
+
+          // Subtle gold border for face cards
+          if (['A', 'K', 'Q', 'J'].contains(val))
             Container(
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: accentGold.withOpacity(0.2), width: 2),
+                border: Border.all(color: accentGold.withOpacity(0.15), width: 1.5),
               ),
             ),
         ],
       ),
     );
+  }
+
+  Widget _buildCornerInfo(String val, String suit, Color color) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          val,
+          style: TextStyle(
+            color: color,
+            fontWeight: FontWeight.w900,
+            fontSize: width * 0.2,
+            height: 1,
+          ),
+        ),
+        Text(
+          _getSuitEmoji(suit),
+          style: TextStyle(fontSize: width * 0.15, color: color),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMainContent(String val, String suit, Color color) {
+    if (val == 'A') {
+      return Text(_getSuitEmoji(suit), style: TextStyle(fontSize: width * 0.5, color: color));
+    }
+
+    if (['J', 'Q', 'K'].contains(val)) {
+      IconData icon;
+      if (val == 'K') icon = Icons.workspace_premium;
+      else if (val == 'Q') icon = Icons.auto_awesome;
+      else icon = Icons.person;
+
+      return Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, color: color.withOpacity(0.8), size: width * 0.45),
+          Text(val, style: TextStyle(color: color.withOpacity(0.5), fontWeight: FontWeight.bold, fontSize: width * 0.1)),
+        ],
+      );
+    }
+
+    // Pips for 2-10
+    final int count = int.tryParse(val) ?? 0;
+    return _buildPips(count, suit, color);
+  }
+
+  Widget _buildPips(int count, String suit, Color color) {
+    final emoji = _getSuitEmoji(suit);
+    final style = TextStyle(fontSize: width * 0.16, color: color);
+
+    switch (count) {
+      case 2:
+        return Column(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text(emoji, style: style), Text(emoji, style: style)]);
+      case 3:
+        return Column(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text(emoji, style: style), Text(emoji, style: style), Text(emoji, style: style)]);
+      case 4:
+        return Column(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text(emoji, style: style), Text(emoji, style: style)]),
+            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text(emoji, style: style), Text(emoji, style: style)]),
+          ],
+        );
+      case 5:
+        return Column(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text(emoji, style: style), Text(emoji, style: style)]),
+            Text(emoji, style: style),
+            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text(emoji, style: style), Text(emoji, style: style)]),
+          ],
+        );
+      case 6:
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Column(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text(emoji, style: style), Text(emoji, style: style), Text(emoji, style: style)]),
+            Column(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text(emoji, style: style), Text(emoji, style: style), Text(emoji, style: style)]),
+          ],
+        );
+      case 7:
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Column(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text(emoji, style: style), Text(emoji, style: style), Text(emoji, style: style)]),
+            Text(emoji, style: style),
+            Column(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text(emoji, style: style), Text(emoji, style: style), Text(emoji, style: style)]),
+          ],
+        );
+      case 8:
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Column(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text(emoji, style: style), Text(emoji, style: style), Text(emoji, style: style), Text(emoji, style: style)]),
+            Column(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text(emoji, style: style), Text(emoji, style: style), Text(emoji, style: style), Text(emoji, style: style)]),
+          ],
+        );
+      case 9:
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Column(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text(emoji, style: style), Text(emoji, style: style), Text(emoji, style: style), Text(emoji, style: style)]),
+            Text(emoji, style: style),
+            Column(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text(emoji, style: style), Text(emoji, style: style), Text(emoji, style: style), Text(emoji, style: style)]),
+          ],
+        );
+      case 10:
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Column(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text(emoji, style: style), Text(emoji, style: style), Text(emoji, style: style), Text(emoji, style: style)]),
+            Column(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [Text(emoji, style: style), Text(emoji, style: style)]),
+            Column(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text(emoji, style: style), Text(emoji, style: style), Text(emoji, style: style), Text(emoji, style: style)]),
+          ],
+        );
+      default:
+        return Text(emoji, style: style);
+    }
   }
 
   Widget _buildBack() {
@@ -143,27 +224,39 @@ class PlayingCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: const Color(0xFF1A1A1A),
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: accentGold.withOpacity(0.2)),
+        border: Border.all(color: accentGold.withOpacity(0.3), width: 1),
       ),
       child: Stack(
         children: [
           CustomPaint(
             size: Size(width, height),
-            painter: CardBackPainter(accentGold.withOpacity(0.1)),
+            painter: CardBackPainter(accentGold.withOpacity(0.08)),
           ),
           Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.auto_awesome, color: accentGold.withOpacity(0.3), size: width * 0.4),
+                Icon(Icons.diamond_rounded, color: accentGold.withOpacity(0.4), size: width * 0.3),
+                const SizedBox(height: 8),
+                Text(
+                  'CASINO\nDELIGHT',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: accentGold.withOpacity(0.6),
+                    fontSize: width * 0.1,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1.5,
+                    height: 1.1,
+                  ),
+                ),
                 const SizedBox(height: 4),
                 Text(
-                  'MINUS',
+                  'dukankidukan.in',
                   style: TextStyle(
                     color: accentGold.withOpacity(0.3),
-                    fontSize: width * 0.12,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 2,
+                    fontSize: width * 0.06,
+                    fontWeight: FontWeight.w500,
+                    letterSpacing: 0.5,
                   ),
                 ),
               ],
@@ -196,7 +289,7 @@ class CardBackPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = 0.5;
 
-    const spacing = 8.0;
+    const spacing = 10.0;
     for (double i = -size.height; i < size.width; i += spacing) {
       canvas.drawLine(Offset(i, 0), Offset(i + size.height, size.height), paint);
     }
