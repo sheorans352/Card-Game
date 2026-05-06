@@ -749,7 +749,8 @@ BEGIN
   ALTER PUBLICATION supabase_realtime ADD TABLE 
     public.tehri_rooms, 
     public.tehri_players, 
-    public.tehri_tricks;
+    public.tehri_tricks,
+    public.tehri_hands;
 EXCEPTION
   WHEN duplicate_object THEN NULL;
 END $$;
