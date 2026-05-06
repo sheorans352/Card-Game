@@ -33,7 +33,13 @@ CREATE TABLE public.tehri_rooms (
   round_number integer NOT NULL DEFAULT 1,
   dealing_team_id integer, -- 0 or 1
   created_at timestamptz DEFAULT now(),
-  updated_at timestamptz DEFAULT now()
+  updated_at timestamptz DEFAULT now(),
+  last_selection_card jsonb,
+  bid_turn_count integer DEFAULT 0,
+  tehri_score integer DEFAULT 0,
+  game_wins_even_team integer DEFAULT 0,
+  game_wins_odd_team integer DEFAULT 0,
+  last_round_summary jsonb
 );
 
 -- Players table
@@ -335,17 +341,17 @@ BEGIN
   IF r.status <> 'playing' THEN RAISE EXCEPTION 'Game not in playing state'; END IF;
   IF p.seat_index <> r.current_turn_index THEN RAISE EXCEPTION 'Not your turn'; END IF;
 
-  -- 1. Check hand
-  SELECT cards INTO hand FROM public.tehri_hands WHERE player_id = pid;
+  -- 1. Check hand & Lock it
+  SELECT cards INTO hand FROM public.tehri_hands WHERE player_id = pid FOR UPDATE;
   IF NOT (card_id = ANY(hand)) THEN RAISE EXCEPTION 'Card not in hand'; END IF;
 
   -- 2. Get current trick
   SELECT * INTO tr FROM public.tehri_tricks 
   WHERE room_id = rid AND winner_id IS NULL 
-  ORDER BY trick_number DESC LIMIT 1;
+  ORDER BY trick_number DESC LIMIT 1 FOR UPDATE;
 
-  -- ALWAYS remove card from hand
-  UPDATE public.tehri_hands SET cards = array_remove(hand, card_id) WHERE player_id = pid;
+  -- ALWAYS remove card from hand using the column reference to be safe
+  UPDATE public.tehri_hands SET cards = array_remove(cards, card_id) WHERE player_id = pid;
 
   IF tr IS NULL THEN
     -- Start NEW trick
@@ -611,10 +617,8 @@ BEGIN
     bid_turn_count = 0,
     current_turn_index = (SELECT seat_index FROM public.tehri_players WHERE id = final_cutter_id),
     round_number = round_number + 1,
-    last_round_summary = NULL
   WHERE id = rid;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- RPC: Cut Deck
