@@ -84,14 +84,14 @@ ALTER TABLE public.tehri_hands ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.tehri_tricks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.tehri_shoes ENABLE ROW LEVEL SECURITY;
 
--- Deny direct access to shoes and hands via API
+-- Security Policies
 CREATE POLICY "Private: tehri_shoes hidden" ON public.tehri_shoes FOR ALL USING (false);
-CREATE POLICY "Private: tehri_hands hidden" ON public.tehri_hands FOR ALL USING (false);
 
 -- Open access for staging (standard tables)
 CREATE POLICY "Staging: tehri_rooms allow all" ON public.tehri_rooms FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Staging: tehri_players allow all" ON public.tehri_players FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Staging: tehri_tricks allow all" ON public.tehri_tricks FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Staging: tehri_hands allow all" ON public.tehri_hands FOR ALL USING (true) WITH CHECK (true);
 
 -- 4. RPCs (Security Definer)
 
