@@ -121,16 +121,18 @@ class _HubScreenState extends State<HubScreen> with SingleTickerProviderStateMix
                   shimmerCtrl: _shimmerCtrl,
                 ),
                 _GameCard(
-                  name: '3 PATTI',
-                  tagline: 'Indian Poker · 3–6 Players',
+                  name: 'COURT PIECE',
+                  tagline: 'Trick-Taking',
+                  bulletPoints: const ['Coming soon'],
                   gradient: const [Color(0xFF1A0D0D), Color(0xFF120909)],
                   accentColor: const Color(0xFFE74C3C),
                   isLive: false,
                   shimmerCtrl: _shimmerCtrl,
                 ),
                 _GameCard(
-                  name: 'POKER',
-                  tagline: 'Texas Hold\'em',
+                  name: 'SEEP',
+                  tagline: 'Classic Indian Game',
+                  bulletPoints: const ['Coming soon'],
                   gradient: const [Color(0xFF0D1A2B), Color(0xFF09121C)],
                   accentColor: const Color(0xFF3498DB),
                   isLive: false,
@@ -245,7 +247,7 @@ class _HubScreenState extends State<HubScreen> with SingleTickerProviderStateMix
 
   Widget _buildHero() {
     return Container(
-      height: 260,
+      height: 120,
       decoration: const BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topCenter,
@@ -415,30 +417,27 @@ class _GameCardState extends State<_GameCard> {
                           ),
                         ),
                         const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: widget.isLive
-                                ? widget.accentColor.withOpacity(0.15)
-                                : Colors.white.withOpacity(0.05),
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                              color: widget.isLive
-                                  ? widget.accentColor.withOpacity(0.6)
-                                  : Colors.white12,
-                              width: 0.5,
+                        if (widget.isLive)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: widget.accentColor.withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: widget.accentColor.withOpacity(0.6),
+                                width: 0.5,
+                              ),
+                            ),
+                            child: Text(
+                              '● LIVE',
+                              style: TextStyle(
+                                color: widget.accentColor,
+                                fontSize: 8,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 1.5,
+                              ),
                             ),
                           ),
-                          child: Text(
-                            widget.isLive ? '● LIVE' : 'COMING SOON',
-                            style: TextStyle(
-                              color: widget.isLive ? widget.accentColor : Colors.white24,
-                              fontSize: 8,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 1.5,
-                            ),
-                          ),
-                        ),
                       ],
                     ),
 
@@ -518,7 +517,7 @@ class _GameCardState extends State<_GameCard> {
                         ),
                         child: const Center(
                           child: Text(
-                            'COMING SOON',
+                            'NOTIFY ME →',
                             style: TextStyle(
                               color: Colors.white24,
                               fontSize: 9,
